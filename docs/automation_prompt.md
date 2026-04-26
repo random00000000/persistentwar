@@ -48,9 +48,11 @@ python C:\Users\Javier\Desktop\CodexCLI\AgileSprints\agile.py --project-path "C:
    - Keep the run focused on one clean handoff.
 
 3. Update Agile card flow.
+   - Update the worked card's `## Notes` before moving it. Include what changed, proof run, known gaps, and the next optimization hint for the following agent.
    - If the task is finished, move the card workflow to `review`.
    - If a card moved from sprint work into review, pull one ready backlog card into the sprint.
    - Use the AgileSprints CLI for these changes.
+   - Card notes command: `python C:\Users\Javier\Desktop\CodexCLI\AgileSprints\agile.py --project-path "C:\Users\Javier\Desktop\CodexCLI\AgileSprints\Frontline Officer" notes-set <CARD-ID> "Changed: ... Proof: ... Gaps: ... Next: ..." --append`
    - Card review command: `python C:\Users\Javier\Desktop\CodexCLI\AgileSprints\agile.py --project-path "C:\Users\Javier\Desktop\CodexCLI\AgileSprints\Frontline Officer" workflow-set <CARD-ID> review`
    - Sprint pull command: `python C:\Users\Javier\Desktop\CodexCLI\AgileSprints\agile.py --project-path "C:\Users\Javier\Desktop\CodexCLI\AgileSprints\Frontline Officer" move-card <BACKLOG-CARD-ID> sprint`
 

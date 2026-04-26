@@ -17,9 +17,11 @@ run often.
    - Update only docs or Agile state touched by the work.
 
 3. Update Agile card flow.
+   - Update the worked card's `## Notes` with what changed, proof run, known gaps, and the next optimization hint.
    - If the task is finished, move the card workflow to `review`.
    - If a sprint card moved to review, pull one ready backlog card into the sprint.
    - Use the AgileSprints CLI for these changes.
+   - Notes: `python .\agile.py --project-path "C:\Users\Javier\Desktop\CodexCLI\AgileSprints\Frontline Officer" notes-set <CARD-ID> "Changed: ... Proof: ... Gaps: ... Next: ..." --append`
    - Review: `python .\agile.py --project-path "C:\Users\Javier\Desktop\CodexCLI\AgileSprints\Frontline Officer" workflow-set <CARD-ID> review`
    - Pull: `python .\agile.py --project-path "C:\Users\Javier\Desktop\CodexCLI\AgileSprints\Frontline Officer" move-card <BACKLOG-CARD-ID> sprint`
 
