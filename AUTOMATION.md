@@ -28,7 +28,8 @@ Use this file for project-specific automation guidance that should persist acros
 
 1. Pick one useful next task.
 2. Do the smallest shippable improvement and prove it.
-3. Use [$force-automation-run](C:\Users\Javier\.codex\skills\force-automation-run\SKILL.md) to start the next automation run and confirm it started.
+3. Update Agile card flow: if the task is finished, move it to `review`; if a sprint card moved to review, pull one ready backlog card into the sprint.
+4. Use [$force-automation-run](C:\Users\Javier\.codex\skills\force-automation-run\SKILL.md) to start the next automation run and confirm it started.
 
 ## Ready Automation Setup
 

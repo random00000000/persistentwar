@@ -47,6 +47,13 @@ python C:\Users\Javier\Desktop\CodexCLI\AgileSprints\agile.py --project-path "C:
    - Use browser/playtest screenshots when the change is visual or gameplay-facing.
    - Keep the run focused on one clean handoff.
 
-3. Start the next automation run.
+3. Update Agile card flow.
+   - If the task is finished, move the card workflow to `review`.
+   - If a card moved from sprint work into review, pull one ready backlog card into the sprint.
+   - Use the AgileSprints CLI for these changes.
+   - Card review command: `python C:\Users\Javier\Desktop\CodexCLI\AgileSprints\agile.py --project-path "C:\Users\Javier\Desktop\CodexCLI\AgileSprints\Frontline Officer" workflow-set <CARD-ID> review`
+   - Sprint pull command: `python C:\Users\Javier\Desktop\CodexCLI\AgileSprints\agile.py --project-path "C:\Users\Javier\Desktop\CodexCLI\AgileSprints\Frontline Officer" move-card <BACKLOG-CARD-ID> sprint`
+
+4. Start the next automation run.
    - Use [$force-automation-run](C:\Users\Javier\.codex\skills\force-automation-run\SKILL.md).
    - Confirm the next run started before ending.

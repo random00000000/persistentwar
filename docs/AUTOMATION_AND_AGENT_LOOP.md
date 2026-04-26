@@ -3,7 +3,7 @@
 The recurring automation for `Frontline Officer` should stay simple enough to
 run often.
 
-## Three-Step Loop
+## Four-Step Loop
 
 1. Pick one useful next task.
    - Use [$game-studio:game-studio](C:\Users\Javier\.codex\plugins\cache\openai-curated\game-studio\b066e4a0\skills\game-studio\SKILL.md) as the browser-game routing step.
@@ -16,7 +16,14 @@ run often.
    - Use browser screenshots when the change needs visual proof.
    - Update only docs or Agile state touched by the work.
 
-3. Start the next automation run.
+3. Update Agile card flow.
+   - If the task is finished, move the card workflow to `review`.
+   - If a sprint card moved to review, pull one ready backlog card into the sprint.
+   - Use the AgileSprints CLI for these changes.
+   - Review: `python .\agile.py --project-path "C:\Users\Javier\Desktop\CodexCLI\AgileSprints\Frontline Officer" workflow-set <CARD-ID> review`
+   - Pull: `python .\agile.py --project-path "C:\Users\Javier\Desktop\CodexCLI\AgileSprints\Frontline Officer" move-card <BACKLOG-CARD-ID> sprint`
+
+4. Start the next automation run.
    - Use [$force-automation-run](C:\Users\Javier\.codex\skills\force-automation-run\SKILL.md).
    - Confirm the next run started.
 
