@@ -11,6 +11,7 @@ Use [@game-studio](plugin://game-studio@openai-curated) when it helps.
 ## Three Steps
 
 1. Pick one useful next task.
+   - Use [$game-studio:game-studio](C:\Users\Javier\.codex\plugins\cache\openai-curated\game-studio\b066e4a0\skills\game-studio\SKILL.md) to route the browser-game work before choosing implementation details.
    - Read `AGENTS.md`, `AUTOMATION.md`, and the active Agile card.
    - Read other docs only if the task needs them.
    - Prefer officer-war gameplay over inherited extraction work.

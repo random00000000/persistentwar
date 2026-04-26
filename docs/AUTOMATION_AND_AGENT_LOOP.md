@@ -6,6 +6,7 @@ run often.
 ## Three-Step Loop
 
 1. Pick one useful next task.
+   - Use [$game-studio:game-studio](C:\Users\Javier\.codex\plugins\cache\openai-curated\game-studio\b066e4a0\skills\game-studio\SKILL.md) as the browser-game routing step.
    - Prefer the active Agile card.
    - Read only the docs needed for that task.
    - Keep the fork pointed at the officer-war loop.

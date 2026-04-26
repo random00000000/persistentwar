@@ -5,6 +5,7 @@ This automation is intentionally simple. Iterate on the game, not the ceremony.
 ## Three-Step Loop
 
 1. Pick one useful next task.
+   - Use [$game-studio:game-studio](C:\Users\Javier\.codex\plugins\cache\openai-curated\game-studio\b066e4a0\skills\game-studio\SKILL.md) as the browser-game routing step.
    - Start from the active Agile card when available.
    - Keep the fork direction in mind: `docs/PERSISTENT_WAR_OFFICER_FORK_INTENT.md`.
    - Favor officer-war gameplay: soldiers, orders, trenches, cover, suppression, logistics, camp damage, protected operation banking.
