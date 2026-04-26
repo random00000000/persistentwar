@@ -1,27 +1,34 @@
 # Automation Notes
 
-This automation is intentionally simple. Iterate on the game, not the ceremony.
+Use this file for project-specific automation guidance that should persist across recurring runs.
 
-## Three-Step Loop
+## Early Target
+
+`One replayable town with two opposing camps, autonomous soldiers, officer build orders, buildable trenches and ammo positions, protected operation banking, and a match ending when one camp is destroyed.`
+
+## Current Automation Focus
+
+- Keep the automation simple: one useful task, one proof, one clean handoff.
+- Treat `docs/PERSISTENT_WAR_OFFICER_FORK_INTENT.md` as the active product direction when more context is needed.
+- Start from the active Agile card when available.
+- Use [$game-studio:game-studio](C:\Users\Javier\.codex\plugins\cache\openai-curated\game-studio\b066e4a0\skills\game-studio\SKILL.md) as the browser-game routing step.
+- Prefer officer-war gameplay over inherited extraction work.
+- Favor soldiers, orders, trenches, cover, suppression, logistics, camp damage, and protected operation banking.
+
+## Project-Specific Constraints
+
+- `Top-down combat readability is mandatory.`
+- `Battles should be slow and cinematic.`
+- `Every build order should imply risk and reward.`
+- `The first town must stay replayable and expandable.`
+- `Online multiplayer is later; single-player NPC war is the first proof.`
+
+## Workflow Steps
 
 1. Pick one useful next task.
-   - Use [$game-studio:game-studio](C:\Users\Javier\.codex\plugins\cache\openai-curated\game-studio\b066e4a0\skills\game-studio\SKILL.md) as the browser-game routing step.
-   - Start from the active Agile card when available.
-   - Keep the fork direction in mind: `docs/PERSISTENT_WAR_OFFICER_FORK_INTENT.md`.
-   - Favor officer-war gameplay: soldiers, orders, trenches, cover, suppression, logistics, camp damage, protected operation banking.
-
 2. Do the smallest shippable improvement and prove it.
-   - Use the CLI when possible.
-   - Use browser/playtest screenshots when the change is visual or gameplay-facing.
-   - Update only the docs or Agile state that actually changed.
+3. Use [$force-automation-run](C:\Users\Javier\.codex\skills\force-automation-run\SKILL.md) to start the next automation run and confirm it started.
 
-3. Start the next automation run.
-   - Use [$force-automation-run](C:\Users\Javier\.codex\skills\force-automation-run\SKILL.md).
-   - Confirm the next run started before ending.
+## Ready Automation Setup
 
-## Fixed Context
-
-- Project: `C:\Users\Javier\Desktop\CodexCLI\2d-game-engine\projects\frontline-officer`
-- Agile project: `C:\Users\Javier\Desktop\CodexCLI\AgileSprints\Frontline Officer`
-- Dev URL: `http://127.0.0.1:5847/`
-- Preview URL: `http://127.0.0.1:5848/`
+The recurring Codex automation should use [automation prompt](C:/Users/Javier/Desktop/CodexCLI/2d-game-engine/projects/frontline-officer/docs/automation_prompt.md).
