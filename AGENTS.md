@@ -46,6 +46,19 @@ The old extraction-shooter documents still exist because this fork inherited the
 - Online play is later. Single-player NPC war simulation must work first.
 - Modern Ukraine-war context should ground battlefield texture, but the setting, factions, places, and events must remain fictional.
 
+## Shipping Priority Order
+
+When choosing work without a newer human directive, move the first playable forward in this order:
+
+1. `First-town war state`: create a durable state model for one replayable town.
+2. `Two camps`: establish one camp for each side and make camp health/control inspectable.
+3. `Autonomous soldiers`: spawn NPC soldiers who can move, fight, suppress, retreat, and recover without being puppets.
+4. `Officer build order`: let the player place at least one battlefield construction order.
+5. `Construction execution`: make soldiers travel to the order and build the object under risk.
+6. `Trench or cover payoff`: completed construction must change survivability, suppression, or movement choices.
+7. `Camp destruction win condition`: the match ends when one camp is destroyed.
+8. `Protected operation banking`: preserve the stash/extraction menu as protected preparation for future pushes.
+
 ## Local Rules
 
 - Keep work contained inside this project folder.
@@ -60,6 +73,28 @@ The old extraction-shooter documents still exist because this fork inherited the
   - dev: `http://127.0.0.1:5847/`
   - preview: `http://127.0.0.1:5848/`
 
+## Automation Definition Of Done
+
+Each recurring automation run should leave one clean handoff:
+
+- one useful behavior, system seam, or verification surface changed;
+- one CLI, browser, screenshot, or build proof recorded in the final answer;
+- Agile state updated when card progress changed;
+- docs updated only when the project reality changed;
+- no broad cleanup or unrelated refactor bundled into the run.
+
+## Not Yet
+
+Do not spend automation runs on these until the first-town officer-war slice works:
+
+- online multiplayer;
+- a giant persistent world map;
+- tanks-first development before infantry/build-order consequence is proven;
+- broad UI polish that does not support orders, banking, readability, or verification;
+- lore expansion without playable simulation impact;
+- extraction-only raid polish;
+- new economies or tech trees before camp destruction and operation banking are inspectable.
+
 ## Current State
 
 This fork currently starts from the inherited extraction-shooter codebase. The product direction has been pivoted by documentation, but most runtime systems still need to be reshaped toward the officer-led persistent war.
@@ -67,6 +102,7 @@ This fork currently starts from the inherited extraction-shooter codebase. The p
 ## Agent Surfaces
 
 - Fork north star: [docs/PERSISTENT_WAR_OFFICER_FORK_INTENT.md](docs/PERSISTENT_WAR_OFFICER_FORK_INTENT.md)
+- AgileSprints project: `C:\Users\Javier\Desktop\CodexCLI\AgileSprints\Frontline Officer`
 - Project wiki: [wiki/README.md](wiki/README.md)
 - Project CLI manual: [wiki/project-cli.md](wiki/project-cli.md)
 - Project CLI entry point: `npm run game:cli -- <command>`
