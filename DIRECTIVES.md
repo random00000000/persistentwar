@@ -4,8 +4,12 @@ These directives shape development over time. They are not required to be comple
 
 ## Critical Directives
 
-- Hold any new UI work until the north-star milestone work is completed, and prioritize finishing those milestone tracks before returning to interface polish or expansion.
-- Deliver the milestones inside the north-star spec packages and use those package plans as the main execution path for completing the product. There are 8 package areas under C:\Users\Javier\Desktop\CodexCLI\2d-game-engine\projects\topdownextractionshooter\docs\north-star-specs: main-map-tactical-slice, ai-pressure-and-territorial-replayability, gun-doctrine, stash-normalization-and-squad-recovery, extraction-pressure-and-operation-flow, rimworld-dialogue-campaign-flavor, endgame-campaign-finale, and combat-center-of-gravity-and-presentation. Each has its own IMPLEMENTATION_PLAN.md; agents should pick a milestone that is not yet completed and execute against that plan instead of inventing unrelated work.
+- Active fork direction is `Frontline Officer`, not the inherited extraction-shooter product. Read `docs/PERSISTENT_WAR_OFFICER_FORK_INTENT.md` before choosing implementation work.
+- Prioritize officer build orders, autonomous NPC soldier behavior, first-town replayability, logistics, protected stash banking, and slow suppression-driven battle simulation.
+- Treat inherited extraction north-star package plans as reusable source material, not the main execution path, unless the work clearly advances the persistent-war officer loop.
+- Hold broad UI polish until the first officer-war slice is proven. UI work is valid when it directly supports build-order placement, command readability, protected stash operations, or simulation inspection.
+- The inherited north-star spec packages under `docs/north-star-specs` can be mined for implementation ideas, but future milestone work should be reframed around the fork intent before execution.
+
 ## Moderate Directives
 
 ## Notes

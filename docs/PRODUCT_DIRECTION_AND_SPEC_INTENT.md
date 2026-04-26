@@ -1,5 +1,15 @@
 # Product Direction And Spec Intent
 
+## Frontline Officer Fork Notice
+
+This file was inherited from `Top Down Extraction Shooter`.
+
+For this fork, the active product direction is:
+
+- [Persistent War Officer Fork Intent](./PERSISTENT_WAR_OFFICER_FORK_INTENT.md)
+
+That document supersedes the extraction-first direction below. Use the older direction as reference material for reusable combat, guns, stash, dialogue, casualty, and territorial-memory systems.
+
 ## Purpose
 
 This document is the short agent-facing intent wrapper for the whole current product-direction stack.

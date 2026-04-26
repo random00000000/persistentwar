@@ -1,5 +1,15 @@
 # Tactical Squad Extraction North Star
 
+## Frontline Officer Fork Notice
+
+This file was inherited from `Top Down Extraction Shooter`.
+
+For this fork, the active product direction is:
+
+- [Persistent War Officer Fork Intent](./PERSISTENT_WAR_OFFICER_FORK_INTENT.md)
+
+Use this extraction north star as historical context and as a source of reusable mechanics. It is not the active north star for `frontline-officer`.
+
 ## Source Documents
 
 This north star was shaped directly by the following earlier project documents and should be read in continuity with them:

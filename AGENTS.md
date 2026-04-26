@@ -1,56 +1,83 @@
-# Top Down Extraction Shooter
+# Frontline Officer
 
-This project is a long-running agentic game build inside the 2D game engine workspace.
+This project is a fork of `Top Down Extraction Shooter` inside the 2D game engine workspace.
 
-When dealing with bugs use GStack Investigate Skill
+When dealing with bugs use GStack Investigate Skill.
+
+## Mandatory Direction Read
+
+Before coding, read this document completely:
+
+`C:\Users\Javier\Desktop\CodexCLI\2d-game-engine\projects\frontline-officer\docs\PERSISTENT_WAR_OFFICER_FORK_INTENT.md`
+
+That document is the current product north star for this fork.
+
+The old extraction-shooter documents still exist because this fork inherited the previous codebase and design history. Treat them as source material to mine for reusable systems, not as the active product direction.
 
 ## Game Identity
 
-- Working title: `Top Down Extraction Shooter`
-- Slug: `topdownextractionshooter`
-- Core fantasy: `Survive high-stakes top-down raids by fighting scavs, securing loot, completing quests, and extracting alive so the stash keeps growing.`
-- Primary loop: `Enter a raid, clear or avoid threats, loot valuable gear, complete quest objectives, extract alive, and manage the stash before the next run.`
-- Camera and movement perspective: `Top-down movement and combat readability are mandatory.`
-- First playable target: `A complete raid where the player can use distinct guns, fight scavs, gather loot, and extract successfully back to the stash.`
+- Working title: `Frontline Officer`
+- Slug: `frontline-officer`
+- Core fantasy: `Shape a slow, cinematic NPC-driven war as an officer whose build orders, logistics, and commands decide who lives, who dies, and which camp falls.`
+- Primary loop: `Prepare protected stash resources, place build orders and battlefield intent, watch soldiers execute under risk, personally intervene when worth the danger, bank or lose war assets, and push toward destroying the enemy camp.`
+- Camera and movement perspective: `Top-down combat readability is mandatory.`
+- First playable target: `One replayable town with two opposing camps, autonomous soldiers, buildable trenches/ammo positions, slow suppression-driven fights, protected stash preparation, and a match ending when one camp is destroyed.`
 
-## Design Pillars
+## Product Pillars
 
-- `Deep fights with a real skill gap and room for winning strategies like Tarkov.`
-- `Strong-looking, readable top-down combat and loot presentation.`
-- `Raids and stash management should feel deep, tense, and replayable.`
+- `Officer consequence: the player's orders are the reason people live and die.`
+- `NPC war first: soldiers must autonomously build, occupy, suppress, retreat, resupply, and recover before online play matters.`
+- `Slow cinematic combat: fights should breathe through cover, suppression, hesitation, fallback, and logistics instead of arcade swarm pressure.`
+- `Building risk and reward: every trench, bunker, crate, wire line, depot, and med post creates both advantage and exposure.`
+- `Protected grind: stash/extraction flow lets players bank tanks, good guns, supplies, and operation stockpiles for future pushes.`
+- `Hardcore intervention: the player can enter the war personally, but officer death costs tech tree progress.`
+- `First town first: prove one replayable, expandable town before chasing a giant war map or multiplayer.`
 
 ## Implementation Direction
 
-- Default runtime path: `2D Phaser browser game`, unless future directives intentionally change the stack.
-- The first milestone should prove raid flow before broadening scope into bigger questlines, economy layers, or PvP.
-- Weapon handling must create meaningful tactical differences early, not just cosmetic stat changes.
+- Default runtime path: `2D Phaser browser game`.
+- The current codebase is inherited from the extraction shooter. Reuse good systems instead of rewriting everything:
+  - gun identity and shoot feel
+  - dialogue/story-pack architecture
+  - stash and extraction banking surfaces
+  - squad/soldier state ideas
+  - suppression, casualty, body recovery, territory, and route scar concepts
+- Do not preserve extraction as the primary win condition. In this fork, extraction is a banking/preparation layer inside a larger persistent war.
+- Online play is later. Single-player NPC war simulation must work first.
+- Modern Ukraine-war context should ground battlefield texture, but the setting, factions, places, and events must remain fictional.
 
 ## Local Rules
 
 - Keep work contained inside this project folder.
-- Favor player-facing improvements, this does not mean more UI work, it means delivering on directives and making the game more deep in areas like Enemy AI, Orthogonal Enemies, Level Design and mostly what is asked on the directives.
-- Avoid working UI improvements and favor Enemy AI, Level Design, Endgame and North Star Implementation Milestones.
-- Use directives to shape the game development over multiple runs.
-- Avoid feature drift that breaks the core fantasy.
+- Prefer work that advances the officer/build-order/NPC-war loop over extraction-only polish.
+- Favor AI behavior, building execution, logistics, terrain consequence, first-town replayability, and emergent soldier drama.
+- Avoid broad UI-only work unless it directly supports officer orders, protected stash preparation, battlefield readability, or verification.
+- Avoid feature drift into a pure RTS command console. The war should be watched through soldiers reacting to orders and terrain.
+- Avoid feature drift into a lone-soldier extraction shooter. Personal intervention is valuable but not the core loop.
 - Use Game Studio workflows when they help planning, implementation, or playtesting.
-- Preserve the top-down extraction-shooter identity instead of drifting into arcade swarm combat.
-- Treat stash flow as part of the core loop, not a detached menu afterthought.
 - Default desktop browser QA, screenshots, smoke tests, and Playwright verification to `1920 x 1080` unless the user explicitly asks for another viewport.
+- The fork has dedicated Vite ports:
+  - dev: `http://127.0.0.1:5847/`
+  - preview: `http://127.0.0.1:5848/`
 
 ## Current State
 
-This project has been customized from the template and is ready for the recurring directive-and-decision loop.
+This fork currently starts from the inherited extraction-shooter codebase. The product direction has been pivoted by documentation, but most runtime systems still need to be reshaped toward the officer-led persistent war.
 
 ## Agent Surfaces
 
-
-- Project wiki: [wiki/README.md](wiki/README.md) (Please read the wiki now before doeing any coding)
+- Fork north star: [docs/PERSISTENT_WAR_OFFICER_FORK_INTENT.md](docs/PERSISTENT_WAR_OFFICER_FORK_INTENT.md)
+- Project wiki: [wiki/README.md](wiki/README.md)
 - Project CLI manual: [wiki/project-cli.md](wiki/project-cli.md)
 - Project CLI entry point: `npm run game:cli -- <command>`
-- After code changes, update and maintain the wiki so future agents have current documentation.
-- Read the following document completely, this is the current slice to be delivered and must be read before doing coding work, it is the north star: 
-C:\Users\Javier\Desktop\CodexCLI\2d-game-engine\projects\topdownextractionshooter\docs\TACTICAL_SQUAD_EXTRACTION_NORTH_STAR.md
-The north star is the evolution of the first creative direction listed below:
-C:\Users\Javier\Desktop\CodexCLI\2d-game-engine\projects\topdownextractionshooter\docs\INFILTRATION_SHOOTER_DIRECTION.md
+- After code changes, update and maintain relevant docs so future agents know whether a system is inherited extraction behavior or active frontline-officer behavior.
 
-- Shorter North Star Explanation Read Completely: C:\Users\Javier\Desktop\CodexCLI\2d-game-engine\projects\topdownextractionshooter\docs\PRODUCT_DIRECTION_AND_SPEC_INTENT.md
+## Inherited Reference Docs
+
+Use these for historical context and reusable mechanics, not as the active north star:
+
+- [Tactical Squad Extraction North Star](docs/TACTICAL_SQUAD_EXTRACTION_NORTH_STAR.md)
+- [Product Direction And Spec Intent](docs/PRODUCT_DIRECTION_AND_SPEC_INTENT.md)
+- [Infiltration Shooter Direction](docs/INFILTRATION_SHOOTER_DIRECTION.md)
+- [Combat Center Of Gravity Direction](docs/COMBAT_CENTER_OF_GRAVITY_DIRECTION.md)
+- [Systemic Reuse And Prefab Rules](docs/SYSTEMIC_REUSE_AND_PREFAB_RULES.md)

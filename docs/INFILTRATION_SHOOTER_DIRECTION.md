@@ -1,3 +1,5 @@
+Frontline Officer fork notice: this file is inherited reference material. For active fork direction, read [Persistent War Officer Fork Intent](./PERSISTENT_WAR_OFFICER_FORK_INTENT.md). Use this document for atmosphere and reusable battlefield verbs, not to pull the fork back into extraction-first development.
+
 Core ProblemThe game currently has extraction mechanics, but extraction does not yet carry enough emotional or strategic weight.The player needs to constantly ask:What am I risking if I stay longer with my boys?
 Can we still extract alive with this damage, this ammo, and this haul?
 Do I push one more compound or cut losses now?
