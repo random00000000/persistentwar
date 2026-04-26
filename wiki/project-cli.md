@@ -2,6 +2,20 @@
 
 The project CLI gives agents a stable terminal surface for inspecting and driving the game without editing code each time.
 
+## Frontline Officer Fork Note
+
+This CLI is inherited from the extraction-shooter runtime. For this fork, use it
+as a migration and verification surface while reshaping the game into the
+officer-war loop. Prefer commands that reveal or protect reusable systems:
+snapshot state, soldier/squad behavior, suppression, stash banking, authored
+showcases, and regression gates.
+
+The fork's dedicated dev server is `http://127.0.0.1:5847/`. Use
+`--url http://127.0.0.1:5847` when reusing a running server.
+
+The default agent API is still `window.__topdownExtractionAgentApi` until the
+runtime is renamed. Do not treat that name as product direction.
+
 ## Manual As Contract
 
 This manual is the authoritative contract for the supported CLI surface.
@@ -171,7 +185,7 @@ Run commands through:
 npm run game:cli -- <command> [options]
 ```
 
-By default the CLI starts a local Vite dev server, opens a headless Chromium session at `http://127.0.0.1:4173/`, and talks to `window.__topdownExtractionAgentApi`.
+By default the CLI can start a local Vite server and talks to `window.__topdownExtractionAgentApi`. In this fork, prefer the dedicated dev URL `http://127.0.0.1:5847/`.
 
 Use `--url <url>` when you want to reuse an already running server.
 

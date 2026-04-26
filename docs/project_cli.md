@@ -3,11 +3,23 @@
 The project CLI is the stable agent-facing control surface for top-down game state and playtesting.  
 It talks to the browser game through the runtime agent API exposed on `window.__topdownExtractionAgentApi`.
 
+## Frontline Officer Fork Note
+
+This manual describes the inherited extraction-shooter CLI surface. For
+`frontline-officer`, use it as migration tooling while building the first-town
+officer-war loop. The API name remains inherited until the runtime is renamed.
+
+Use the fork's dedicated dev server when possible:
+
+```bash
+npm run game:cli -- status --url http://127.0.0.1:5847
+```
+
 ## Prerequisites
 
 - Node.js and dependencies installed (`npm install`)
 - Game CLI entrypoint available at `scripts/project-cli.mjs`
-- Default local port is `4173` (`http://127.0.0.1:4173`)
+- Dedicated fork dev port is `5847` (`http://127.0.0.1:5847`)
 
 ## Command usage
 
@@ -37,7 +49,7 @@ Read a live snapshot of current game state (phase, stash, route, player health, 
 
 ```bash
  npm run game:cli -- status
-npm run game:cli -- status --url http://127.0.0.1:4173
+npm run game:cli -- status --url http://127.0.0.1:5847
 ```
 
 ### `list`

@@ -5,6 +5,7 @@ This wiki is the durable index for agent-facing project documentation.
 ## Core References
 
 - [Persistent War Officer Fork Intent](../docs/PERSISTENT_WAR_OFFICER_FORK_INTENT.md) **ACTIVE FORK NORTH STAR**
+- [Automation And Agent Loop](../docs/AUTOMATION_AND_AGENT_LOOP.md)
 - [Project CLI Manual](./project-cli.md)
 - [Automation Notes](../AUTOMATION.md)
 - [Directives](../DIRECTIVES.md)

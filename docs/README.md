@@ -14,6 +14,7 @@ Use this folder for persistent project artifacts such as:
 Read this first for the fork:
 
 - `PERSISTENT_WAR_OFFICER_FORK_INTENT.md`
+- `AUTOMATION_AND_AGENT_LOOP.md`
 
 This is the active north star for `frontline-officer`. It supersedes the inherited extraction-shooter direction for future product work.
 
