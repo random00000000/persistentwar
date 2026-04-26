@@ -11,6 +11,7 @@ Use this file for project-specific automation guidance that should persist acros
 - Keep the automation simple: one useful task, one proof, one clean handoff.
 - Treat `docs/PERSISTENT_WAR_OFFICER_FORK_INTENT.md` as the active product direction when more context is needed.
 - Start from the active Agile card when available.
+- Use the AgileSprints CLI as the agentic task tool for sprint and card state.
 - Use [$game-studio:game-studio](C:\Users\Javier\.codex\plugins\cache\openai-curated\game-studio\b066e4a0\skills\game-studio\SKILL.md) as the browser-game routing step.
 - Prefer officer-war gameplay over inherited extraction work.
 - Favor soldiers, orders, trenches, cover, suppression, logistics, camp damage, and protected operation banking.

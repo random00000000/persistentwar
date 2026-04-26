@@ -18,10 +18,17 @@ Read `C:\Users\Javier\Desktop\CodexCLI\2d-game-engine\projects\frontline-officer
 
 Use the active Agile card from `C:\Users\Javier\Desktop\CodexCLI\AgileSprints\Frontline Officer` as the default next task. Read other docs only when the task needs them.
 
+Check task state with the AgileSprints CLI:
+
+```powershell
+python C:\Users\Javier\Desktop\CodexCLI\AgileSprints\agile.py --project-path "C:\Users\Javier\Desktop\CodexCLI\AgileSprints\Frontline Officer" sprint-status
+python C:\Users\Javier\Desktop\CodexCLI\AgileSprints\agile.py --project-path "C:\Users\Javier\Desktop\CodexCLI\AgileSprints\Frontline Officer" board
+```
+
 ## Operating Rules
 
 - Keep all game work inside `C:\Users\Javier\Desktop\CodexCLI\2d-game-engine\projects\frontline-officer`.
-- Use the AgileSprints CLI for sprint and card state.
+- Use the AgileSprints CLI for sprint and card state. Treat the active card as the agentic task tool for recurring runs.
 - Use the project CLI for runtime inspection and verification when possible.
 - Use `http://127.0.0.1:5847/` for browser checks.
 - Prefer officer-war gameplay over inherited extraction work.
