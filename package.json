@@ -1,0 +1,21 @@
+{
+  "name": "frontline-officer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "game:cli": "node scripts/project-cli.mjs",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.57.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.9"
+  }
+}

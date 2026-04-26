@@ -1,0 +1,1 @@
+Commander gives order to clear bunker, your boys can be set to follow you, when you move your boys move around you, Your boys protect you when set to follow you, you walk they walk, you save them they save you, towns can change hands, some people are beter than others assaulting trenches, some trenches are better than others, 
