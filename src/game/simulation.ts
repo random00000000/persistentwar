@@ -20,6 +20,8 @@ import {
   SQUAD_DIALOGUE_TEMPLATES,
   SQUAD_DIALOGUE_VOICE_PROFILES
 } from "./dialogue/storyPacks";
+import type { DialogueStoryMemoryTag, HostileStoryEventKind } from "./dialogue/storyPackSchema";
+import { TOWN_WAR_ENEMY_FACTION, TOWN_WAR_PLAYER_FACTION, townWarController } from "./townWar";
 import { WEAPONS, type WeaponDefinition, type WeaponId } from "./weapons";
 
 export type EnemyArchetypeId = "rifleman" | "rusher" | "skirmisher";
@@ -313,6 +315,15 @@ const GRENADE_RADIUS = 112;
 const GRENADE_PRESSURE_RADIUS = 164;
 const PLAYER_GRENADE_COOLDOWN = 1.25;
 const HOSTILE_GRENADE_COOLDOWN = 6.8;
+const HOSTILE_PLAYER_BALANCE = {
+  spreadMultiplier: 1.26,
+  damageMultiplier: 0.72,
+  rangeMultiplier: 0.88,
+  speedMultiplier: 0.94,
+  fireIntervalMultiplier: 1.18,
+  machineGunFireIntervalMultiplier: 1.28,
+  machineGunLanePinMultiplier: 0.62
+} as const;
 const GRENADE_RETURN_INTERACT_RADIUS = 74;
 const GRENADE_RETURN_AUTO_RADIUS = 56;
 const GRENADE_RETURN_MIN_REMAINING = 0.2;
@@ -439,7 +450,7 @@ export interface EnemyState {
 
 export interface FriendlyCombatantState {
   id: number;
-  ownerKind: "squadmate" | "support" | "incident";
+  ownerKind: "squadmate" | "support" | "incident" | "camp-garrison";
   ownerId: string | number;
   squadMateId: string;
   name: string;
@@ -541,6 +552,10 @@ export interface SupplyCacheState {
   rewardCredits: number;
   medkitReward: number;
   ammoReward: number;
+  resupplyCrate?: boolean;
+  resupplyAmmoStock?: number;
+  resupplyAmmoStockMax?: number;
+  resupplyThreatTimer?: number;
   stashReward: SupplyStock;
   opportunityId: RaidPocketEventId | null;
   opportunitySummary: string | null;
@@ -585,6 +600,7 @@ export interface FallenEnemyBodyState {
   position: Vec2;
   facing: Vec2;
   recoveryProgress: number;
+  bodyAlarmSuppressed?: boolean;
 }
 
 export interface ActiveSquadBodyRecoveryState {
@@ -610,6 +626,7 @@ export interface ActiveRescueTaskState {
   destination: Vec2 | null;
   destinationLabel: string | null;
   movementPenaltyTimer: number;
+  storyBeat: "noticed" | "stabilizing" | "moving" | "extracting";
 }
 
 export interface ActiveHostileRescueTaskState {
@@ -905,23 +922,25 @@ export type DialogueEventKind =
   | "claim-held"
   | "claim-loss"
   | "extract-open"
-  | "extract-hot";
+  | "extract-hot"
+  | "build-order-issued"
+  | "builder-moving"
+  | "builder-exposed"
+  | "construction-started"
+  | "construction-stalled"
+  | "trench-completed"
+  | "ammo-crate-completed"
+  | "ammo-crate-low"
+  | "ammo-crate-empty"
+  | "line-held"
+  | "line-collapsed"
+  | "camp-under-fire"
+  | "camp-damaged"
+  | "camp-destroyed"
+  | "fallback-ordered"
+  | "bad-order-cost";
 export type DialogueEventIntensity = "low" | "medium" | "high" | "critical";
-export type DialogueMemoryTag =
-  | "mate-recovered"
-  | "mate-left-behind"
-  | "civilian-saved"
-  | "surrender-taken"
-  | "sector-held"
-  | "sector-lost"
-  | "sector-reclaiming"
-  | "sector-fragile"
-  | "sector-breaking"
-  | "casualty-corridor-open"
-  | "convoy-hit"
-  | "extract-barely-made"
-  | "family-informed"
-  | "wake-held";
+export type DialogueMemoryTag = DialogueStoryMemoryTag;
 
 export interface DialogueMemory {
   tag: DialogueMemoryTag;
@@ -1165,7 +1184,8 @@ export type FrontlineSupportOrderId =
   | "draw-heat"
   | "secure-exfil"
   | "hold-position"
-  | "breach-push";
+  | "breach-push"
+  | "drop-ammo-crate";
 export type FrontlineSupportKind = "fireteam" | "convoy" | "recovery";
 export type FrontlineSupportStatus = "moving" | "holding" | "covering" | "retreating";
 export type FrontlineSupportMomentumFlavor = "standard" | "field-coffee" | "burner-coffee";
@@ -1208,7 +1228,7 @@ export interface RaidPocketObjectiveState {
 export interface FrontlineSupportOrderDefinition {
   id: FrontlineSupportOrderId;
   title: string;
-  hotkey: "Z" | "X" | "C" | "B" | "V";
+  hotkey: "Z" | "X" | "C" | "B" | "V" | "N";
   duration: number;
   cooldown: number;
   summary: string;
@@ -2172,6 +2192,10 @@ const INTEL_PROMPT_RADIUS = 76;
 const CACHE_INTERACT_RADIUS = 66;
 const CACHE_HOLD_RADIUS = 68;
 const CACHE_PROMPT_RADIUS = 78;
+const OFFICER_AMMO_CRATE_RESUPPLY_RADIUS = 104;
+const OFFICER_AMMO_CRATE_THREAT_RADIUS = 132;
+const OFFICER_AMMO_CRATE_LOSS_SECONDS = 2.6;
+const OFFICER_AMMO_CRATE_DEFAULT_STOCK = 120;
 const LOOT_INTERACT_RADIUS = 58;
 const LOOT_HOLD_RADIUS = 56;
 const LOOT_PROMPT_RADIUS = 70;
@@ -2369,7 +2393,7 @@ interface ResolvedSquadDialogue {
 
 interface HostileDialogueTemplate {
   id: string;
-  kind: "advance" | "contact" | "surrender" | "civilian" | "extract";
+  kind: HostileStoryEventKind;
   tone: SquadCommsTone;
   channel: string;
   text: string;
@@ -2697,6 +2721,15 @@ export const FRONTLINE_SUPPORT_ORDERS: Record<FrontlineSupportOrderId, Frontline
     cooldown: 18,
     summary: "Tell the boys to stack the live cut and surge through so the breach becomes a real shove under fire.",
     effectSummary: "Friendly rifles stack on the cut, help finish the breach, and surge through the opened lane."
+  },
+  "drop-ammo-crate": {
+    id: "drop-ammo-crate",
+    title: "Drop Ammo Crate",
+    hotkey: "N",
+    duration: 0.25,
+    cooldown: 22,
+    summary: "Kick a protected ammo crate forward so the line can top off without collapsing back to stash.",
+    effectSummary: "Drops a finite ammo crate that nearby friendlies can resupply from until it runs dry or gets overrun."
   }
 };
 
@@ -2775,6 +2808,14 @@ function getSupportOrderFocusLabel(state: RaidState, orderId: FrontlineSupportOr
 
   if (orderId === "hold-position") {
     return getSupportHoldAnchorForState(state).label;
+  }
+
+  if (orderId === "drop-ammo-crate") {
+    return (
+      getClosestLabeledObstacleForState(state, state.player.position, 180)?.label ??
+      getFocusedFrontlineIncidentForState(state)?.label ??
+      getSupportHoldAnchorForState(state).label
+    );
   }
 
   if (orderId === "secure-exfil") {
@@ -7862,6 +7903,90 @@ const getDistinctNavigationOptions = (
   return distinct;
 };
 
+const getNearestPointOnObstacle = (point: Vec2, obstacle: ArenaObstacle): Vec2 => ({
+  x: clamp(point.x, obstacle.x, obstacle.x + obstacle.width),
+  y: clamp(point.y, obstacle.y, obstacle.y + obstacle.height)
+});
+
+const getDistanceToObstacle = (point: Vec2, obstacle: ArenaObstacle): number =>
+  distance(point, getNearestPointOnObstacle(point, obstacle));
+
+const getNearbyNavigationObstacle = (
+  point: Vec2,
+  obstacles: ReadonlyArray<ArenaObstacle>,
+  radius: number
+): ArenaObstacle | null => {
+  let nearestObstacle: ArenaObstacle | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  const threshold = Math.max(46, radius + 24);
+
+  for (const obstacle of obstacles) {
+    const obstacleDistance = getDistanceToObstacle(point, obstacle);
+    if (obstacleDistance > threshold || obstacleDistance >= nearestDistance) {
+      continue;
+    }
+
+    nearestObstacle = obstacle;
+    nearestDistance = obstacleDistance;
+  }
+
+  return nearestObstacle;
+};
+
+const getNavigationRecoveryTarget = (
+  start: Vec2,
+  end: Vec2,
+  radius: number,
+  obstacles: ReadonlyArray<ArenaObstacle>,
+  recoveryIndex = 0
+): Vec2 | null => {
+  const obstacle =
+    getBlockingObstacle(start, end, obstacles, Math.max(18, radius + 4)) ??
+    getNearbyNavigationObstacle(start, obstacles, radius);
+
+  if (!obstacle) {
+    return null;
+  }
+
+  const obstacleCenter = {
+    x: obstacle.x + obstacle.width / 2,
+    y: obstacle.y + obstacle.height / 2
+  };
+  const nearestObstaclePoint = getNearestPointOnObstacle(start, obstacle);
+  const awayFromObstacle =
+    distance(start, nearestObstaclePoint) > 0.001
+      ? normalize(subtract(start, nearestObstaclePoint))
+      : normalize(subtract(start, obstacleCenter));
+  const routeDirection = length(subtract(end, start)) > 0.001 ? normalize(subtract(end, start)) : { x: 1, y: 0 };
+  const fallbackAway = length(awayFromObstacle) > 0.001 ? awayFromObstacle : perpendicular(routeDirection);
+  const lateral = perpendicular(fallbackAway);
+  const standoff = Math.max(58, radius * 3.6);
+  const rawCandidates = [
+    add(start, multiply(fallbackAway, standoff)),
+    add(add(start, multiply(fallbackAway, standoff * 0.74)), multiply(lateral, standoff * 0.9)),
+    add(add(start, multiply(fallbackAway, standoff * 0.74)), multiply(lateral, -standoff * 0.9)),
+    ...getObstacleBypassCandidates(start, end, obstacle, radius).slice(0, 6).map((candidate) => candidate.point)
+  ];
+
+  const candidates = getDistinctNavigationOptions(
+    rawCandidates
+      .map((point) => clampWorldPoint(point, radius + 8))
+      .filter((point) => !collidesWithAnyObstacle(point, radius, obstacles, Math.max(6, radius * 0.45)))
+      .map((point) => ({
+        immediateTarget: point,
+        score: distance(start, point) + distance(point, end) + (getBlockingObstacle(start, point, obstacles, Math.max(12, radius + 2)) ? 180 : 0)
+      }))
+      .sort((left, right) => left.score - right.score),
+    Math.max(18, radius + 8)
+  );
+
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return candidates[Math.min(Math.max(0, recoveryIndex), candidates.length - 1)]?.immediateTarget ?? candidates[0].immediateTarget;
+};
+
 const shouldKeepCommittedNavigationTarget = (
   current: Vec2,
   committedTarget: Vec2 | null,
@@ -12357,6 +12482,11 @@ const SQUAD_AMBIENT_CALLS = {
     "Stack up. Flood the room.",
     "Cut and shove. No doorway death.",
     "Breach live. Kill the deep man."
+  ],
+  "order-drop-ammo-crate": [
+    "Ammo crate down. Hold it.",
+    "Rounds staged. Protect the box.",
+    "Crate is live. Top off and push."
   ]
 } as const;
 
@@ -14800,6 +14930,22 @@ function getFriendlyCombatantAnchor(
   };
 }
 
+function getRussianCampNpcName(squadMate: SquadMateState): string {
+  if (squadMate.combatProfileId === "rusher") {
+    return "Russian Assaultman";
+  }
+  if (squadMate.weaponId === "pkm" || squadMate.role.toLowerCase().includes("support")) {
+    return "Russian Support Gunner";
+  }
+  if (squadMate.role.toLowerCase().includes("medic")) {
+    return "Russian Field Medic";
+  }
+  if (squadMate.combatProfileId === "skirmisher") {
+    return "Russian Skirmisher";
+  }
+  return "Russian Rifleman";
+}
+
 const createFriendlyCombatant = (
   id: number,
   squadMate: SquadMateState,
@@ -14817,8 +14963,8 @@ const createFriendlyCombatant = (
     ownerKind: "squadmate",
     ownerId: squadMate.id,
     squadMateId: squadMate.id,
-    name: squadMate.name,
-    voiceTag: squadMate.voiceTag,
+    name: getRussianCampNpcName(squadMate),
+    voiceTag: "Russian",
     archetypeId: squadMate.combatProfileId,
     weaponId,
     position,
@@ -15099,6 +15245,10 @@ const createSupplyCaches = (spawns: ReadonlyArray<SupplyCacheSpawn>): SupplyCach
     medkitReward: spawn.medkitReward ?? (spawn.kind === "medical" ? 1 : 0),
     ammoReward:
       spawn.ammoReward ?? (spawn.kind === "ammo" ? 20 + Math.floor(Math.random() * 13) : spawn.kind === "locker" ? 10 + Math.floor(Math.random() * 11) : 0),
+    resupplyCrate: false,
+    resupplyAmmoStock: 0,
+    resupplyAmmoStockMax: 0,
+    resupplyThreatTimer: 0,
     stashReward:
       spawn.stashReward ??
       (spawn.kind === "medical"
@@ -15487,6 +15637,10 @@ export class RaidController {
       rewardCredits,
       medkitReward,
       ammoReward,
+      resupplyCrate: false,
+      resupplyAmmoStock: 0,
+      resupplyAmmoStockMax: 0,
+      resupplyThreatTimer: 0,
       stashReward: cloneSupplyStock(stashReward),
       opportunityId: null,
       opportunitySummary: null,
@@ -15529,6 +15683,171 @@ export class RaidController {
     }
 
     this.state.supplyCaches.push(drop);
+  }
+
+  private createOfficerAmmoCrateDrop(sourceLabel: string, position: Vec2): SupplyCacheState {
+    return {
+      id: this.getNextSupplyCacheId(),
+      position: clampWorldPoint(position, 28),
+      kind: "ammo",
+      label: "Ammo Crate",
+      demandCategory: "munitions",
+      searched: false,
+      searchDuration: 0,
+      rewardCredits: 0,
+      medkitReward: 0,
+      ammoReward: 0,
+      resupplyCrate: true,
+      resupplyAmmoStock: OFFICER_AMMO_CRATE_DEFAULT_STOCK,
+      resupplyAmmoStockMax: OFFICER_AMMO_CRATE_DEFAULT_STOCK,
+      resupplyThreatTimer: 0,
+      stashReward: { ...EMPTY_SUPPLY_STOCK },
+      opportunityId: null,
+      opportunitySummary: null,
+      frontlineDrop: true,
+      frontlineDropSourceLabel: sourceLabel
+    };
+  }
+
+  private addOfficerAmmoCrateDrop(sourceLabel: string, position: Vec2): void {
+    const drop = this.createOfficerAmmoCrateDrop(sourceLabel, position);
+    const overlappingCacheIds = this.state.supplyCaches
+      .filter((cache) => !cache.searched && distance(cache.position, drop.position) < 26)
+      .map((cache) => cache.id);
+
+    if (overlappingCacheIds.length > 0) {
+      this.state.supplyCaches = this.state.supplyCaches.filter((cache) => !overlappingCacheIds.includes(cache.id));
+      if (this.state.activeSearch && overlappingCacheIds.includes(this.state.activeSearch.cacheId)) {
+        this.state.activeSearch = null;
+      }
+    }
+
+    this.state.supplyCaches.push(drop);
+  }
+
+  private updateOfficerAmmoCrates(deltaSeconds: number): void {
+    for (const cache of this.state.supplyCaches) {
+      if (!cache.resupplyCrate || cache.searched) {
+        continue;
+      }
+
+      const ammoStock = cache.resupplyAmmoStock ?? 0;
+      if (ammoStock <= 0) {
+        cache.searched = true;
+        cache.resupplyAmmoStock = 0;
+        cache.label = "Dry Ammo Crate";
+        continue;
+      }
+
+      const enemyNear = this.state.enemies.some(
+        (enemy) => distance(enemy.position, cache.position) <= OFFICER_AMMO_CRATE_THREAT_RADIUS
+      );
+      if (!enemyNear) {
+        cache.resupplyThreatTimer = Math.max(0, (cache.resupplyThreatTimer ?? 0) - deltaSeconds * 1.25);
+        continue;
+      }
+
+      const friendlyNear =
+        distance(this.state.player.position, cache.position) <= OFFICER_AMMO_CRATE_THREAT_RADIUS ||
+        this.state.friendlyCombatants.some(
+          (combatant) => distance(combatant.position, cache.position) <= OFFICER_AMMO_CRATE_THREAT_RADIUS
+        );
+
+      if (friendlyNear) {
+        cache.resupplyThreatTimer = Math.max(0, (cache.resupplyThreatTimer ?? 0) - deltaSeconds * 1.1);
+        continue;
+      }
+
+      cache.resupplyThreatTimer = (cache.resupplyThreatTimer ?? 0) + deltaSeconds;
+      if ((cache.resupplyThreatTimer ?? 0) < OFFICER_AMMO_CRATE_LOSS_SECONDS) {
+        continue;
+      }
+
+      cache.searched = true;
+      cache.resupplyAmmoStock = 0;
+      cache.label = "Ammo Crate (Overrun)";
+      if (distance(this.state.player.position, cache.position) <= 520) {
+        this.state.message = "Ammo crate was overrun and lost. Forward crates must be protected or they vanish.";
+      }
+    }
+  }
+
+  private tryResupplyFriendlyCombatantFromAmmoCrate(combatant: FriendlyCombatantState): void {
+    if (combatant.resupplyTimer > 0 || combatant.reloadTimer > 0) {
+      return;
+    }
+
+    if (getFrontlineResupplyNeed(combatant) <= 0) {
+      return;
+    }
+
+    const crate =
+      this.state.supplyCaches
+        .filter(
+          (cache) =>
+            cache.resupplyCrate &&
+            !cache.searched &&
+            (cache.resupplyAmmoStock ?? 0) > 0 &&
+            distance(cache.position, combatant.position) <= OFFICER_AMMO_CRATE_RESUPPLY_RADIUS
+        )
+        .sort(
+          (left, right) =>
+            distance(left.position, combatant.position) - distance(right.position, combatant.position)
+        )[0] ?? null;
+
+    if (!crate) {
+      return;
+    }
+
+    const transferAmount = getFrontlineResupplyTransferAmount(crate.resupplyAmmoStock ?? 0, combatant);
+    if (transferAmount <= 0) {
+      return;
+    }
+
+    crate.resupplyAmmoStock = Math.max(0, (crate.resupplyAmmoStock ?? 0) - transferAmount);
+    combatant.reserveAmmo += transferAmount;
+    combatant.resupplyTimer = 1.05;
+    combatant.dryFireTimer = 0;
+    if (combatant.ammoInMag <= 0 && combatant.reloadTimer <= 0) {
+      this.beginFrontlineReload(combatant);
+    }
+
+    if ((crate.resupplyAmmoStock ?? 0) <= 0) {
+      crate.searched = true;
+      crate.resupplyAmmoStock = 0;
+      crate.label = "Dry Ammo Crate";
+    }
+  }
+
+  private tryResupplyPlayerFromAmmoCrate(cache: SupplyCacheState): boolean {
+    if (!cache.resupplyCrate || cache.searched || (cache.resupplyAmmoStock ?? 0) <= 0) {
+      return false;
+    }
+
+    const weapon = WEAPONS[this.state.player.weaponId];
+    const desiredReserve = Math.max(weapon.magazineSize * 2, Math.round(weapon.magazineSize * 2.2), 18);
+    const neededReserve = Math.max(0, desiredReserve - this.state.player.reserveAmmo);
+    if (neededReserve <= 0) {
+      this.state.message = "Ammo crate is staged, but your reserve is already topped off.";
+      return true;
+    }
+
+    const transferAmount = Math.min(cache.resupplyAmmoStock ?? 0, Math.max(weapon.magazineSize, neededReserve));
+    if (transferAmount <= 0) {
+      return true;
+    }
+
+    this.state.player.reserveAmmo += transferAmount;
+    cache.resupplyAmmoStock = Math.max(0, (cache.resupplyAmmoStock ?? 0) - transferAmount);
+    this.state.message = `Ammo crate used. +${transferAmount} reserve rounds (crate ${Math.max(0, cache.resupplyAmmoStock ?? 0)} left).`;
+
+    if ((cache.resupplyAmmoStock ?? 0) <= 0) {
+      cache.searched = true;
+      cache.resupplyAmmoStock = 0;
+      cache.label = "Dry Ammo Crate";
+    }
+
+    return true;
   }
 
   private recruitCursor = 3;
@@ -16501,7 +16820,19 @@ export class RaidController {
     const tacticalService = this.getSelectedTacticalService();
     const raidObstacles = createRaidObstacles(route, activeSector);
     const stagedPlan = this.stagedRaidPlan ?? this.createStagedRaidPlan(route, raidObstacles);
-    const insertion = stagedPlan.insertion;
+    townWarController.ensureDemoSeeded();
+    const townWarSnapshot = townWarController.getSnapshot();
+    const playerCamp = townWarSnapshot.camps.find((camp) => camp.id === "camp-a") ?? null;
+    const insertion: RaidInsertionDefinition =
+      playerCamp && !playerCamp.destroyed
+        ? {
+            ...stagedPlan.insertion,
+            label: playerCamp.label,
+            summary: "Deploying from the protected right-side player camp.",
+            position: { ...playerCamp.spawn.position },
+            facing: { x: -1, y: 0 }
+          }
+        : stagedPlan.insertion;
 
     if (this.state.phase !== "stash") {
       return;
@@ -16534,8 +16865,11 @@ export class RaidController {
       route,
       stagedPlan.enemySpawns,
       this.state.player.position,
-      (activeFrontlineDefinition?.enemyReduction ?? 0) + sectorEnemyReduction
+      (activeFrontlineDefinition?.enemyReduction ?? 0) + sectorEnemyReduction,
+      townWarSnapshot
     );
+    this.state.enemies.push(...this.createEnemyCampGarrison(townWarSnapshot, this.state.player.position));
+    this.state.enemies.push(...this.createEnemyFrontlinePatrol(townWarSnapshot, this.state.player.position));
     this.state.bullets = [];
     this.state.grenades = [];
     this.state.frontlineTracers = [];
@@ -16605,7 +16939,8 @@ export class RaidController {
       this.state.frontlineIncidents
     );
     this.friendlyCombatantId += ambientCombatants.length;
-    this.state.friendlyCombatants = [...squadCombatants, ...ambientCombatants];
+    const campCombatants = this.createFriendlyCampGarrison(townWarSnapshot);
+    this.state.friendlyCombatants = [...squadCombatants, ...ambientCombatants, ...campCombatants];
     this.state.squadComms = createSquadComms(
       "Rook",
       "Point rifleman",
@@ -17053,10 +17388,13 @@ export class RaidController {
   }
 
   public setMoveInput(nextMove: Vec2): void {
-    this.moveInput = normalize(nextMove);
+    this.moveInput = this.state.player.commandRestrictionMode === "downed" || this.isPlayerRescueLocked() ? { x: 0, y: 0 } : normalize(nextMove);
   }
 
   public setAimTarget(worldPosition: Vec2): void {
+    if (this.state.player.commandRestrictionMode === "downed" || this.isPlayerRescueLocked()) {
+      return;
+    }
     this.aimTarget = worldPosition;
   }
 
@@ -17389,7 +17727,7 @@ export class RaidController {
     if (mode === "assisted") {
       return {
         mode,
-        canFire: true,
+        canFire: false,
         spreadMultiplier: RESCUE_ASSIST_FIRE_SPREAD_MULTIPLIER,
         fireIntervalMultiplier: RESCUE_ASSIST_FIRE_INTERVAL_MULTIPLIER,
         movementPenaltySeconds: RESCUE_ASSIST_FIRE_MOVEMENT_PENALTY_SECONDS,
@@ -17400,7 +17738,7 @@ export class RaidController {
     if (mode === "carried") {
       return {
         mode,
-        canFire: true,
+        canFire: false,
         spreadMultiplier: RESCUE_CARRY_FIRE_SPREAD_MULTIPLIER,
         fireIntervalMultiplier: RESCUE_CARRY_FIRE_INTERVAL_MULTIPLIER,
         movementPenaltySeconds: RESCUE_CARRY_FIRE_MOVEMENT_PENALTY_SECONDS,
@@ -17598,6 +17936,57 @@ export class RaidController {
     return Boolean(this.state.activeRescueTask && this.state.activeRescueTask.targetKind === "player" && this.state.activeRescueTask.task !== "stabilize");
   }
 
+  private emitRescueStoryBeat(input: {
+    id: string;
+    kind: "downed" | "stabilizing" | "moving" | "extracting" | "completed" | "failed";
+    targetName: string;
+    rescuerName?: string | null;
+    position: Vec2;
+    destinationLabel?: string | null;
+    targetIsPlayer?: boolean;
+  }): void {
+    const eventKind: DialogueEventKind =
+      input.kind === "extracting" ? "extract-open" : input.kind === "downed" || input.kind === "failed" ? "mate-down" : "body-recovery";
+    const speaker = input.rescuerName ?? (input.targetIsPlayer ? "Makar" : "Rook");
+    const destination = input.destinationLabel ?? "cover";
+    const line =
+      input.kind === "downed"
+        ? input.targetIsPlayer
+          ? "Blue is down. Stop chasing kills and get hands on him."
+          : `${input.targetName} is down. Anyone close, break off and get him breathing.`
+        : input.kind === "stabilizing"
+          ? `${speaker} is stabilizing ${input.targetName}. Cover the body.`
+        : input.kind === "moving"
+          ? `${speaker} has ${input.targetName}. Moving to ${destination}.`
+        : input.kind === "extracting"
+          ? `${speaker} is pressing the extract for ${input.targetName}. Hold the ring.`
+        : input.kind === "completed"
+          ? `${input.targetName} made it to ${destination}. Keep the route open.`
+        : `${input.targetName} slipped out of the rescue. That body is costing us.`;
+
+    this.emitSquadDialogueEvent(
+      {
+        id: `rescue:${input.kind}:${input.id}`,
+        kind: eventKind,
+        locationLabel: input.targetName,
+        extractLabel: this.getFocusedExtract().label,
+        breachLabel: destination,
+        intensity: input.kind === "downed" || input.kind === "failed" ? "critical" : "high",
+        dominantTapeId: getDominantEnemyTapeId(this.state.enemies, input.position),
+        playerCritical: input.targetIsPlayer === true || this.state.player.health <= this.state.player.maxHealth * 0.45,
+        greedPressure: clamp(this.state.carriedValue / 3200, 0, 1),
+        memoryTags: getDialogueMemoryTags(this.state.squadMates.flatMap((mate) => mate.recentDialogueMemories))
+      },
+      "Rescue",
+      {
+        speaker,
+        tone: input.kind === "extracting" ? "extract" : input.kind === "failed" || input.kind === "downed" ? "critical" : "warning",
+        line,
+        channel: "Rescue"
+      }
+    );
+  }
+
   private beginFriendlyPostStabilizeSupport(task: ActiveRescueTaskState): void {
     if (task.rescuerKind !== "squadmate") {
       this.state.activeRescueTask = null;
@@ -17618,8 +18007,18 @@ export class RaidController {
       timer: 0,
       destination: destination.position,
       destinationLabel: destination.label,
-      movementPenaltyTimer: 0
+      movementPenaltyTimer: 0,
+      storyBeat: "moving"
     };
+    this.emitRescueStoryBeat({
+      id: `${task.rescuerId}:${task.targetId}:moving`,
+      kind: "moving",
+      targetName: task.targetName,
+      rescuerName: task.rescuerName,
+      position: target.position,
+      destinationLabel: destination.label,
+      targetIsPlayer: task.targetKind === "player"
+    });
     this.state.message =
       task.targetKind === "player"
         ? `${task.rescuerName} has Blue on him. The boys are carrying him toward ${destination.label}.`
@@ -17707,6 +18106,28 @@ export class RaidController {
     combatant.velocity = { x: 0, y: 0 };
     combatant.alert = true;
     combatant.awareness = "engaged";
+    this.emitNoise(combatant.position, 360, 0.18, "Casualty");
+    for (const ally of this.state.friendlyCombatants) {
+      if (
+        ally.ownerKind !== "squadmate" ||
+        ally.squadMateId === combatant.squadMateId ||
+        ally.casualtyState === "downed" ||
+        ally.casualtyState === "dead" ||
+        distance(ally.position, combatant.position) > AUTO_RESCUE_SEARCH_RADIUS
+      ) {
+        continue;
+      }
+      ally.alert = true;
+      ally.awareness = "investigating";
+      ally.investigateTarget = { ...combatant.position };
+      ally.investigateTimer = Math.max(ally.investigateTimer, 2.8);
+    }
+    this.emitRescueStoryBeat({
+      id: `${combatant.squadMateId}:${Math.round(this.state.timerRemaining)}`,
+      kind: "downed",
+      targetName: combatant.name,
+      position: combatant.position
+    });
   }
 
   private downPlayer(): void {
@@ -17722,7 +18143,18 @@ export class RaidController {
     player.stabilized = false;
     player.commandRestrictionMode = "downed";
     player.velocity = { x: 0, y: 0 };
-    this.state.message = "Blue is down. You can still command the boys for a few seconds, but the bleedout clock is live.";
+    this.moveInput = { x: 0, y: 0 };
+    this.triggerHeldByLiveInput = false;
+    this.triggerHeld = this.triggerHeldByAgent;
+    this.emitNoise(player.position, 420, 0.24, "Officer down");
+    this.emitRescueStoryBeat({
+      id: `player:${Math.round(this.state.timerRemaining)}`,
+      kind: "downed",
+      targetName: "Blue",
+      position: player.position,
+      targetIsPlayer: true
+    });
+    this.state.message = "Blue is down. Aim and movement are locked; the boys must stabilize or carry him out.";
   }
 
   private stabilizeSquadMate(combatant: FriendlyCombatantState): void {
@@ -17809,8 +18241,16 @@ export class RaidController {
           timer: SQUAD_STABILIZE_SECONDS,
           destination: null,
           destinationLabel: null,
-          movementPenaltyTimer: 0
+          movementPenaltyTimer: 0,
+          storyBeat: "stabilizing"
         };
+        this.emitRescueStoryBeat({
+          id: `player:${casualty.squadMateId}:stabilizing`,
+          kind: "stabilizing",
+          targetName: casualty.name,
+          rescuerName: "Blue",
+          position: casualty.position
+        });
         this.state.message = `${casualty.name} is down. Hold close and stabilize him before the bleedout clock wins.`;
       } else {
         this.state.message = "No downed brother is close enough to stabilize.";
@@ -18491,6 +18931,17 @@ export class RaidController {
       return;
     }
 
+    if (orderId === "drop-ammo-crate") {
+      const existingCrate =
+        this.state.supplyCaches.find(
+          (cache) => cache.resupplyCrate && !cache.searched && distance(cache.position, this.state.player.position) <= 160
+        ) ?? null;
+      if (existingCrate) {
+        this.state.message = "Ammo crate is already staged nearby. Protect it and use it before it dries out.";
+        return;
+      }
+    }
+
     const order = FRONTLINE_SUPPORT_ORDERS[orderId];
     if (this.state.activeFrontlineSupportOrderId === orderId && this.state.frontlineSupportOrderTimer > 0) {
       this.state.message = `${order.title} is already live for ${this.state.frontlineSupportOrderTimer.toFixed(1)}s more.`;
@@ -18611,6 +19062,40 @@ export class RaidController {
       return;
     }
 
+    if (orderId === "drop-ammo-crate") {
+      const focusLabel = getSupportOrderFocusLabel(this.state, orderId);
+      const dropPosition = {
+        x: this.state.player.position.x + this.state.player.facing.x * 42,
+        y: this.state.player.position.y + this.state.player.facing.y * 42
+      };
+      this.addOfficerAmmoCrateDrop(focusLabel ?? "Officer Net", dropPosition);
+      this.emitSquadDialogueEvent(
+        {
+          id: `order:drop-ammo-crate:${focusLabel ?? "none"}`,
+          kind: "contact",
+          locationLabel: focusLabel ?? "this shoulder",
+          extractLabel: this.getFocusedExtract().label,
+          breachLabel: focusLabel ?? "this shoulder",
+          intensity: "medium",
+          dominantTapeId: getDominantEnemyTapeId(this.state.enemies, this.state.player.position),
+          playerCritical: false,
+          greedPressure: 0.06,
+          memoryTags: getDialogueMemoryTags(this.state.squadMates.flatMap((mate) => mate.recentDialogueMemories))
+        },
+        "Order",
+        {
+          speaker: "Rook",
+          tone: "steady",
+          channel: "Order",
+          line: "Ammo crate is down. Protect it or Blue will strip it dry."
+        }
+      );
+      this.state.message = focusLabel
+        ? `Ammo crate staged near ${focusLabel}. ${order.effectSummary}`
+        : `Ammo crate staged. ${order.effectSummary}`;
+      return;
+    }
+
     this.emitSquadDialogueEvent(
       {
         id: "order:secure-exfil",
@@ -18716,7 +19201,7 @@ export class RaidController {
     );
 
     const desiredFacing = normalize(subtract(this.aimTarget, player.position));
-    if (length(desiredFacing) > 0) {
+    if (playerActionAvailability.canFire && length(desiredFacing) > 0) {
       player.facing = desiredFacing;
     }
 
@@ -18755,6 +19240,7 @@ export class RaidController {
     this.updateEnemyBodyRecovery(deltaSeconds);
     this.updateHostileBodyAlarm(deltaSeconds);
     this.updateSupplyCacheSearch(deltaSeconds);
+    this.updateOfficerAmmoCrates(deltaSeconds);
     this.updateIntelCapture(deltaSeconds);
     this.updatePendingReinforcements(deltaSeconds);
     this.updateFrontlineSupportOrder(deltaSeconds);
@@ -22526,12 +23012,76 @@ export class RaidController {
     this.state.currentPocketObjectives = buildPocketObjectives(this.state.currentPocketPlan);
   }
 
+  private getTownWarEnemySideLimit(
+    townWarSnapshot: ReturnType<typeof townWarController.getSnapshot> = townWarController.getSnapshot()
+  ): { maxX: number; enemyCampPosition: Vec2 } | null {
+    const playerCamp = townWarSnapshot.camps.find((camp) => camp.id === TOWN_WAR_PLAYER_FACTION) ?? null;
+    const enemyCamp = townWarSnapshot.camps.find((camp) => camp.id === TOWN_WAR_ENEMY_FACTION) ?? null;
+    if (!playerCamp || !enemyCamp || enemyCamp.destroyed) {
+      return null;
+    }
+
+    const contactLineX = (playerCamp.spawn.position.x + enemyCamp.spawn.position.x) / 2;
+    const maxX = Math.min(playerCamp.spawn.position.x - 360, contactLineX + 180);
+    return {
+      maxX: clamp(maxX, 64, WORLD_WIDTH - 64),
+      enemyCampPosition: { ...enemyCamp.spawn.position }
+    };
+  }
+
+  private clampToTownWarEnemySide(
+    position: Vec2,
+    sideLimit: { maxX: number; enemyCampPosition: Vec2 } | null
+  ): Vec2 {
+    if (!sideLimit || position.x <= sideLimit.maxX) {
+      return { ...position };
+    }
+
+    const spillover = position.x - sideLimit.maxX;
+    const yPull = clamp(spillover * 0.18, -180, 180);
+    return clampWorldPoint({
+      x: sideLimit.maxX - Math.min(160, spillover * 0.2),
+      y: clamp(position.y + Math.sign(sideLimit.enemyCampPosition.y - position.y) * Math.abs(yPull), 48, WORLD_HEIGHT - 48)
+    });
+  }
+
+  private findTownWarEnemySideSpawnPoint(
+    desiredPosition: Vec2,
+    radius: number,
+    scatterRadius: number,
+    obstacles: ReadonlyArray<ArenaObstacle>,
+    reservedPoints: ReadonlyArray<Vec2>,
+    minReservedDistance: number,
+    sideLimit: { maxX: number; enemyCampPosition: Vec2 } | null
+  ): Vec2 {
+    const sidePosition = this.clampToTownWarEnemySide(desiredPosition, sideLimit);
+    for (let attempt = 0; attempt < RAID_SPAWN_MAX_ATTEMPTS; attempt += 1) {
+      const candidate = this.clampToTownWarEnemySide(
+        attempt === 0 ? sidePosition : randomPointAround(sidePosition, scatterRadius),
+        sideLimit
+      );
+      if (
+        isPointWalkable(candidate, radius, obstacles) &&
+        reservedPoints.every((point) => distance(point, candidate) >= minReservedDistance)
+      ) {
+        return candidate;
+      }
+    }
+
+    return this.clampToTownWarEnemySide(
+      findWalkableSpawnPoint(sidePosition, radius, scatterRadius * 1.35, obstacles, reservedPoints, minReservedDistance),
+      sideLimit
+    );
+  }
+
   private createRaidEnemies(
     route: RaidRouteDefinition,
     stagedSpawns: ReadonlyArray<StagedEnemySpawnPlan>,
     playerPosition: Vec2,
-    enemyReduction = 0
+    enemyReduction = 0,
+    townWarSnapshot: ReturnType<typeof townWarController.getSnapshot> | null = null
   ): EnemyState[] {
+    const townWarEnemySideLimit = this.getTownWarEnemySideLimit(townWarSnapshot ?? townWarController.getSnapshot());
     const objectivePoints = [
       playerPosition,
       ...route.intelPositions,
@@ -22817,13 +23367,14 @@ export class RaidController {
       const doctrineState = getEnemyDoctrineState(squadAssignment.squadRole, adjustedPosture, squadStrongpoint);
       const doctrineWatchDirection = normalize(subtract(tacticalSpawn.facingTarget, tacticalSpawn.anchor));
       const doctrineWatchArcDegrees = getEnemyDoctrineWatchArc(doctrineState);
-      const position = findWalkableSpawnPoint(
+      const position = this.findTownWarEnemySideSpawnPoint(
         tacticalSpawn.position,
         archetypeId === "rusher" ? 17 : 16,
         ENEMY_SPAWN_SCATTER_RADIUS,
         this.state.obstacles,
         [...objectivePoints, ...usedPositions],
-        usedPositions.length > 0 ? 84 : RAID_OBJECTIVE_SAFE_RADIUS
+        usedPositions.length > 0 ? 84 : RAID_OBJECTIVE_SAFE_RADIUS,
+        townWarEnemySideLimit
       );
 
       const minPlayerDistance = Math.max(ENEMY_MIN_PLAYER_DISTANCE, QUIET_INGRESS_MIN_PLAYER_DISTANCE);
@@ -22832,6 +23383,17 @@ export class RaidController {
         position.x = clamp(playerPosition.x + retreatDirection.x * minPlayerDistance, 32, WORLD_WIDTH - 32);
         position.y = clamp(playerPosition.y + retreatDirection.y * minPlayerDistance, 32, WORLD_HEIGHT - 32);
       }
+      const sideCorrectedPosition = this.findTownWarEnemySideSpawnPoint(
+        position,
+        archetypeId === "rusher" ? 17 : 16,
+        ENEMY_SPAWN_SCATTER_RADIUS,
+        this.state.obstacles,
+        [...objectivePoints, ...usedPositions],
+        usedPositions.length > 0 ? 84 : RAID_OBJECTIVE_SAFE_RADIUS,
+        townWarEnemySideLimit
+      );
+      position.x = sideCorrectedPosition.x;
+      position.y = sideCorrectedPosition.y;
 
       usedPositions.push({ ...position });
       const enemy = createEnemy(
@@ -22842,7 +23404,7 @@ export class RaidController {
       );
       const roleCombatProfile = getSharedWeaponCombatProfile(stagedWeaponId, archetypeId);
 
-      enemy.anchor = { ...tacticalSpawn.anchor };
+      enemy.anchor = this.clampToTownWarEnemySide(tacticalSpawn.anchor, townWarEnemySideLimit);
       enemy.openingPosture = adjustedPosture;
       enemy.squadId = squadAssignment.squadId;
       enemy.squadRole = squadAssignment.squadRole;
@@ -22866,6 +23428,208 @@ export class RaidController {
         enemy.facing = normalize(subtract(enemy.anchor, enemy.position));
       }
 
+      return enemy;
+    });
+  }
+
+  private createFriendlyCampGarrison(townWarSnapshot: ReturnType<typeof townWarController.getSnapshot>): FriendlyCombatantState[] {
+    const playerCamp = townWarSnapshot.camps.find((camp) => camp.id === "camp-a") ?? null;
+    const enemyCamp = townWarSnapshot.camps.find((camp) => camp.id === "camp-b") ?? null;
+    if (!playerCamp || !enemyCamp || playerCamp.destroyed) {
+      return [];
+    }
+
+    const contactLineCenter = {
+      x: (playerCamp.spawn.position.x + enemyCamp.spawn.position.x) / 2,
+      y: (playerCamp.spawn.position.y + enemyCamp.spawn.position.y) / 2
+    };
+    const campCenter = playerCamp.spawn.position;
+    const garrisonPlan: Array<{
+      name: string;
+      offset: Vec2;
+      archetypeId: EnemyArchetypeId;
+      weaponId: WeaponId;
+      facingTarget: Vec2;
+    }> = [
+      {
+        name: "Russian Rifleman",
+        offset: { x: -128, y: -74 },
+        archetypeId: "rifleman",
+        weaponId: "rifle",
+        facingTarget: { x: contactLineCenter.x + 180, y: contactLineCenter.y - 82 }
+      },
+      {
+        name: "Russian Skirmisher",
+        offset: { x: -172, y: 64 },
+        archetypeId: "skirmisher",
+        weaponId: "worn-ak",
+        facingTarget: { x: contactLineCenter.x + 168, y: contactLineCenter.y + 72 }
+      },
+      {
+        name: "Russian Support Gunner",
+        offset: { x: -54, y: -8 },
+        archetypeId: "rifleman",
+        weaponId: "pkm",
+        facingTarget: { x: contactLineCenter.x + 178, y: contactLineCenter.y }
+      },
+      {
+        name: "Russian Assaultman",
+        offset: { x: -218, y: 128 },
+        archetypeId: "rusher",
+        weaponId: "smg",
+        facingTarget: { x: contactLineCenter.x + 160, y: contactLineCenter.y + 112 }
+      }
+    ];
+
+    return garrisonPlan.map((entry, index) => {
+      const weapon = WEAPONS[entry.weaponId];
+      const archetype = SCAV_ARCHETYPES[entry.archetypeId];
+      const combatProfile = getSharedWeaponCombatProfile(entry.weaponId, entry.archetypeId);
+      const position = findWalkableSpawnPoint(
+        clampWorldPoint(add(campCenter, entry.offset)),
+        entry.archetypeId === "rusher" ? 17 : 16,
+        42,
+        this.state.obstacles,
+        [this.state.player.position, enemyCamp.spawn.position],
+        120
+      );
+
+      return {
+        id: this.friendlyCombatantId++,
+        ownerKind: "camp-garrison",
+        ownerId: `camp-a-frontline-${index + 1}`,
+        squadMateId: `camp-a-frontline-${index + 1}`,
+        name: entry.name,
+        voiceTag: "Russian",
+        archetypeId: entry.archetypeId,
+        weaponId: entry.weaponId,
+        position,
+        velocity: { x: 0, y: 0 },
+        facing: normalize(subtract(entry.facingTarget, position)),
+        health: archetype.health,
+        maxHealth: archetype.health,
+        radius: entry.archetypeId === "rusher" ? 17 : 16,
+        cooldown: combatProfile.fireIntervalMin + Math.random() * Math.max(0.05, combatProfile.fireIntervalMax - combatProfile.fireIntervalMin),
+        grenadeStock: index === 3 ? 1 : 0,
+        grenadeCooldown: 0,
+        ammoInMag: weapon.magazineSize,
+        reserveAmmo: Math.max(weapon.magazineSize, Math.round(weapon.reserveAmmo * 0.9)),
+        reloadTimer: 0,
+        dryFireTimer: 0,
+        resupplyTimer: 0,
+        anchor: { ...position },
+        alert: true,
+        awareness: "patrol",
+        investigateTarget: null,
+        investigateTimer: 0,
+        navigationStallTime: 0,
+        navigationRecoveryIndex: 0,
+        lastNavigationSample: { ...position },
+        navigationCommittedTarget: null,
+        pressureType: null,
+        pressureTimer: 0,
+        blindFireTimer: 0,
+        panicTimer: 0,
+        armorBrokenTimer: 0,
+        armorFlash: 0,
+        fleshFlash: 0,
+        casualtyState: "healthy",
+        woundSeverity: "none",
+        bleedoutTimer: 0,
+        stabilized: false
+      };
+    });
+  }
+
+  private createEnemyCampGarrison(
+    townWarSnapshot: ReturnType<typeof townWarController.getSnapshot>,
+    playerPosition: Vec2
+  ): EnemyState[] {
+    const enemyCamp = townWarSnapshot.camps.find((camp) => camp.id === "camp-b") ?? null;
+    if (!enemyCamp || enemyCamp.destroyed) {
+      return [];
+    }
+
+    const garrisonPlan: Array<{ offset: Vec2; archetypeId: EnemyArchetypeId }> = [
+      { offset: { x: 124, y: -58 }, archetypeId: "rifleman" },
+      { offset: { x: 78, y: 60 }, archetypeId: "skirmisher" },
+      { offset: { x: -12, y: -86 }, archetypeId: "rifleman" },
+      { offset: { x: 168, y: 32 }, archetypeId: "rusher" },
+      { offset: { x: -76, y: 48 }, archetypeId: "rifleman" }
+    ];
+
+    return garrisonPlan.map((entry, index) => {
+      const position = findWalkableSpawnPoint(
+        clampWorldPoint(add(enemyCamp.spawn.position, entry.offset)),
+        entry.archetypeId === "rusher" ? 17 : 16,
+        46,
+        this.state.obstacles,
+        [playerPosition],
+        260
+      );
+      const enemy = createEnemy(this.enemyId++, position, entry.archetypeId, playerPosition, true);
+      enemy.anchor = { ...position };
+      enemy.openingPosture = index === 3 ? "sweeper" : "hold";
+      enemy.squadId = "town-war-camp-b-garrison";
+      enemy.squadRole = index === 1 || index === 3 ? "probe-rifle" : "anchor-rifle";
+      enemy.supportStrongpointLabel = enemyCamp.label;
+      enemy.supportStrongpointTier = "must-own";
+      enemy.supportLaneLabel = "Enemy camp defense";
+      enemy.doctrineState = index === 3 ? "probe-flank" : "hold-threshold";
+      enemy.doctrineWatchDirection = normalize(subtract(playerPosition, enemy.position));
+      enemy.doctrineWatchArcDegrees = 120;
+      enemy.awareness = "investigating";
+      enemy.investigateTarget = { ...playerPosition };
+      return enemy;
+    });
+  }
+
+  private createEnemyFrontlinePatrol(
+    townWarSnapshot: ReturnType<typeof townWarController.getSnapshot>,
+    playerPosition: Vec2
+  ): EnemyState[] {
+    const playerCamp = townWarSnapshot.camps.find((camp) => camp.id === "camp-a") ?? null;
+    const enemyCamp = townWarSnapshot.camps.find((camp) => camp.id === "camp-b") ?? null;
+    if (!playerCamp || !enemyCamp || enemyCamp.destroyed) {
+      return [];
+    }
+
+    const frontCenter = {
+      x: (playerCamp.spawn.position.x + enemyCamp.spawn.position.x) / 2,
+      y: (playerCamp.spawn.position.y + enemyCamp.spawn.position.y) / 2
+    };
+    const patrolPlan: Array<{ offset: Vec2; archetypeId: EnemyArchetypeId; weaponId?: WeaponId }> = [
+      { offset: { x: -246, y: -78 }, archetypeId: "rifleman", weaponId: "rifle" },
+      { offset: { x: -292, y: 72 }, archetypeId: "skirmisher", weaponId: "worn-ak" },
+      { offset: { x: -340, y: -4 }, archetypeId: "rifleman", weaponId: "pkm" },
+      { offset: { x: -198, y: 124 }, archetypeId: "rusher", weaponId: "smg" }
+    ];
+
+    return patrolPlan.map((entry, index) => {
+      const target = { x: frontCenter.x + 220, y: frontCenter.y + entry.offset.y * 0.84 };
+      const position = findWalkableSpawnPoint(
+        clampWorldPoint(add(frontCenter, entry.offset)),
+        entry.archetypeId === "rusher" ? 17 : 16,
+        42,
+        this.state.obstacles,
+        [playerPosition, playerCamp.spawn.position],
+        120
+      );
+      const enemy = createEnemy(this.enemyId++, position, entry.archetypeId, target, true);
+      enemy.anchor = { ...position };
+      enemy.openingPosture = index === 3 ? "sweeper" : "hold";
+      enemy.squadId = "town-war-ukrainian-frontline-patrol";
+      enemy.squadRole = index === 1 || index === 3 ? "probe-rifle" : index === 2 ? "support-gunner" : "anchor-rifle";
+      enemy.weaponId = entry.weaponId ?? enemy.weaponId;
+      enemy.supportStrongpointLabel = "Ukrainian frontline patrol";
+      enemy.supportStrongpointTier = "guarded";
+      enemy.supportLaneLabel = "AI vs AI contact line";
+      enemy.doctrineState = index === 1 || index === 3 ? "probe-flank" : "hold-threshold";
+      enemy.doctrineWatchDirection = normalize(subtract(target, enemy.position));
+      enemy.doctrineWatchArcDegrees = 136;
+      enemy.awareness = "investigating";
+      enemy.investigateTarget = { ...target };
+      enemy.investigateTimer = Math.max(enemy.investigateTimer, 2.4);
       return enemy;
     });
   }
@@ -23352,6 +24116,33 @@ export class RaidController {
     }
   }
 
+  private spawnAiWeaponProjectiles(
+    origin: Vec2,
+    target: Vec2,
+    weaponId: WeaponId,
+    options: {
+      faction: "friendly" | "hostile";
+      source: "friendly-combatant" | "enemy";
+      spreadMultiplier: number;
+      damageMultiplier: number;
+      rangeMultiplier: number;
+      speedMultiplier: number;
+      bracedShot?: boolean;
+    }
+  ): void {
+    const weapon = WEAPONS[weaponId];
+    this.spawnWeaponProjectiles(origin, normalize(subtract(target, origin)), weaponId, {
+      faction: options.faction,
+      source: options.source,
+      fromPlayer: false,
+      spread: weapon.spread * options.spreadMultiplier,
+      damageMultiplier: options.damageMultiplier,
+      rangeMultiplier: options.rangeMultiplier,
+      speedMultiplier: options.speedMultiplier,
+      bracedShot: options.bracedShot ?? false
+    });
+  }
+
   private applyEnemyPressure(
     enemy: EnemyState,
     pressureType: EnemyPressureType,
@@ -23671,6 +24462,7 @@ export class RaidController {
         this.advanceFrontlineReload(combatant, deltaSeconds);
         combatant.dryFireTimer = Math.max(0, combatant.dryFireTimer - deltaSeconds);
         combatant.resupplyTimer = Math.max(0, combatant.resupplyTimer - deltaSeconds);
+        this.tryResupplyFriendlyCombatantFromAmmoCrate(combatant);
         combatant.investigateTimer = Math.max(0, combatant.investigateTimer - deltaSeconds);
         combatant.pressureTimer = Math.max(0, combatant.pressureTimer - deltaSeconds);
         combatant.blindFireTimer = Math.max(0, combatant.blindFireTimer - deltaSeconds);
@@ -24036,12 +24828,10 @@ export class RaidController {
                     WORLD_HEIGHT - 48
                   )
                 };
-                const fireDirection = normalize(subtract(scatterTarget, combatant.position));
-                this.spawnWeaponProjectiles(combatant.position, fireDirection, combatant.weaponId, {
+                this.spawnAiWeaponProjectiles(combatant.position, scatterTarget, combatant.weaponId, {
                   faction: "friendly",
                   source: "friendly-combatant",
-                  fromPlayer: false,
-                  spread: WEAPONS[combatant.weaponId].spread * suppressSpreadMultiplier,
+                  spreadMultiplier: suppressSpreadMultiplier,
                   damageMultiplier: weaponCombatProfile.damageMultiplier * suppressDamageMultiplier,
                   rangeMultiplier: suppressRangeMultiplier,
                   speedMultiplier: weaponCombatProfile.speedMultiplier,
@@ -24195,8 +24985,18 @@ export class RaidController {
               timer: autoRescueTarget.task === "stabilize" ? SQUAD_STABILIZE_SECONDS : 0,
               destination: destination?.position ?? null,
               destinationLabel: destination?.label ?? null,
-              movementPenaltyTimer: 0
+              movementPenaltyTimer: 0,
+              storyBeat: autoRescueTarget.task === "stabilize" ? "stabilizing" : "moving"
             };
+            this.emitRescueStoryBeat({
+              id: `${combatant.squadMateId}:${autoRescueTarget.id}:${autoRescueTarget.task}`,
+              kind: autoRescueTarget.task === "stabilize" ? "stabilizing" : "moving",
+              targetName: autoRescueTarget.name,
+              rescuerName: combatant.name,
+              position: autoRescueTarget.position,
+              destinationLabel: destination?.label ?? null,
+              targetIsPlayer: autoRescueTarget.kind === "player"
+            });
             this.state.message =
               autoRescueTarget.task === "stabilize"
                 ? `${combatant.name} is stabilizing ${autoRescueTarget.name} under fire.`
@@ -24255,11 +25055,10 @@ export class RaidController {
                 : 1;
             const squadSpreadMultiplier = braceWatchReady ? 0.64 : moveWatchSpreadMultiplier;
             if (hasSight) {
-              this.spawnWeaponProjectiles(combatant.position, normalize(toEnemy), combatant.weaponId, {
+              this.spawnAiWeaponProjectiles(combatant.position, visibleEnemy.position, combatant.weaponId, {
                 faction: "friendly",
                 source: "friendly-combatant",
-                fromPlayer: false,
-                spread: WEAPONS[combatant.weaponId].spread * weaponCombatProfile.spreadMultiplier * squadSpreadMultiplier,
+                spreadMultiplier: weaponCombatProfile.spreadMultiplier * squadSpreadMultiplier,
                 damageMultiplier: weaponCombatProfile.damageMultiplier,
                 rangeMultiplier: engageRange / Math.max(1, WEAPONS[combatant.weaponId].range),
                 speedMultiplier: weaponCombatProfile.speedMultiplier,
@@ -24326,12 +25125,10 @@ export class RaidController {
                 WORLD_HEIGHT - 48
               )
             };
-            const fireDirection = normalize(subtract(scatterTarget, combatant.position));
-            this.spawnWeaponProjectiles(combatant.position, fireDirection, combatant.weaponId, {
+            this.spawnAiWeaponProjectiles(combatant.position, scatterTarget, combatant.weaponId, {
               faction: "friendly",
               source: "friendly-combatant",
-              fromPlayer: false,
-              spread: WEAPONS[combatant.weaponId].spread * moveWatchSuppressProfile.spreadMultiplier,
+              spreadMultiplier: moveWatchSuppressProfile.spreadMultiplier,
               damageMultiplier: weaponCombatProfile.damageMultiplier * moveWatchSuppressProfile.probeDamageMultiplier,
               rangeMultiplier: Math.max(0.68, moveWatchSuppressProfile.effectiveRange / Math.max(1, WEAPONS[combatant.weaponId].range)),
               speedMultiplier: weaponCombatProfile.speedMultiplier,
@@ -24785,6 +25582,27 @@ export class RaidController {
         movedDistance < Math.max(1.5, expectedDistance * 0.22);
       const nextNavigationStallTime = stalled ? enemy.navigationStallTime + deltaSeconds : 0;
       const rotateNavigation = nextNavigationStallTime >= 0.42;
+      const recoveryTarget =
+        rotateNavigation && moveScale > 0.001
+          ? getNavigationRecoveryTarget(
+              enemy.position,
+              navigationGoal,
+              enemy.radius,
+              this.state.obstacles,
+              enemy.navigationRecoveryIndex
+            )
+          : null;
+      if (recoveryTarget) {
+        const recoveryDirection = normalize(subtract(recoveryTarget, enemy.position));
+        const recoverySpeed = Math.max(moveScale * 1.15, SCAV_ARCHETYPES[enemy.archetypeId].patrolSpeed * 1.08);
+        enemy.position = moveWithObstacleCollision(
+          enemy.position,
+          multiply(recoveryDirection, recoverySpeed),
+          deltaSeconds,
+          enemy.radius,
+          this.state.obstacles
+        );
+      }
 
       enemy.navigationStallTime = rotateNavigation ? 0 : nextNavigationStallTime;
       enemy.navigationRecoveryIndex = stalled
@@ -24794,18 +25612,20 @@ export class RaidController {
         : 0;
       enemy.lastNavigationSample = stalled ? enemy.lastNavigationSample : { ...enemy.position };
       enemy.navigationCommittedTarget =
-        rotateNavigation ||
-        shouldClearCommittedNavigationTarget(
-          enemy.position,
-          movementTarget,
-          navigationGoal,
-          enemy.radius,
-          this.state.obstacles
-        )
-          ? null
-          : movementTarget
-            ? { x: movementTarget.x, y: movementTarget.y }
-            : null;
+        recoveryTarget
+          ? { ...recoveryTarget }
+          : rotateNavigation ||
+            shouldClearCommittedNavigationTarget(
+              enemy.position,
+              movementTarget,
+              navigationGoal,
+              enemy.radius,
+              this.state.obstacles
+            )
+            ? null
+            : movementTarget
+              ? { x: movementTarget.x, y: movementTarget.y }
+              : null;
 
       if (!activeHostileRescueTask && !lockedAsHostileRescueTarget && returnableFriendlyGrenade && enemy.cooldown === 0) {
         this.returnGrenade(
@@ -24839,6 +25659,8 @@ export class RaidController {
         continue;
       }
 
+      const hostilePlayerBalance = targetKind === "player" ? HOSTILE_PLAYER_BALANCE : null;
+
       if (
         enemy.pressureType === "suppressed" &&
         enemy.panicTimer === 0 &&
@@ -24858,12 +25680,17 @@ export class RaidController {
         );
         enemy.blindFireTimer = Math.max(enemy.blindFireTimer, machineGunner ? 1.45 : 1.05);
         if (machineGunner && targetKind === "player") {
-          this.applyHostileLanePin(enemy, targetPosition, 0.72);
+          this.applyHostileLanePin(enemy, targetPosition, 0.72 * HOSTILE_PLAYER_BALANCE.machineGunLanePinMultiplier);
         }
         enemy.cooldown =
           (weaponCombatProfile.fireIntervalMin * (machineGunner ? 0.74 : 1.08) +
             Math.random() * Math.max(0.05, weaponCombatProfile.fireIntervalMax - weaponCombatProfile.fireIntervalMin)) *
-          tapeCombatTuning.fireIntervalMultiplier;
+          tapeCombatTuning.fireIntervalMultiplier *
+          (hostilePlayerBalance
+            ? machineGunner
+              ? hostilePlayerBalance.machineGunFireIntervalMultiplier
+              : hostilePlayerBalance.fireIntervalMultiplier
+            : 1);
       } else if (
         enemy.pressureType !== "staggered" &&
         enemy.pressureType !== "suppressed" &&
@@ -24876,37 +25703,32 @@ export class RaidController {
       ) {
         const weapon = WEAPONS[enemy.weaponId];
         if (targetKind === "player") {
-          this.spawnWeaponProjectiles(enemy.position, normalize(toTarget), enemy.weaponId, {
+          this.spawnAiWeaponProjectiles(enemy.position, targetPosition, enemy.weaponId, {
             faction: "hostile",
             source: "enemy",
-            fromPlayer: false,
-            spread:
-              weapon.spread *
+            spreadMultiplier:
               weaponCombatProfile.spreadMultiplier *
               tapeCombatTuning.spreadMultiplier *
-              (machineGunner ? 1.08 : 1),
+              (machineGunner ? 1.08 : 1) *
+              HOSTILE_PLAYER_BALANCE.spreadMultiplier,
+            damageMultiplier: weaponCombatProfile.damageMultiplier * HOSTILE_PLAYER_BALANCE.damageMultiplier,
+            rangeMultiplier: (engageRange / Math.max(1, weapon.range)) * HOSTILE_PLAYER_BALANCE.rangeMultiplier,
+            speedMultiplier: weaponCombatProfile.speedMultiplier * HOSTILE_PLAYER_BALANCE.speedMultiplier,
+            bracedShot: false
+          });
+          if (machineGunner) {
+            this.applyHostileLanePin(enemy, targetPosition, HOSTILE_PLAYER_BALANCE.machineGunLanePinMultiplier);
+          }
+        } else if (frontlineTarget?.kind === "friendly-combatant") {
+          this.spawnAiWeaponProjectiles(enemy.position, targetPosition, enemy.weaponId, {
+            faction: "hostile",
+            source: "enemy",
+            spreadMultiplier: weaponCombatProfile.spreadMultiplier * tapeCombatTuning.spreadMultiplier * (machineGunner ? 1.04 : 1),
             damageMultiplier: weaponCombatProfile.damageMultiplier,
             rangeMultiplier: engageRange / Math.max(1, weapon.range),
             speedMultiplier: weaponCombatProfile.speedMultiplier,
             bracedShot: false
           });
-          if (machineGunner) {
-            this.applyHostileLanePin(enemy, targetPosition, 1);
-          }
-        } else if (frontlineTarget?.kind === "friendly-combatant") {
-          this.emitFrontlineTracerBurst(
-            enemy.position,
-            frontlineTarget.target.position,
-            enemy.weaponId,
-            0x93c5fd,
-            "hostile",
-            weaponCombatProfile.tracerBurstScale * (machineGunner ? 1.28 : 1)
-          );
-          this.applyHostileDamageToFriendlyCombatant(
-            frontlineTarget.target,
-            enemy.position,
-            Math.max(4, Math.round(weapon.damage * weaponCombatProfile.frontlineDamageMultiplier * 0.92))
-          );
         } else if (frontlineTarget) {
           this.emitFrontlineTracerBurst(
             enemy.position,
@@ -24926,7 +25748,12 @@ export class RaidController {
             Math.random() * Math.max(0.05, weaponCombatProfile.fireIntervalMax - weaponCombatProfile.fireIntervalMin)) *
           tapeCombatTuning.fireIntervalMultiplier *
           woundFireIntervalMultiplier *
-          (machineGunner ? 0.72 : 1);
+          (machineGunner ? 0.72 : 1) *
+          (hostilePlayerBalance
+            ? machineGunner
+              ? hostilePlayerBalance.machineGunFireIntervalMultiplier
+              : hostilePlayerBalance.fireIntervalMultiplier
+            : 1);
       }
     }
   }
@@ -25162,6 +25989,7 @@ export class RaidController {
       enemy.squadRole === "anchor-rifle" && (squadRead === null || !squadRead.anchorRifleAlive);
     const deepRifleEliminated =
       enemy.squadRole === "deep-rifle" && (squadRead === null || squadRead.deepRifleAliveCount === 0);
+    const suppressBodyAlarm = enemy.squadId?.startsWith("town-war-") ?? false;
     this.state.fallenEnemyBodies.push({
       id: this.fallenEnemyBodyId++,
       enemyId: enemy.id,
@@ -25170,7 +25998,8 @@ export class RaidController {
       tapeId: enemy.tapeId,
       position: { ...enemy.position },
       facing: { ...enemy.facing },
-      recoveryProgress: ENEMY_BODY_RECOVERY_SECONDS
+      recoveryProgress: ENEMY_BODY_RECOVERY_SECONDS,
+      bodyAlarmSuppressed: suppressBodyAlarm
     });
     const archetype = SCAV_ARCHETYPES[enemy.archetypeId];
     const dropCount = Math.random() > 0.5 ? 2 : 1;
@@ -25374,7 +26203,10 @@ export class RaidController {
       }
     }
 
-    this.state.message = `${combatant.name} was killed in the raid. The Russian side is now fighting one body lighter.`;
+    this.state.message =
+      combatant.ownerKind === "camp-garrison"
+        ? `${combatant.name} was killed in the raid. The Russian side is now fighting one body lighter.`
+        : `${combatant.name} was killed in the raid. The Russian side is now fighting one body lighter.`;
   }
 
   private recordPocketKill(position: Vec2): void {
@@ -25592,6 +26424,14 @@ export class RaidController {
     if (activeTask.task === "stabilize") {
       if (distance(rescuer.position, target.position) > SQUAD_STABILIZE_RADIUS) {
         this.state.message = `${activeTask.targetName} slipped out of stabilization range when ${activeTask.rescuerName} left the body.`;
+        this.emitRescueStoryBeat({
+          id: `${activeTask.rescuerId}:${activeTask.targetId}:stabilize-failed`,
+          kind: "failed",
+          targetName: activeTask.targetName,
+          rescuerName: activeTask.rescuerName,
+          position: target.position,
+          targetIsPlayer: activeTask.targetKind === "player"
+        });
         this.state.activeRescueTask = null;
         return;
       }
@@ -25645,6 +26485,21 @@ export class RaidController {
       const extractDestination = this.getExtractAtPoint(activeTask.destination, true);
       if (activeTask.targetKind === "player" && extractDestination) {
         (target as PlayerState).commandRestrictionMode = "downed";
+        if (activeTask.storyBeat !== "extracting") {
+          activeTask.storyBeat = "extracting";
+          this.emitRescueStoryBeat({
+            id: `${activeTask.rescuerId}:${activeTask.targetId}:extracting`,
+            kind: "extracting",
+            targetName: activeTask.targetName,
+            rescuerName: activeTask.rescuerName,
+            position: target.position,
+            destinationLabel: extractDestination.label,
+            targetIsPlayer: true
+          });
+        }
+        if (this.state.extractionReady && this.state.extractionHoldTimer <= 0 && !this.state.extractionContested) {
+          this.tryStartExtractionHold(extractDestination, true);
+        }
         this.state.message =
           target.casualtyState === "dead"
             ? `${activeTask.rescuerName} got Blue's body inside ${extractDestination.label}. Hold the ring and bring him home.`
@@ -25659,6 +26514,15 @@ export class RaidController {
         activeTask.task === "carry"
           ? `${activeTask.rescuerName} got ${activeTask.targetName} to ${activeTask.destinationLabel ?? "cover"}.`
           : `${activeTask.rescuerName} walked ${activeTask.targetName} onto ${activeTask.destinationLabel ?? "cover"}.`;
+      this.emitRescueStoryBeat({
+        id: `${activeTask.rescuerId}:${activeTask.targetId}:completed`,
+        kind: "completed",
+        targetName: activeTask.targetName,
+        rescuerName: activeTask.rescuerName,
+        position: target.position,
+        destinationLabel: activeTask.destinationLabel,
+        targetIsPlayer: activeTask.targetKind === "player"
+      });
       this.state.activeRescueTask = null;
     }
   }
@@ -25860,6 +26724,12 @@ export class RaidController {
   }
 
   private triggerHostileBodyWave(alarm: ActiveHostileBodyAlarmState): void {
+    const alarmBody = this.state.fallenEnemyBodies.find((body) => body.id === alarm.bodyId) ?? null;
+    if (alarmBody?.bodyAlarmSuppressed) {
+      this.state.message = `${alarm.bodyLabel} is down. No recovery wave is being called for this town-war casualty.`;
+      return;
+    }
+
     const route = this.getActiveRoute();
     const pressureSpawns = route.noiseResponseSpawns;
     const pressureBriefing = `${alarm.bodyLabel} got called in. A six-man recovery file is stepping toward the body with a PKM lane owner and flank rifles behind it.`;
@@ -25940,6 +26810,10 @@ export class RaidController {
       }
 
       for (const body of this.state.fallenEnemyBodies) {
+        if (body.bodyAlarmSuppressed) {
+          continue;
+        }
+
         const caller = this.state.enemies.find((enemy) => {
           if (enemy.casualtyState === "downed" || enemy.casualtyState === "dead") {
             return false;
@@ -25979,6 +26853,11 @@ export class RaidController {
     const caller = this.state.enemies.find((enemy) => enemy.id === activeAlarm.callerId) ?? null;
     const body = this.state.fallenEnemyBodies.find((entry) => entry.id === activeAlarm.bodyId) ?? null;
     if (!caller || !body) {
+      this.state.activeHostileBodyAlarm = null;
+      return;
+    }
+
+    if (body.bodyAlarmSuppressed) {
       this.state.activeHostileBodyAlarm = null;
       return;
     }
@@ -26193,6 +27072,12 @@ export class RaidController {
     if (supplyCache) {
       if (this.state.activeSearch?.cacheId === supplyCache.id) {
         return;
+      }
+
+      if (supplyCache.resupplyCrate) {
+        if (this.tryResupplyPlayerFromAmmoCrate(supplyCache)) {
+          return;
+        }
       }
 
       this.state.activeSearch = {
@@ -26782,7 +27667,7 @@ export class RaidController {
               ? `Stabilizing ${activeRescueTask.targetName}: ${activeRescueTask.timer.toFixed(1)}s remaining.`
               : `${activeRescueTask.targetName} is slipping out. Re-enter the pocket to finish the stabilizing cut.`
             : activeRescueTask.targetKind === "player"
-              ? `${activeRescueTask.rescuerName} is ${activeRescueTask.task === "carry" ? "carrying" : "assisting"} Blue toward ${activeRescueTask.destinationLabel ?? "cover"}. Trigger still fires, but the pull slows.`
+              ? `${activeRescueTask.rescuerName} is ${activeRescueTask.task === "carry" ? "carrying" : "assisting"} Blue toward ${activeRescueTask.destinationLabel ?? "cover"}. Downed controls are locked.`
               : `${activeRescueTask.rescuerName} is ${activeRescueTask.task === "carry" ? "carrying" : "assisting"} ${activeRescueTask.targetName} toward ${activeRescueTask.destinationLabel ?? "cover"}.`;
         return;
       }
@@ -27213,6 +28098,7 @@ export class RaidController {
     briefing: string,
     targetPosition: Vec2
   ): void {
+    const townWarEnemySideLimit = this.getTownWarEnemySideLimit();
     const reservedPoints = [
       this.state.player.position,
       targetPosition,
@@ -27221,15 +28107,24 @@ export class RaidController {
     ];
 
     for (const spawn of spawns) {
-      const stagedPosition = findSafeReinforcementSpawnPoint(
-        spawn.position,
+      const requestedPosition = this.clampToTownWarEnemySide(spawn.position, townWarEnemySideLimit);
+      const stagedPosition = this.findTownWarEnemySideSpawnPoint(
+        findSafeReinforcementSpawnPoint(
+          requestedPosition,
+          16,
+          86,
+          this.state.obstacles,
+          reservedPoints,
+          72,
+          this.state.player.position,
+          targetPosition
+        ),
         16,
         86,
         this.state.obstacles,
         reservedPoints,
         72,
-        this.state.player.position,
-        targetPosition
+        townWarEnemySideLimit
       );
       reservedPoints.push(stagedPosition);
       this.state.pendingReinforcements.push({
@@ -27268,8 +28163,23 @@ export class RaidController {
         continue;
       }
 
-      const liveSpawnPosition = findSafeReinforcementSpawnPoint(
-        pending.position,
+      const townWarEnemySideLimit = this.getTownWarEnemySideLimit();
+      const liveSpawnPosition = this.findTownWarEnemySideSpawnPoint(
+        findSafeReinforcementSpawnPoint(
+          this.clampToTownWarEnemySide(pending.position, townWarEnemySideLimit),
+          16,
+          132,
+          this.state.obstacles,
+          [
+            this.state.player.position,
+            pending.targetPosition,
+            ...this.state.enemies.map((enemy) => enemy.position),
+            ...remaining.map((entry) => entry.position)
+          ],
+          72,
+          this.state.player.position,
+          pending.targetPosition
+        ),
         16,
         132,
         this.state.obstacles,
@@ -27280,8 +28190,7 @@ export class RaidController {
           ...remaining.map((entry) => entry.position)
         ],
         72,
-        this.state.player.position,
-        pending.targetPosition
+        townWarEnemySideLimit
       );
       pending.position = liveSpawnPosition;
 

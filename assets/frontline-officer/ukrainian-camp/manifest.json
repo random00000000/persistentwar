@@ -1,0 +1,427 @@
+{
+  "pack": "frontline-officer-ukrainian-camp",
+  "factionUse": "Fictional friendly-side camp with Ukrainian-side visual read; avoids real flags, unit marks, and slogans.",
+  "anchor": "top-down sprites, transparent PNG unless noted",
+  "files": [
+    {
+      "file": "ukrainian_ammo_cache_64.png",
+      "size": [
+        64,
+        64
+      ],
+      "role": "supply stockpile / logistics target"
+    },
+    {
+      "file": "ukrainian_barracks_tent_112x96.png",
+      "size": [
+        112,
+        96
+      ],
+      "role": "reinforcement or rest tent"
+    },
+    {
+      "file": "ukrainian_barracks_tent_96.png",
+      "size": [
+        96,
+        96
+      ],
+      "role": "reinforcement or rest tent"
+    },
+    {
+      "file": "ukrainian_barracks_tent_damaged_96.png",
+      "size": [
+        96,
+        96
+      ],
+      "role": "reinforcement or rest tent"
+    },
+    {
+      "file": "ukrainian_camo_net_storage_128.png",
+      "size": [
+        128,
+        128
+      ],
+      "role": "camp visual asset"
+    },
+    {
+      "file": "ukrainian_camp_extended_preview_sheet.png",
+      "size": [
+        512,
+        384
+      ],
+      "role": "non-runtime visual index"
+    },
+    {
+      "file": "ukrainian_camp_preview_sheet.png",
+      "size": [
+        512,
+        384
+      ],
+      "role": "non-runtime visual index"
+    },
+    {
+      "file": "ukrainian_camp_props_32_sheet.png",
+      "size": [
+        128,
+        128
+      ],
+      "role": "camp visual asset"
+    },
+    {
+      "file": "ukrainian_checkpoint_gate_128x64.png",
+      "size": [
+        128,
+        64
+      ],
+      "role": "camp visual asset"
+    },
+    {
+      "file": "ukrainian_command_bunker_128.png",
+      "size": [
+        128,
+        128
+      ],
+      "role": "camp command core / damage target"
+    },
+    {
+      "file": "ukrainian_command_bunker_damaged_128.png",
+      "size": [
+        128,
+        96
+      ],
+      "role": "camp command core / damage target"
+    },
+    {
+      "file": "ukrainian_command_core_160x144.png",
+      "size": [
+        160,
+        144
+      ],
+      "role": "camp visual asset"
+    },
+    {
+      "file": "ukrainian_field_kitchen_64.png",
+      "size": [
+        64,
+        64
+      ],
+      "role": "camp visual asset"
+    },
+    {
+      "file": "ukrainian_fuel_drums_64.png",
+      "size": [
+        64,
+        64
+      ],
+      "role": "camp visual asset"
+    },
+    {
+      "file": "ukrainian_generator_trailer_96.png",
+      "size": [
+        96,
+        96
+      ],
+      "role": "camp visual asset"
+    },
+    {
+      "file": "ukrainian_large_supply_dump_128.png",
+      "size": [
+        128,
+        128
+      ],
+      "role": "supply stockpile / logistics target"
+    },
+    {
+      "file": "ukrainian_logistics_truck_128x96.png",
+      "size": [
+        128,
+        96
+      ],
+      "role": "logistics vehicle"
+    },
+    {
+      "file": "ukrainian_logistics_truck_144x96.png",
+      "size": [
+        144,
+        96
+      ],
+      "role": "logistics vehicle"
+    },
+    {
+      "file": "ukrainian_medical_dugout_96.png",
+      "size": [
+        96,
+        96
+      ],
+      "role": "camp visual asset"
+    },
+    {
+      "file": "ukrainian_mortar_pit_96.png",
+      "size": [
+        96,
+        96
+      ],
+      "role": "camp visual asset"
+    },
+    {
+      "file": "ukrainian_motor_pool_truck_128x96.png",
+      "size": [
+        128,
+        96
+      ],
+      "role": "logistics vehicle"
+    },
+    {
+      "file": "ukrainian_radio_mast_64.png",
+      "size": [
+        64,
+        64
+      ],
+      "role": "command and observation prop"
+    },
+    {
+      "file": "ukrainian_sandbag_wall_128x32.png",
+      "size": [
+        128,
+        32
+      ],
+      "role": "defensive cover / firing position"
+    },
+    {
+      "file": "ukrainian_supply_depot_96.png",
+      "size": [
+        96,
+        96
+      ],
+      "role": "supply stockpile / logistics target"
+    },
+    {
+      "file": "ukrainian_supply_dump_128x112.png",
+      "size": [
+        128,
+        112
+      ],
+      "role": "supply stockpile / logistics target"
+    },
+    {
+      "file": "ukrainian_trench_firing_bay_128x64.png",
+      "size": [
+        128,
+        64
+      ],
+      "role": "defensive cover / firing position"
+    },
+    {
+      "file": "ukrainian_trench_gate_128x64.png",
+      "size": [
+        128,
+        64
+      ],
+      "role": "defensive cover / firing position"
+    },
+    {
+      "file": "ukrainian_vehicle_wreck_128x96.png",
+      "size": [
+        128,
+        96
+      ],
+      "role": "destroyed vehicle scar"
+    },
+    {
+      "file": "ukrainian_watch_post_96.png",
+      "size": [
+        96,
+        96
+      ],
+      "role": "camp visual asset"
+    },
+    {
+      "file": "ukrainian_wire_belt_128x64.png",
+      "size": [
+        128,
+        64
+      ],
+      "role": "barbed-wire belt / movement blocker"
+    },
+    {
+      "file": "ukrainian_camp_modules_64_sheet.png",
+      "size": [
+        256,
+        256
+      ],
+      "role": "4x4 runtime camp module sheet: command, tents, logistics, radio, defenses, vehicles, and support props",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "ukrainian_camp_damage_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 damaged camp state sheet for blasted buildings, wrecked cover, craters, and disabled vehicles",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "ukrainian_perimeter_defenses_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 runtime camp perimeter sheet: sandbags, wire, steel, logs, watch cover, and fighting pits",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "ukrainian_fieldwork_build_stages_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4-stage trench and barricade construction progress sheet for build-order execution",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "ukrainian_logistics_markers_32_sheet.png",
+      "size": [
+        256,
+        64
+      ],
+      "role": "8-frame 32 px logistics/command marker sheet for ammo, fuel, radio, power, food, and med props",
+      "frameSize": [
+        32,
+        32
+      ]
+    },
+    {
+      "file": "ukrainian_camp_interiors_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 interior/support module sheet for command desks, bunk room, radio, planning tables, generator, storage, and mast base",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "ukrainian_supply_stacks_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 logistics stack sheet for fuel, ammo, batteries, crates, sandbags, field stores, and mixed supply piles",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "ukrainian_signal_panels_32_sheet.png",
+      "size": [
+        256,
+        64
+      ],
+      "role": "8-frame 32 px fictional identification panel sheet for camp markings, signs, and small command props",
+      "frameSize": [
+        32,
+        32
+      ]
+    },
+    {
+      "file": "ukrainian_heavy_emplacements_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 heavy emplacement sheet for mortar pits, machine-gun cover, road guns, comms, and support vehicles",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "ukrainian_camp_services_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 camp services sheet for kitchen, bunks, aid, repair, comms, stockpiles, generator, and storage",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "ukrainian_ground_markers_32_sheet.png",
+      "size": [
+        256,
+        64
+      ],
+      "role": "8-frame 32 px fictional ground marker sheet for camp lane markings, warning plates, and command tags",
+      "frameSize": [
+        32,
+        32
+      ]
+    },
+    {
+      "file": "ukrainian_abandoned_camp_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 abandoned and damaged camp evidence sheet for broken equipment, collapsed storage, and burned positions",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "ukrainian_recovery_medical_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 casualty recovery and field medical prop sheet for aid, evacuation, supplies, and triage dressing",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "ukrainian_camo_command_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 camouflaged command and covered support position sheet for fictional Ukrainian-side camp dressing",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "ukrainian_night_watch_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 night-watch camp sheet for lit posts, watch lamps, dark cover, and low-light support props",
+      "frameSize": [
+        64,
+        64
+      ]
+    }
+  ]
+}

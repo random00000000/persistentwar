@@ -1418,6 +1418,789 @@ body.stash-open .hud {
   background: rgba(8, 47, 73, 0.5);
 }
 
+.officer-tools-dock {
+  pointer-events: auto;
+  position: relative;
+  align-self: flex-end;
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  min-width: 132px;
+}
+
+.build-mode-dock {
+  pointer-events: auto;
+  position: relative;
+  align-self: flex-end;
+  display: grid;
+  justify-items: end;
+  gap: 7px;
+  width: min(520px, calc(100vw - 24px));
+}
+
+.build-mode-toggle,
+.camp-art-toggle {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  border: 1px solid rgba(250, 204, 21, 0.4);
+  border-radius: 999px;
+  padding: 7px 12px;
+  background:
+    linear-gradient(135deg, rgba(68, 64, 60, 0.72), rgba(24, 36, 30, 0.68)),
+    rgba(2, 6, 23, 0.72);
+  color: #fef3c7;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: 0 16px 34px rgba(2, 6, 23, 0.34);
+}
+
+.build-mode-toggle span,
+.build-mode-toggle strong,
+.camp-art-toggle span,
+.camp-art-toggle strong,
+.build-mode-actions button {
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.build-mode-toggle strong,
+.camp-art-toggle strong {
+  color: #f8fafc;
+}
+
+.build-mode-toggle.active,
+.build-mode-toggle.placing,
+.camp-art-toggle.hidden-art {
+  border-color: rgba(250, 204, 21, 0.68);
+  background:
+    linear-gradient(135deg, rgba(120, 53, 15, 0.76), rgba(22, 64, 52, 0.72)),
+    rgba(2, 6, 23, 0.76);
+  box-shadow:
+    0 0 0 1px rgba(250, 204, 21, 0.14),
+    0 18px 40px rgba(2, 6, 23, 0.42);
+}
+
+.camp-art-toggle {
+  min-height: 30px;
+  padding: 5px 9px;
+  border-color: rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.56);
+  color: #cbd5e1;
+  box-shadow: 0 10px 24px rgba(2, 6, 23, 0.24);
+}
+
+.build-mode-strip {
+  width: 100%;
+  max-width: 520px;
+  padding: 8px;
+  border: 1px solid rgba(250, 204, 21, 0.24);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(19, 15, 8, 0.92), rgba(2, 6, 23, 0.9)),
+    rgba(2, 6, 23, 0.9);
+  box-shadow: 0 22px 52px rgba(2, 6, 23, 0.46);
+}
+
+.build-mode-strip.hidden {
+  display: none;
+}
+
+.build-mode-strip > div {
+  display: grid;
+  gap: 7px;
+}
+
+.build-mode-read {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.build-mode-read article {
+  min-width: 0;
+  padding: 6px 7px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.build-mode-read span,
+.build-mode-hint {
+  color: #94a3b8;
+  font-size: 0.61rem;
+  line-height: 1.3;
+}
+
+.build-mode-read span {
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.build-mode-read strong {
+  display: block;
+  margin-top: 2px;
+  color: #f8fafc;
+  font-size: 0.72rem;
+  line-height: 1.1;
+}
+
+.build-mode-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.build-mode-actions button {
+  min-height: 30px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.58);
+  color: #cbd5e1;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.build-mode-actions button.active,
+.build-mode-actions button:hover {
+  border-color: rgba(250, 204, 21, 0.36);
+  background: rgba(120, 53, 15, 0.56);
+  color: #fef3c7;
+}
+
+.build-mode-hint {
+  margin: 0;
+}
+
+body.town-war-build-mode .hud-row-top,
+body.town-war-build-mode .field-strip,
+body.town-war-build-mode .hud-secondary-card,
+body.town-war-build-mode .decision-card,
+body.town-war-build-mode .tactical-drawer {
+  opacity: 0.16;
+  pointer-events: none;
+  filter: saturate(0.7);
+}
+
+body.town-war-build-mode .field-strip,
+body.town-war-build-mode .hud-secondary-card,
+body.town-war-build-mode .decision-card {
+  display: none;
+}
+
+body.town-war-build-mode .hud-row-bottom {
+  justify-content: flex-end;
+}
+
+.officer-tools-toggle {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  border: 1px solid rgba(250, 204, 21, 0.28);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(38, 28, 10, 0.5);
+  color: #fef3c7;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: 0 14px 34px rgba(2, 6, 23, 0.28);
+}
+
+.officer-tools-toggle span,
+.officer-tools-toggle strong,
+.officer-tools-tab,
+.officer-tools-actions button,
+.officer-tools-row button {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.officer-tools-toggle strong {
+  color: #f8fafc;
+}
+
+.officer-tools-toggle.placing {
+  border-color: rgba(250, 204, 21, 0.58);
+  background: rgba(120, 53, 15, 0.68);
+  box-shadow:
+    0 0 0 1px rgba(250, 204, 21, 0.12),
+    0 16px 36px rgba(2, 6, 23, 0.34);
+}
+
+.officer-tools-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(680px, 72vh);
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  overflow: auto;
+  border: 1px solid rgba(250, 204, 21, 0.22);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(19, 15, 8, 0.94), rgba(2, 6, 23, 0.94)),
+    rgba(2, 6, 23, 0.92);
+  box-shadow: 0 24px 56px rgba(2, 6, 23, 0.52);
+}
+
+.officer-tools-panel.hidden {
+  display: none;
+}
+
+.officer-tools-head,
+.officer-tools-section-head,
+.officer-soldier-main,
+.officer-tools-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.officer-tools-head {
+  position: sticky;
+  top: -10px;
+  z-index: 1;
+  padding: 2px 0 6px;
+  background: linear-gradient(180deg, rgba(19, 15, 8, 0.98), rgba(19, 15, 8, 0));
+}
+
+.officer-tools-head strong {
+  display: block;
+  color: #f8fafc;
+  font-size: 0.86rem;
+}
+
+.officer-tools-icon-button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.62);
+  color: #cbd5e1;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.officer-tools-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.42);
+}
+
+.officer-tools-tab,
+.officer-tools-actions button,
+.officer-tools-row button {
+  min-height: 28px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.52);
+  color: #cbd5e1;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.officer-tools-tab.active,
+.officer-tools-actions button.active,
+.officer-tools-actions button:hover,
+.officer-tools-row button:hover {
+  border-color: rgba(250, 204, 21, 0.34);
+  background: rgba(120, 53, 15, 0.52);
+  color: #fef3c7;
+}
+
+.officer-tools-body,
+.officer-tools-section,
+.officer-soldier-row,
+.officer-soldier-inspector,
+.officer-priority-bridge,
+.officer-tools-build-cards {
+  display: grid;
+  gap: 8px;
+}
+
+.officer-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.officer-tools-stat,
+.officer-tools-note,
+.officer-tools-row,
+.officer-soldier-row,
+.officer-soldier-inspector,
+.officer-priority-bridge,
+.officer-tools-build-cards article {
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.46);
+}
+
+.officer-soldier-row.selected,
+.officer-soldier-inspector {
+  border-color: rgba(250, 204, 21, 0.24);
+  background:
+    linear-gradient(180deg, rgba(120, 53, 15, 0.18), rgba(15, 23, 42, 0.46)),
+    rgba(15, 23, 42, 0.46);
+}
+
+.officer-soldier-inspector.muted {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.38);
+}
+
+.officer-tools-placement-note.active {
+  border-color: rgba(250, 204, 21, 0.28);
+  background: rgba(120, 53, 15, 0.34);
+}
+
+.officer-tools-stat {
+  display: grid;
+  gap: 3px;
+  padding: 7px;
+}
+
+.officer-colony-status-card {
+  display: grid;
+  gap: 7px;
+  padding: 8px;
+  border-color: rgba(34, 197, 94, 0.18);
+  background: rgba(6, 78, 59, 0.2);
+}
+
+.officer-colony-meter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.officer-colony-meter-grid span {
+  min-height: 21px;
+  padding: 4px 5px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 6px;
+  background: rgba(2, 6, 23, 0.24);
+  color: #cbd5e1;
+  font-size: 0.58rem;
+  line-height: 1.15;
+}
+
+.officer-tools-stat span,
+.officer-tools-section-head span,
+.officer-tools-row span,
+.officer-soldier-main span,
+.officer-soldier-inspector span,
+.officer-tools-note span,
+.officer-tools-build-cards span,
+.officer-tools-empty,
+.officer-tools-action-read {
+  color: #94a3b8;
+  font-size: 0.64rem;
+  line-height: 1.35;
+}
+
+.officer-tools-stat strong,
+.officer-tools-section-head strong,
+.officer-tools-row strong,
+.officer-soldier-main strong,
+.officer-soldier-inspector strong,
+.officer-tools-note strong,
+.officer-tools-build-cards strong {
+  color: #f8fafc;
+  font-size: 0.72rem;
+}
+
+.officer-tools-row em {
+  color: #fde68a;
+  font-size: 0.72rem;
+  font-style: normal;
+}
+
+.officer-tools-row-compact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px;
+}
+
+.officer-story-row {
+  border-color: rgba(96, 165, 250, 0.18);
+  background: rgba(30, 64, 175, 0.18);
+}
+
+.officer-story-row span + span,
+.officer-soldier-main span + span {
+  display: block;
+  margin-top: 2px;
+  color: #cbd5e1;
+}
+
+.officer-tools-build-cards {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.officer-tools-build-cards article {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+}
+
+.officer-tools-build-cards em {
+  color: #fde68a;
+  font-size: 0.6rem;
+  font-style: normal;
+}
+
+.officer-tools-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.officer-tools-actions button {
+  flex: 1 1 auto;
+  padding: 0 8px;
+}
+
+.officer-tools-actions-tight button {
+  flex: 0 1 auto;
+}
+
+.officer-tools-section {
+  padding-top: 2px;
+}
+
+.officer-tools-section-head {
+  align-items: center;
+}
+
+.officer-tools-row,
+.officer-soldier-row,
+.officer-priority-bridge,
+.officer-tools-note {
+  padding: 7px;
+}
+
+.officer-tools-row em,
+.officer-soldier-main em {
+  color: #fde68a;
+  font-size: 0.6rem;
+  font-style: normal;
+  text-align: right;
+}
+
+.officer-soldier-main {
+  align-items: center;
+}
+
+.officer-priority-bridge {
+  border-color: rgba(34, 197, 94, 0.16);
+  background:
+    linear-gradient(180deg, rgba(6, 78, 59, 0.16), rgba(15, 23, 42, 0.42)),
+    rgba(15, 23, 42, 0.42);
+}
+
+.officer-priority-bridge-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.officer-priority-bridge-head span,
+.officer-priority-need-row span,
+.officer-priority-labor-grid span {
+  color: #94a3b8;
+  font-size: 0.62rem;
+  line-height: 1.3;
+}
+
+.officer-priority-bridge-head span {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.officer-priority-bridge-head strong,
+.officer-priority-labor-grid strong {
+  color: #f8fafc;
+  font-size: 0.7rem;
+}
+
+.officer-priority-labor-grid,
+.officer-priority-need-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.officer-priority-labor-grid span,
+.officer-priority-need-row span {
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 6px;
+  background: rgba(2, 6, 23, 0.24);
+}
+
+.officer-priority-labor-grid strong {
+  float: right;
+}
+
+.officer-priority-need-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.officer-soldier-inspector {
+  padding: 8px;
+}
+
+.officer-soldier-inspector-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.officer-soldier-inspector-head span {
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.officer-soldier-inspector-head em,
+.officer-soldier-inspector p,
+.officer-soldier-chip-grid span,
+.officer-soldier-meter-grid span em {
+  color: #cbd5e1;
+  font-size: 0.62rem;
+  font-style: normal;
+  line-height: 1.35;
+}
+
+.officer-soldier-inspector p {
+  margin: 0;
+}
+
+.officer-soldier-inspector-grid,
+.officer-soldier-chip-grid,
+.officer-priority-nudge-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.officer-soldier-inspector-grid span,
+.officer-soldier-chip-grid span {
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 6px;
+  background: rgba(2, 6, 23, 0.28);
+}
+
+.officer-soldier-inspector-grid strong,
+.officer-soldier-chip-grid strong {
+  display: block;
+  margin-top: 2px;
+}
+
+.officer-soldier-chip-grid.priority span {
+  border-color: rgba(250, 204, 21, 0.14);
+  background: rgba(120, 53, 15, 0.16);
+}
+
+.officer-priority-nudge-grid {
+  grid-template-columns: 1fr;
+}
+
+.officer-priority-nudge-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px 24px 24px;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 4px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 6px;
+  background: rgba(2, 6, 23, 0.24);
+}
+
+.officer-priority-nudge-row span {
+  color: #cbd5e1;
+  font-size: 0.62rem;
+  line-height: 1.1;
+}
+
+.officer-priority-nudge-row strong {
+  color: #f8fafc;
+  font-size: 0.68rem;
+  text-align: center;
+}
+
+.officer-priority-nudge-row button {
+  width: 24px;
+  height: 22px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.54);
+  color: #cbd5e1;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.officer-priority-nudge-row button:hover {
+  border-color: rgba(250, 204, 21, 0.34);
+  background: rgba(120, 53, 15, 0.52);
+  color: #fef3c7;
+}
+
+.officer-decision-stack {
+  display: grid;
+  gap: 5px;
+  padding: 6px;
+  border: 1px solid rgba(96, 165, 250, 0.12);
+  border-radius: 7px;
+  background: rgba(30, 64, 175, 0.1);
+}
+
+.officer-decision-stack-head,
+.officer-decision-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.officer-decision-stack-head span {
+  color: #94a3b8;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.officer-decision-stack-head strong,
+.officer-decision-row strong {
+  color: #f8fafc;
+  font-size: 0.68rem;
+}
+
+.officer-decision-row {
+  position: relative;
+  overflow: hidden;
+  min-height: 34px;
+  padding: 5px 6px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 6px;
+  background: rgba(2, 6, 23, 0.24);
+}
+
+.officer-decision-row.active {
+  border-color: rgba(250, 204, 21, 0.18);
+  background: rgba(120, 53, 15, 0.18);
+}
+
+.officer-decision-row span {
+  display: block;
+  margin-top: 2px;
+  color: #94a3b8;
+  font-size: 0.58rem;
+  line-height: 1.25;
+}
+
+.officer-decision-row em {
+  color: #fde68a;
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.officer-decision-row i {
+  position: absolute;
+  right: auto;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(96, 165, 250, 0.36);
+}
+
+.officer-soldier-meter-grid {
+  display: grid;
+  gap: 4px;
+}
+
+.officer-soldier-meter-grid span {
+  position: relative;
+  min-height: 17px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.32);
+}
+
+.officer-soldier-meter-grid i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: inherit;
+  background: rgba(250, 204, 21, 0.22);
+}
+
+.officer-soldier-meter-grid span em {
+  position: relative;
+  z-index: 1;
+  display: block;
+  padding: 2px 7px;
+}
+
+.officer-tools-note {
+    display: grid;
+    gap: 4px;
+  }
+
+  .officer-tools-outcome-card {
+    border-color: rgba(74, 222, 128, 0.18);
+    background: rgba(20, 83, 45, 0.24);
+  }
+
+  .officer-tools-outcome-card.danger {
+    border-color: rgba(248, 113, 113, 0.24);
+    background: rgba(127, 29, 29, 0.24);
+  }
+
+  .officer-tools-outcome-card em {
+    color: #fde68a;
+    font-size: 0.6rem;
+    font-style: normal;
+    line-height: 1.35;
+  }
+
+.officer-tools-empty,
+.officer-tools-action-read {
+  margin: 0;
+}
+
 .controls-card-collapsed {
   opacity: 0;
   pointer-events: none;
@@ -12500,6 +13283,8 @@ body.stash-open .hud {
   .hud-ribbon,
   .objective-card,
   .field-strip,
+  .build-mode-dock,
+  .officer-tools-dock,
   .tactical-drawer {
     max-width: none;
     width: auto;
@@ -12550,6 +13335,40 @@ body.stash-open .hud {
     width: auto;
     max-height: min(72vh, 560px);
     border-radius: 22px 22px 0 0;
+  }
+
+  .officer-tools-dock {
+    justify-items: stretch;
+  }
+
+  .build-mode-dock {
+    justify-items: stretch;
+  }
+
+  .officer-tools-toggle {
+    justify-content: center;
+  }
+
+  .build-mode-toggle,
+  .camp-art-toggle {
+    justify-content: center;
+  }
+
+  .officer-tools-panel {
+    position: fixed;
+    right: 12px;
+    bottom: 58px;
+    left: 12px;
+    width: auto;
+    max-height: min(70vh, 560px);
+  }
+
+  .officer-tools-grid,
+  .officer-tools-tabs,
+  .officer-tools-build-cards,
+  .build-mode-read,
+  .build-mode-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .stash-overlay {

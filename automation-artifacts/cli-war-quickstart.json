@@ -1,0 +1,469 @@
+﻿
+> frontline-officer@0.1.0 game:cli
+> node scripts/project-cli.mjs war-quickstart --reuse
+
+{
+  "ok": true,
+  "summary": "Town town-001 (route broken-signal) | Camp A 1000/1000 | Camp B 1000/1000",
+  "recommendedNextCommand": "npm run game:cli -- cutover",
+  "war": {
+    "fork": "frontline-officer",
+    "intentDoc": "docs/PERSISTENT_WAR_OFFICER_FORK_INTENT.md",
+    "town": {
+      "id": "town-001",
+      "routeId": "broken-signal",
+      "activeSector": {
+        "routeName": "Broken Signal",
+        "zoneLabel": "Relay cut line",
+        "control": "contested",
+        "pressure": 63,
+        "fortification": 44
+      }
+    },
+    "match": {
+      "status": "active",
+      "winner": null,
+      "reason": null
+    },
+    "camps": [
+      {
+        "id": "camp-a",
+        "side": "a",
+        "label": "Camp A",
+        "health": 1000,
+        "maxHealth": 1000,
+        "supply": {
+          "ammo": 250,
+          "build": 250
+        },
+        "control": {
+          "morale": 1,
+          "readiness": 1
+        },
+        "destroyed": false
+      },
+      {
+        "id": "camp-b",
+        "side": "b",
+        "label": "Camp B",
+        "health": 1000,
+        "maxHealth": 1000,
+        "supply": {
+          "ammo": 250,
+          "build": 250
+        },
+        "control": {
+          "morale": 1,
+          "readiness": 1
+        },
+        "destroyed": false
+      }
+    ],
+    "townWar": {
+      "version": 1,
+      "nextSoldierId": 5,
+      "nextOrderId": 1,
+      "clock": {
+        "seconds": 0.39810000000149015
+      },
+      "officer": {
+        "focusedLane": "mid",
+        "lastCommandRead": null,
+        "lastCommandAtSeconds": 0
+      },
+      "orders": [],
+      "town": {
+        "id": "town-001",
+        "label": "First Town",
+        "control": {
+          "camp-a": 0.5,
+          "camp-b": 0.5
+        }
+      },
+      "camps": [
+        {
+          "id": "camp-a",
+          "label": "Camp A",
+          "health": {
+            "current": 1000,
+            "max": 1000
+          },
+          "supply": {
+            "ammo": 250,
+            "build": 250
+          },
+          "control": {
+            "morale": 1,
+            "readiness": 1
+          },
+          "destroyed": false
+        },
+        {
+          "id": "camp-b",
+          "label": "Camp B",
+          "health": {
+            "current": 1000,
+            "max": 1000
+          },
+          "supply": {
+            "ammo": 250,
+            "build": 250
+          },
+          "control": {
+            "morale": 1,
+            "readiness": 1
+          },
+          "destroyed": false
+        }
+      ],
+      "match": {
+        "status": "active",
+        "winner": null,
+        "reason": null
+      },
+      "combatants": [
+        {
+          "id": "town-war-soldier-1",
+          "kind": "soldier",
+          "faction": "camp-a",
+          "role": "builder",
+          "position": {
+            "x": 3716.3432000001076,
+            "y": 3099
+          },
+          "health": {
+            "current": 100,
+            "max": 100
+          },
+          "ammo": {
+            "inMag": 12,
+            "reserve": 24,
+            "maxMag": 30
+          },
+          "morale": {
+            "pressure": 0,
+            "maxPressure": 100
+          },
+          "task": {
+            "kind": "build",
+            "label": "Demo: dig trench (placeholder)",
+            "targetPosition": {
+              "x": 3827.6800000000003,
+              "y": 3099
+            },
+            "targetEntityId": null
+          }
+        },
+        {
+          "id": "town-war-soldier-2",
+          "kind": "soldier",
+          "faction": "camp-a",
+          "role": "rifleman",
+          "position": {
+            "x": 3687.6800000000003,
+            "y": 3229
+          },
+          "health": {
+            "current": 100,
+            "max": 100
+          },
+          "ammo": {
+            "inMag": 30,
+            "reserve": 90,
+            "maxMag": 30
+          },
+          "morale": {
+            "pressure": 0,
+            "maxPressure": 100
+          },
+          "task": {
+            "kind": "hold",
+            "label": "Demo: hold the lane (placeholder)",
+            "targetPosition": {
+              "x": 3927.6800000000003,
+              "y": 3229
+            },
+            "targetEntityId": null
+          }
+        },
+        {
+          "id": "town-war-soldier-3",
+          "kind": "soldier",
+          "faction": "camp-b",
+          "role": "builder",
+          "position": {
+            "x": 7807.656799999894,
+            "y": 3265
+          },
+          "health": {
+            "current": 100,
+            "max": 100
+          },
+          "ammo": {
+            "inMag": 12,
+            "reserve": 24,
+            "maxMag": 30
+          },
+          "morale": {
+            "pressure": 0,
+            "maxPressure": 100
+          },
+          "task": {
+            "kind": "build",
+            "label": "Demo: fortify berm (placeholder)",
+            "targetPosition": {
+              "x": 7696.320000000001,
+              "y": 3265
+            },
+            "targetEntityId": null
+          }
+        },
+        {
+          "id": "town-war-soldier-4",
+          "kind": "soldier",
+          "faction": "camp-b",
+          "role": "suppressor",
+          "position": {
+            "x": 7836.320000000001,
+            "y": 3155
+          },
+          "health": {
+            "current": 100,
+            "max": 100
+          },
+          "ammo": {
+            "inMag": 60,
+            "reserve": 180,
+            "maxMag": 60
+          },
+          "morale": {
+            "pressure": 0,
+            "maxPressure": 100
+          },
+          "task": {
+            "kind": "suppress",
+            "label": "Demo: suppress the crossing (placeholder)",
+            "targetPosition": {
+              "x": 7596.320000000001,
+              "y": 3155
+            },
+            "targetEntityId": null
+          }
+        }
+      ],
+      "soldiers": [
+        {
+          "id": "town-war-soldier-1",
+          "kind": "soldier",
+          "faction": "camp-a",
+          "role": "builder",
+          "position": {
+            "x": 3716.3432000001076,
+            "y": 3099
+          },
+          "health": {
+            "current": 100,
+            "max": 100
+          },
+          "ammo": {
+            "inMag": 12,
+            "reserve": 24,
+            "maxMag": 30
+          },
+          "morale": {
+            "pressure": 0,
+            "maxPressure": 100
+          },
+          "task": {
+            "kind": "build",
+            "label": "Demo: dig trench (placeholder)",
+            "targetPosition": {
+              "x": 3827.6800000000003,
+              "y": 3099
+            },
+            "targetEntityId": null
+          }
+        },
+        {
+          "id": "town-war-soldier-2",
+          "kind": "soldier",
+          "faction": "camp-a",
+          "role": "rifleman",
+          "position": {
+            "x": 3687.6800000000003,
+            "y": 3229
+          },
+          "health": {
+            "current": 100,
+            "max": 100
+          },
+          "ammo": {
+            "inMag": 30,
+            "reserve": 90,
+            "maxMag": 30
+          },
+          "morale": {
+            "pressure": 0,
+            "maxPressure": 100
+          },
+          "task": {
+            "kind": "hold",
+            "label": "Demo: hold the lane (placeholder)",
+            "targetPosition": {
+              "x": 3927.6800000000003,
+              "y": 3229
+            },
+            "targetEntityId": null
+          }
+        },
+        {
+          "id": "town-war-soldier-3",
+          "kind": "soldier",
+          "faction": "camp-b",
+          "role": "builder",
+          "position": {
+            "x": 7807.656799999894,
+            "y": 3265
+          },
+          "health": {
+            "current": 100,
+            "max": 100
+          },
+          "ammo": {
+            "inMag": 12,
+            "reserve": 24,
+            "maxMag": 30
+          },
+          "morale": {
+            "pressure": 0,
+            "maxPressure": 100
+          },
+          "task": {
+            "kind": "build",
+            "label": "Demo: fortify berm (placeholder)",
+            "targetPosition": {
+              "x": 7696.320000000001,
+              "y": 3265
+            },
+            "targetEntityId": null
+          }
+        },
+        {
+          "id": "town-war-soldier-4",
+          "kind": "soldier",
+          "faction": "camp-b",
+          "role": "suppressor",
+          "position": {
+            "x": 7836.320000000001,
+            "y": 3155
+          },
+          "health": {
+            "current": 100,
+            "max": 100
+          },
+          "ammo": {
+            "inMag": 60,
+            "reserve": 180,
+            "maxMag": 60
+          },
+          "morale": {
+            "pressure": 0,
+            "maxPressure": 100
+          },
+          "task": {
+            "kind": "suppress",
+            "label": "Demo: suppress the crossing (placeholder)",
+            "targetPosition": {
+              "x": 7596.320000000001,
+              "y": 3155
+            },
+            "targetEntityId": null
+          }
+        }
+      ]
+    },
+    "seams": {
+      "runtimeOwners": {
+        "simulation": "src/game/simulation.ts",
+        "scene": "src/game/scene/RaidScene.ts",
+        "routeLayout": "src/game/arena.ts",
+        "agentSnapshot": "src/main.ts#getAgentSnapshot",
+        "cli": "scripts/project-cli.mjs"
+      },
+      "cutover": {
+        "town": "Introduce TownState outside Phaser scenes",
+        "camps": "Introduce two CampState entities with health/control",
+        "soldiers": "Evolve from enemies/incidents/supports into SoldierState agents",
+        "buildOrders": "Create build-order ledger (place -> execute -> payoff)",
+        "cli": "Expose war.* in snapshot for automation"
+      }
+    },
+    "runtimeHints": {
+      "enemyCount": 0,
+      "incidentCount": 0,
+      "supportCount": 0
+    }
+  },
+  "brief": {
+    "sector": {
+      "routeName": "Broken Signal",
+      "zoneLabel": "Relay cut line",
+      "control": "contested",
+      "pressure": 63,
+      "fortification": 44
+    },
+    "camps": [
+      {
+        "id": "camp-a",
+        "label": "Camp A",
+        "health": 1000,
+        "maxHealth": 1000,
+        "supply": {
+          "ammo": 250,
+          "build": 250
+        },
+        "destroyed": false
+      },
+      {
+        "id": "camp-b",
+        "label": "Camp B",
+        "health": 1000,
+        "maxHealth": 1000,
+        "supply": {
+          "ammo": 250,
+          "build": 250
+        },
+        "destroyed": false
+      }
+    ],
+    "soldiers": {
+      "total": 4,
+      "byCamp": {
+        "camp-a": {
+          "count": 2,
+          "maxPressure": 0,
+          "tasks": {
+            "build": 1,
+            "hold": 1
+          },
+          "roles": {
+            "builder": 1,
+            "rifleman": 1
+          }
+        },
+        "camp-b": {
+          "count": 2,
+          "maxPressure": 0,
+          "tasks": {
+            "build": 1,
+            "suppress": 1
+          },
+          "roles": {
+            "builder": 1,
+            "suppressor": 1
+          }
+        }
+      }
+    }
+  }
+}

@@ -14,6 +14,10 @@ Use this folder for persistent project artifacts such as:
 Read this first for the fork:
 
 - `PERSISTENT_WAR_OFFICER_FORK_INTENT.md`
+- `BUILDING_AND_AI_NORTH_STAR.md`
+- `NPC_ARCHETYPES_AND_PRIORITIES_NORTH_STAR.md`
+- `EMERGENT_AI_SKILLS_NORTH_STAR.md`
+- `AI_BUILDING_SKILLS_6_MILESTONE_PLAN.md`
 - `AUTOMATION_AND_AGENT_LOOP.md`
 
 This is the active north star for `frontline-officer`. It supersedes the inherited extraction-shooter direction for future product work.

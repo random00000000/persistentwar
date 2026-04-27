@@ -1,0 +1,1510 @@
+﻿
+> frontline-officer@0.1.0 game:cli
+> node scripts/project-cli.mjs snapshot
+
+{
+  "phase": "stash",
+  "message": "Stage the rifle for Broken Signal, cross the first PKM lane clean, clear one relay house, and extract before the route wakes fully.",
+  "ui": {
+    "topTab": "gear",
+    "commandTab": "forecast",
+    "tacticalDrawerOpen": false,
+    "briefingOpen": false,
+    "frontDoorPanel": "board",
+    "overlays": {
+      "frontDoorOpen": true,
+      "stashOpen": false,
+      "briefingOpen": false,
+      "storyFinalePending": false,
+      "storyFinaleResolved": false
+    }
+  },
+  "stash": {
+    "credits": 650,
+    "supplies": {
+      "medkits": 4,
+      "ammoPacks": 3
+    },
+    "prepLoadout": {
+      "medkits": 2,
+      "ammoPacks": 1
+    },
+    "canStartRaid": true,
+    "deploymentCost": 195,
+    "projectedReserveAmmo": 102,
+    "selectedWeapon": "rifle",
+    "selectedTacticalService": "signal-jammer",
+    "firstSession": {
+      "active": true,
+      "stage": "opening",
+      "tone": "support",
+      "title": "First run is lined up",
+      "meta": "Broken Signal // VKR Rifle // Signal Jammer",
+      "copy": "Broken Signal is the product opener: a quiet ingress, one obvious PKM lane, one occupied relay block, and a visible peel. Use the rifle to solve Uplink Yard crossing, clear Dish Houses, and bank the first extract before the route hardens.",
+      "routeId": "broken-signal",
+      "routeName": "Broken Signal",
+      "recommendedWeaponId": "rifle",
+      "recommendedWeaponName": "VKR Rifle",
+      "recommendedTacticalServiceId": "signal-jammer",
+      "recommendedTacticalServiceName": "Signal Jammer",
+      "targetBuildingLabel": "Dish Houses",
+      "targetLaneLabel": "Uplink Yard crossing",
+      "extractLabel": "North Relay Lift",
+      "memorableLine": "Cross the dish lane, clear Dish Houses, and peel before Relay Hamlet wakes fully.",
+      "nextRunReason": "The first extract seeds the route ledger and gives the stash a real reason to recommend the next push instead of guessing.",
+      "selectionAligned": true,
+      "readout": [
+        {
+          "label": "Open On",
+          "value": "Broken Signal"
+        },
+        {
+          "label": "Carry",
+          "value": "VKR Rifle"
+        },
+        {
+          "label": "Support",
+          "value": "Signal Jammer"
+        },
+        {
+          "label": "Teach",
+          "value": "Lane first, then room clear, then peel"
+        }
+      ],
+      "teachingBeats": [
+        "Quiet ingress before the district wakes",
+        "PKM-owned lane at Uplink Yard crossing",
+        "Occupied building: Dish Houses",
+        "One clean room-clear solve",
+        "Visible extract choice at North Relay Lift"
+      ]
+    },
+    "consequenceRead": {
+      "tone": "support",
+      "title": "First haul still missing",
+      "meta": "Broken Signal // Relay-house room clear // first extract decides the wall",
+      "copy": "The stash is still promise, not proof. The first clean extract has to create the loop before the product fantasy is real.",
+      "broughtHome": "Nothing is on the wall yet. The first extract still has to prove what comes home and what actually matters.",
+      "lost": "No chair debt is active yet, but that only means the squad has not been blooded by a real run.",
+      "changed": "Dish Houses and Uplink Yard crossing are already framed as the first real solve, so the opener reads like a tactical problem instead of a cold sandbox.",
+      "nextCall": "Broken Signal: VKR Rifle + Signal Jammer. The first extract seeds the route ledger and gives the stash a real reason to recommend the next push instead of guessing.",
+      "recommendedRouteId": "broken-signal",
+      "recommendedRouteName": "Broken Signal",
+      "doctrineCall": "Treat this as a house-solving operation. Open one lane, own one threshold, and do not let the relay mouth turn into a static duel.",
+      "readout": [
+        {
+          "label": "Brought Home",
+          "value": "Nothing is on the wall yet. The first extract still has to prove what comes home and what actually matters."
+        },
+        {
+          "label": "Lost",
+          "value": "No chair debt is active yet, but that only means the squad has not been blooded by a real run."
+        },
+        {
+          "label": "Changed",
+          "value": "Dish Houses and Uplink Yard crossing are already framed as the first real solve, so the opener reads like a tactical problem instead of a cold sandbox."
+        },
+        {
+          "label": "Next Call",
+          "value": "Broken Signal: VKR Rifle + Signal Jammer. The first extract seeds the route ledger and gives the stash a real reason to recommend the next push instead of guessing."
+        }
+      ]
+    },
+    "activeContractId": "scavCull",
+    "items": [
+      {
+        "id": "bench-weapon",
+        "label": "VKR Rifle",
+        "category": "deployable-weapon",
+        "categoryLabel": "Deployable weapon",
+        "actions": [
+          "equip",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "bench"
+      },
+      {
+        "id": "bench-route",
+        "label": "Broken Signal",
+        "category": "operation-token",
+        "categoryLabel": "Operation token",
+        "actions": [
+          "stage-support",
+          "hold-for-next-run"
+        ],
+        "deployable": false,
+        "brokerTagged": false,
+        "origin": "bench"
+      },
+      {
+        "id": "bench-contract",
+        "label": "Thin The Patrols",
+        "category": "operation-token",
+        "categoryLabel": "Operation token",
+        "actions": [
+          "stage-support",
+          "hold-for-next-run"
+        ],
+        "deployable": false,
+        "brokerTagged": false,
+        "origin": "bench"
+      },
+      {
+        "id": "bench-support",
+        "label": "Signal Jammer",
+        "category": "deployable-support",
+        "categoryLabel": "Deployable support",
+        "actions": [
+          "stage-support",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "bench"
+      },
+      {
+        "id": "bench-medkits",
+        "label": "2 field dressings",
+        "category": "deployable-supply",
+        "categoryLabel": "Deployable supply",
+        "actions": [
+          "deploy",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "bench"
+      },
+      {
+        "id": "bench-ammo",
+        "label": "1 ammo pack",
+        "category": "deployable-supply",
+        "categoryLabel": "Deployable supply",
+        "actions": [
+          "deploy",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "bench"
+      },
+      {
+        "id": "bench-demand",
+        "label": "Breaker Metal",
+        "category": "operation-token",
+        "categoryLabel": "Operation token",
+        "actions": [
+          "stage-support",
+          "hold-for-next-run"
+        ],
+        "deployable": false,
+        "brokerTagged": false,
+        "origin": "bench"
+      },
+      {
+        "id": "bench-insert",
+        "label": "Loaded rig",
+        "category": "operation-token",
+        "categoryLabel": "Operation token",
+        "actions": [
+          "stage-support",
+          "hold-for-next-run"
+        ],
+        "deployable": false,
+        "brokerTagged": false,
+        "origin": "bench"
+      },
+      {
+        "id": "rack-weapon-knife",
+        "label": "Field Knife",
+        "category": "deployable-weapon",
+        "categoryLabel": "Deployable weapon",
+        "actions": [
+          "equip",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "rack"
+      },
+      {
+        "id": "rack-weapon-pistol",
+        "label": "Civic-9 Sidearm",
+        "category": "deployable-sidearm",
+        "categoryLabel": "Deployable sidearm",
+        "actions": [
+          "equip",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "rack"
+      },
+      {
+        "id": "rack-weapon-worn-ak",
+        "label": "Worn AK",
+        "category": "deployable-weapon",
+        "categoryLabel": "Deployable weapon",
+        "actions": [
+          "equip",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "rack"
+      },
+      {
+        "id": "rack-weapon-short-mosin",
+        "label": "Cut-Down Mosin",
+        "category": "deployable-weapon",
+        "categoryLabel": "Deployable weapon",
+        "actions": [
+          "equip",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "rack"
+      },
+      {
+        "id": "rack-weapon-rifle",
+        "label": "VKR Rifle",
+        "category": "deployable-weapon",
+        "categoryLabel": "Deployable weapon",
+        "actions": [
+          "equip",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "rack"
+      },
+      {
+        "id": "rack-weapon-smg",
+        "label": "Kite SMG",
+        "category": "deployable-weapon",
+        "categoryLabel": "Deployable weapon",
+        "actions": [
+          "equip",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "rack"
+      },
+      {
+        "id": "rack-weapon-shotgun",
+        "label": "Morrow Shotgun",
+        "category": "deployable-weapon",
+        "categoryLabel": "Deployable weapon",
+        "actions": [
+          "equip",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "rack"
+      },
+      {
+        "id": "rack-weapon-pkm",
+        "label": "PKM Support Gun",
+        "category": "deployable-weapon",
+        "categoryLabel": "Deployable weapon",
+        "actions": [
+          "equip",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "rack"
+      },
+      {
+        "id": "rack-weapon-amr",
+        "label": "Bastion AMR",
+        "category": "deployable-weapon",
+        "categoryLabel": "Deployable weapon",
+        "actions": [
+          "equip",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "rack"
+      },
+      {
+        "id": "rack-medkit-0",
+        "label": "Field dressing",
+        "category": "deployable-supply",
+        "categoryLabel": "Deployable supply",
+        "actions": [
+          "deploy",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "rack"
+      },
+      {
+        "id": "rack-medkit-1",
+        "label": "Field dressing",
+        "category": "deployable-supply",
+        "categoryLabel": "Deployable supply",
+        "actions": [
+          "deploy",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "rack"
+      },
+      {
+        "id": "rack-medkit-2",
+        "label": "Field dressing",
+        "category": "deployable-supply",
+        "categoryLabel": "Deployable supply",
+        "actions": [
+          "deploy",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "rack"
+      },
+      {
+        "id": "rack-medkit-3",
+        "label": "Field dressing",
+        "category": "deployable-supply",
+        "categoryLabel": "Deployable supply",
+        "actions": [
+          "deploy",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "rack"
+      },
+      {
+        "id": "rack-ammo-0",
+        "label": "Ammo pack",
+        "category": "deployable-supply",
+        "categoryLabel": "Deployable supply",
+        "actions": [
+          "deploy",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "rack"
+      },
+      {
+        "id": "rack-ammo-1",
+        "label": "Ammo pack",
+        "category": "deployable-supply",
+        "categoryLabel": "Deployable supply",
+        "actions": [
+          "deploy",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "rack"
+      },
+      {
+        "id": "rack-ammo-2",
+        "label": "Ammo pack",
+        "category": "deployable-supply",
+        "categoryLabel": "Deployable supply",
+        "actions": [
+          "deploy",
+          "hold-for-next-run"
+        ],
+        "deployable": true,
+        "brokerTagged": false,
+        "origin": "rack"
+      },
+      {
+        "id": "rack-reserve-cash",
+        "label": "Credit scrip",
+        "category": "operation-token",
+        "categoryLabel": "Operation token",
+        "actions": [
+          "stage-support",
+          "hold-for-next-run"
+        ],
+        "deployable": false,
+        "brokerTagged": false,
+        "origin": "rack"
+      },
+      {
+        "id": "rack-route-signal",
+        "label": "Relay tuner",
+        "category": "operation-token",
+        "categoryLabel": "Operation token",
+        "actions": [
+          "stage-support",
+          "hold-for-next-run"
+        ],
+        "deployable": false,
+        "brokerTagged": false,
+        "origin": "rack"
+      }
+    ],
+    "readyWeapons": 10,
+    "readySupplies": 9,
+    "recoveredHaulSummary": {
+      "brokerHaul": 0,
+      "taggedForBroker": 0,
+      "realizedBrokerCredits": 0,
+      "realizedBrokerItems": 0,
+      "supportTokens": 7,
+      "fieldWeapon": null,
+      "fieldWeaponDecision": null
+    },
+    "squadReadiness": {
+      "ready": 3,
+      "reserve": 0,
+      "missing": 0,
+      "memorial": 0,
+      "replacementPending": 0,
+      "blockedChair": null
+    },
+    "replacementSeats": [
+      {
+        "chairLabel": "Quiet board",
+        "outgoingLabel": "All three chairs are stable",
+        "incomingLabel": "Timur",
+        "status": "Depth is available if the route turns ugly",
+        "blocker": "Keep the bench cold until the route earns it.",
+        "tone": "steady"
+      }
+    ],
+    "memorialDebt": [],
+    "operationalWall": {
+      "tone": "steady",
+      "meta": "10 weapons | 9 supplies | 7 support | 0 broker | 0 memorial",
+      "copy": "The wall is sorted into deployables, support, broker weight, and memorial burden, so the next raid reads like an operation instead of a mixed prop shelf.",
+      "cards": [
+        {
+          "label": "Ready Bench",
+          "count": 19,
+          "status": "10 guns | 9 field items",
+          "detail": "VKR Rifle is already staged, and the wall still carries 9 supply items that can meaningfully widen the next raid.",
+          "tone": "steady"
+        },
+        {
+          "label": "Support Wall",
+          "count": 7,
+          "status": "7 tokens | 0 reserve",
+          "detail": "Broken Signal keeps route prep and side support visible instead of burying them in one-line copy.",
+          "tone": "steady"
+        },
+        {
+          "label": "Broker Weight",
+          "count": 0,
+          "status": "No hot haul banked",
+          "detail": "Nothing on the wall is currently reading as sale cargo, which keeps the stash honest but starves the greed layer.",
+          "tone": "warn"
+        },
+        {
+          "label": "Memorial Debt",
+          "count": 0,
+          "status": "Wall quiet",
+          "detail": "No names are pinned right now, so the squad can read the next raid mostly through doctrine and route pressure.",
+          "tone": "steady"
+        }
+      ]
+    }
+  },
+  "combat": {
+    "centerOfGravity": "controller-and-boys",
+    "commandDepthSummary": "0 live boy orders | 0 tactical actions | 0 pressured hostiles",
+    "selectedBoyAction": null,
+    "activeTracerCount": 0,
+    "activeImpactCount": 0,
+    "activeGrenadeCount": 0,
+    "nearbySuppressedEnemies": 0,
+    "nearbyFriendlySuppressors": 0,
+    "activeTacticalActionCount": 0,
+    "startingHardship": {
+      "tone": "steady",
+      "title": "Hard start, but still workable",
+      "meta": "650 cr stash // 195 cr fee // 4 med | 3 ammo",
+      "copy": "The stash is lean, so the route has to be solved cleanly. Let the boys buy the first angle, then only risk what can still come home.",
+      "readout": [
+        {
+          "label": "Primary",
+          "value": "VKR Rifle"
+        },
+        {
+          "label": "Deploy Margin",
+          "value": "455 cr after fee"
+        },
+        {
+          "label": "Rack Guns",
+          "value": "11 weapons in stash"
+        },
+        {
+          "label": "Boys Edge",
+          "value": "1/3 boys carrying the heavier kit"
+        }
+      ],
+      "primaryWeaponId": "rifle",
+      "stashWeaponCount": 11,
+      "stashCredits": 650,
+      "medkitCount": 4,
+      "ammoPackCount": 3,
+      "betterArmedSquadCount": 1,
+      "activeSquadCount": 3,
+      "canAffordDeployment": true,
+      "postFeeCredits": 455
+    },
+    "audioRead": {
+      "title": "AUDIO READ STAGED",
+      "mode": "awaiting-gesture",
+      "dominantWeaponId": null,
+      "snapBySeverity": "quiet",
+      "grenadeSeverity": "quiet",
+      "lines": [
+        "Step into the raid to arm discharge, snap-by, and grenade reads.",
+        "The panel only wakes when live combat pressure exists."
+      ]
+    },
+    "presentationRead": {
+      "title": "Stand by",
+      "dominantFriendlyWeaponId": null,
+      "dominantHostileWeaponId": null,
+      "friendlyTracerCount": 0,
+      "hostileTracerCount": 0,
+      "suppressionCount": 0,
+      "blastCount": 0,
+      "concreteImpactCount": 0,
+      "dustImpactCount": 0,
+      "hostileGrenadeCount": 0,
+      "lines": [
+        "No live raid effects",
+        "Stage a combat showcase to inspect presentation reads"
+      ]
+    },
+    "squadDoctrine": {
+      "title": "Balanced squad package",
+      "summary": "1x PKM Support Gun | 1x VKR Rifle | 1x Kite SMG keep the route from hinging on one body or one angle.",
+      "packageLabel": "1x PKM Support Gun | 1x VKR Rifle | 1x Kite SMG hold the push together",
+      "tags": [
+        "Balanced squad package",
+        "1x PKM Support Gun | 1x VKR Rifle | 1x Kite SMG",
+        "Rook Angle hold | Makar Belt hold | Yara Room flood"
+      ],
+      "mates": [
+        {
+          "id": "rook",
+          "name": "Rook",
+          "role": "Point rifleman",
+          "weaponId": "rifle",
+          "roleLabel": "Angle hold",
+          "detail": "Holds the cleaner sightline so the push does not depend on one noisy gun solving everything alone."
+        },
+        {
+          "id": "makar",
+          "name": "Makar",
+          "role": "Support gunner",
+          "weaponId": "pkm",
+          "roleLabel": "Belt hold",
+          "detail": "Pins the lane long enough for the rest of the stack to cross, brace, or loot without the route resetting."
+        },
+        {
+          "id": "yara",
+          "name": "Yara",
+          "role": "Medic hauler",
+          "weaponId": "smg",
+          "roleLabel": "Room flood",
+          "detail": "Weak on the open relay mouth, but deadly once someone else has already bought the crossing."
+        }
+      ]
+    },
+    "weaponDoctrine": {
+      "tone": "steady",
+      "fitLabel": "Route-owned",
+      "title": "VKR Rifle fits this route",
+      "summary": "Selected fit: rifle lanes this route well. Brace the relay angles and challenge plated riflemen on your timing. Planned insert: South Gully // Fast Cut. VKR Rifle should be treated as a doctrine pick, not a damage skin, while 1x PKM Support Gun | 1x VKR Rifle | 1x Kite SMG shapes the rest of the push.",
+      "primarySpace": "Relay lanes, long windows, and plated peeks",
+      "failureSpace": "First hard door and split-second room shock",
+      "squadPackage": "1x PKM Support Gun | 1x VKR Rifle | 1x Kite SMG hold the push together",
+      "routeCall": "Planned insert: South Gully // Fast Cut",
+      "tags": [
+        "Route-owned",
+        "VKR Rifle",
+        "Relay lanes, long windows, and plated peeks",
+        "Balanced squad package"
+      ]
+    }
+  },
+  "campaign": {
+    "finale": {
+      "state": "locked",
+      "stateLabel": "Stronghold still rumor",
+      "strongholdLabel": "Black Orchard Redoubt",
+      "enemyLabel": "Hinge-9 Brigade",
+      "readiness": 34,
+      "progressLabel": "1/6 prep tracks live",
+      "objectiveLabel": "Break the command relay citadel and open the real escape lane.",
+      "revealReason": "The war keeps hinting that Hinge-9 Brigade is sitting behind Black Orchard Redoubt, but the campaign still lacks enough live extracts and intel to make that district concrete.",
+      "detail": "Break the command relay citadel and open the real escape lane. The war keeps hinting that Hinge-9 Brigade is sitting behind Black Orchard Redoubt, but the campaign still lacks enough live extracts and intel to make that district concrete. The finale still lives or dies on route work, doctrine breadth, and whether the squad can arrive without unresolved chair debt.",
+      "launchInstruction": "Keep feeding safer lane before trying to open Black Orchard Redoubt.",
+      "statusLabel": "Rumor only",
+      "followThrough": "The finale still lives or dies on route work, doctrine breadth, and whether the squad can arrive without unresolved chair debt.",
+      "retryInstruction": null,
+      "prepTracks": [
+        {
+          "label": "Route intel",
+          "status": "The stronghold is still mostly rumor until more intel comes home alive.",
+          "ready": false
+        },
+        {
+          "label": "District reps",
+          "status": "The squad still needs a broader district record before the final wall should feel readable.",
+          "ready": false
+        },
+        {
+          "label": "Doctrine ladder",
+          "status": "The final wall should stay closed until the gun ladder is wider and belt-fed support is real.",
+          "ready": false
+        },
+        {
+          "label": "Preparation orders",
+          "status": "Queue more district prep so the final offensive is built on real approach work, not wishful clicks.",
+          "ready": false
+        },
+        {
+          "label": "Squad depth",
+          "status": "Three ready operators, no unrecovered chair debt, and enough sealed stock to support a harder push.",
+          "ready": true
+        },
+        {
+          "label": "Campaign reps",
+          "status": "The game still needs more clean extracts and closed asks before the stronghold can feel earned.",
+          "ready": false
+        }
+      ],
+      "prepSummary": "No finale prep outputs live",
+      "prepOutputs": [
+        {
+          "id": "safer-lane",
+          "label": "Safer lane",
+          "effectLabel": "Marked pull lane",
+          "status": "No approach lane is staged cleanly enough yet to trust the first finale peel.",
+          "sourceLabel": "No marked exfil route",
+          "detail": "Safer-lane prep should come from marked exfil work or repeated clean pulls on one district instead of raw readiness score inflation.",
+          "ready": false,
+          "tone": "critical"
+        },
+        {
+          "id": "weaker-flank",
+          "label": "Weaker flank",
+          "effectLabel": "Outer lane softened",
+          "status": "The final assault still needs a route where first contact has already been blunted.",
+          "sourceLabel": "No softened flank",
+          "detail": "Weaker-flank prep should come from real territorial reps and planted claims that make one side of the wall less stable.",
+          "ready": false,
+          "tone": "critical"
+        },
+        {
+          "id": "recovery-path",
+          "label": "Recovery path",
+          "effectLabel": "Casualty corridor steadied",
+          "status": "Recovery path is still theory until the squad logs more body or casualty pulls.",
+          "sourceLabel": "No recovery route logged",
+          "detail": "Recovery prep should come from the live memorial debt loop, not a separate finale-only mercy state.",
+          "ready": false,
+          "tone": "critical"
+        },
+        {
+          "id": "route-intel",
+          "label": "Route intel",
+          "effectLabel": "Approach reads updated",
+          "status": "No district has fed enough live intel back to the stash to map the final wall cleanly.",
+          "sourceLabel": "No route intel feed",
+          "detail": "This output is built from real extracted intel rather than a separate campaign tech tree.",
+          "ready": false,
+          "tone": "critical"
+        }
+      ],
+      "assaultPlan": [
+        {
+          "label": "Entry Belt",
+          "title": "Entry lane still blind",
+          "detail": "No approach lane is staged cleanly enough yet to trust the first finale peel. No district has fed enough live intel back to the stash to map the final wall cleanly.",
+          "tone": "critical",
+          "tags": [
+            "Marked pull lane",
+            "No marked exfil route"
+          ]
+        },
+        {
+          "label": "Relay Mouth",
+          "title": "Outer pickets still stiff",
+          "detail": "The final assault still needs a route where first contact has already been blunted. The squad still needs a broader doctrine ladder before the breach mouth should feel finishable.",
+          "tone": "critical",
+          "tags": [
+            "Outer lane softened",
+            "Doctrine ladder"
+          ]
+        },
+        {
+          "label": "Casualty Strip",
+          "title": "Corridor still brittle",
+          "detail": "Recovery path is still theory until the squad logs more body or casualty pulls. Three ready operators, no unrecovered chair debt, and enough sealed stock to support a harder push.",
+          "tone": "critical",
+          "tags": [
+            "Casualty corridor steadied",
+            "Squad depth"
+          ]
+        },
+        {
+          "label": "Escape Cut",
+          "title": "Escape lane is still rumor",
+          "detail": "No district has fed enough live intel back to the stash to map the final wall cleanly. Do not spend the finale on hope alone; the way out still needs a route the squad actually understands.",
+          "tone": "critical",
+          "tags": [
+            "Approach reads updated",
+            "Black Orchard Redoubt"
+          ]
+        }
+      ],
+      "closure": null,
+      "tone": "critical",
+      "compact": "Black Orchard Redoubt | Stronghold still rumor"
+    }
+  },
+  "map": {
+    "district": {
+      "id": "greyline-dead-zone",
+      "label": "Greyline Dead Zone",
+      "controlTone": "mixed",
+      "controlLabel": "Mixed control",
+      "pressureLabel": "54 district pressure",
+      "activeRouteLabel": "Broken Signal",
+      "activeSettlementLabel": "Relay Hamlet",
+      "activeSubzoneLabel": "Dish Houses",
+      "detail": "A compact dead sector where the quay hold, the relay cut, and the convoy scar keep changing hands between raids. Relay Hamlet is currently a fragile hold inside dish houses."
+    },
+    "settlement": {
+      "id": "relay-hamlet",
+      "routeId": "broken-signal",
+      "districtId": "greyline-dead-zone",
+      "label": "Relay Hamlet",
+      "type": "compound",
+      "control": "contested",
+      "controlLabel": "Contested district",
+      "volatility": "fragile",
+      "volatilityLabel": "Fragile hold",
+      "pressureLabel": "63% pressure | Compound",
+      "shiftReason": "The settlement is waiting for a real push before it changes tone.",
+      "detail": "Frontline is moving, but this sector has not seen your latest raid yet. The settlement is waiting for a real push before it changes tone. Sweep teams keep crossing the antenna row.",
+      "tacticalProblem": "The hold is thin enough that one bad lane reopens the whole block.",
+      "tacticalPlan": "Hold the best pocket, keep the squad tight on the first crossing, and leave before the district gets another chance to pry the block open.",
+      "extractRisk": "The district still punishes greed, so the clean extract window closes faster than the labels imply.",
+      "memoryTags": [],
+      "activeSituationIds": [
+        "type-compound",
+        "control-contested",
+        "volatility-fragile",
+        "fragile-hold"
+      ],
+      "lastMeaningfulShiftCycle": 0,
+      "tone": "warning"
+    },
+    "activeSubzone": {
+      "id": "dish-houses",
+      "districtId": "greyline-dead-zone",
+      "routeId": "broken-signal",
+      "label": "Dish Houses",
+      "type": "town-block",
+      "typeLabel": "Town block",
+      "detail": "Small relay houses and alleys reward SMG and shotgun tempo when the dish block is still half-contested."
+    },
+    "noisePressure": {
+      "title": "QUIET LANE",
+      "status": "Relay Search waits at 1.7 noise",
+      "detail": "The route is still reading quiet. Broken Signal reacts early. Long-lane rifle support starts sweeping the relay once the route hears you twice. stays off the board if you keep the first fight short and controlled.",
+      "compact": "Quiet | Relay Search at 1.7",
+      "tone": "steady",
+      "nextResponseLabel": "Relay Search at 1.7",
+      "reinforcementLabel": "1 rifleman + 1 skirmisher",
+      "pressureLabel": "0.00 noise"
+    },
+    "pressurePosture": {
+      "posture": "holding",
+      "title": "Holding",
+      "status": "Holding",
+      "detail": "The district is still in a hold-versus-hold read with no lane fully broken yet.",
+      "compact": "Holding posture",
+      "tone": "steady",
+      "actionLabel": "Probe the lane",
+      "windowLabel": "No crossing window",
+      "threatLabel": "No reserve leaning",
+      "ownershipLabel": null,
+      "pinnedCount": 0,
+      "suppressedCount": 0,
+      "windowSeconds": null,
+      "reserveSeconds": null
+    },
+    "raidOperation": null
+  },
+  "lastRaidSummary": null,
+  "route": {
+    "id": "broken-signal",
+    "name": "Broken Signal",
+    "heat": "Contested",
+    "insertionLabel": "South Gully // Fast Cut",
+    "threatLabel": "Signal Mouth Ambush // Late Collapse",
+    "routeIdentity": {
+      "identityLabel": "Relay-house room clear",
+      "summary": "Broken Signal is the occupied-structure route: relay houses, dirty dish lanes, and one cellar reset pocket that rewards deliberate room clearing instead of lazy long peeks.",
+      "dominantAsk": "Cross the PKM-owned relay lane, clear the first owned house, then decide whether the cellar is worth the second commitment.",
+      "doctrineCall": "Treat this as a house-solving operation. Open one lane, own one threshold, and do not let the relay mouth turn into a static duel.",
+      "operationOutlook": "Broken Signal should feel like a relay-cut operation, not a generic firefight: house first, back room second, peel before the reserve lane hardens.",
+      "landmarkProblems": [
+        "Dish Houses entry",
+        "Uplink Yard PKM crossing",
+        "Relay Cellar counterhold"
+      ],
+      "landmarkSummary": "Dish Houses entry | Uplink Yard PKM crossing | Relay Cellar counterhold",
+      "mustClearStructures": [
+        {
+          "label": "Dish Houses",
+          "tacticalRead": "Threshold hold",
+          "solveCall": "Own the first door before the relay reserve stretches the lane back out.",
+          "status": "Must-own anchor"
+        },
+        {
+          "label": "Uplink Yard",
+          "tacticalRead": "PKM lane owner",
+          "solveCall": "Cut the yard gun, then cross the cable lane on your timing instead of the route's.",
+          "status": "Must-own anchor"
+        },
+        {
+          "label": "Relay Cellar",
+          "tacticalRead": "Cellar compression",
+          "solveCall": "Hold the mouth, then clear deeper before the pocket turns into a burial hole.",
+          "status": "Must-own anchor"
+        }
+      ],
+      "mustClearSummary": "Dish Houses (Threshold hold) | Uplink Yard (PKM lane owner) | Relay Cellar (Cellar compression)",
+      "mustOwnCount": 3,
+      "guardedCount": 1
+    },
+    "buildingOccupation": {
+      "mustOwnCount": 3,
+      "guardedCount": 1,
+      "optionalCount": 4,
+      "entries": [
+        {
+          "label": "Dish Houses",
+          "tier": "must-own",
+          "source": "authored",
+          "nearestPocketLabel": "Antenna Cut",
+          "position": {
+            "x": 922,
+            "y": 826
+          }
+        },
+        {
+          "label": "Relay Cellar",
+          "tier": "must-own",
+          "source": "authored",
+          "nearestPocketLabel": "Antenna Cut",
+          "position": {
+            "x": 854,
+            "y": 674
+          }
+        },
+        {
+          "label": "Uplink Yard",
+          "tier": "must-own",
+          "source": "authored",
+          "nearestPocketLabel": "Antenna Cut",
+          "position": {
+            "x": 1094,
+            "y": 650
+          }
+        },
+        {
+          "label": "Antenna Ditch",
+          "tier": "guarded",
+          "source": "authored",
+          "nearestPocketLabel": "Antenna Cut",
+          "position": {
+            "x": 760,
+            "y": 924
+          }
+        },
+        {
+          "label": "Crane Lane",
+          "tier": "optional",
+          "source": "fallback",
+          "nearestPocketLabel": "Relay Backline",
+          "position": {
+            "x": 5750.5,
+            "y": 1891
+          }
+        },
+        {
+          "label": "Flood Channel",
+          "tier": "optional",
+          "source": "fallback",
+          "nearestPocketLabel": "Flood Ladder",
+          "position": {
+            "x": 5611,
+            "y": 3875
+          }
+        },
+        {
+          "label": "Relay Shed",
+          "tier": "optional",
+          "source": "fallback",
+          "nearestPocketLabel": "Dish Ridge",
+          "position": {
+            "x": 3565,
+            "y": 790.5
+          }
+        },
+        {
+          "label": "Storage Yard",
+          "tier": "optional",
+          "source": "fallback",
+          "nearestPocketLabel": "Antenna Cut",
+          "position": {
+            "x": 2170,
+            "y": 868
+          }
+        }
+      ]
+    },
+    "persistentBodies": {
+      "squad": [],
+      "enemy": []
+    },
+    "pocketObjectives": [
+      {
+        "id": "pocket-objective-1",
+        "pocketLabel": "Relay Mouth",
+        "role": "primary-hot",
+        "rewardLabel": "Kill 2 scavs in the main hot pocket",
+        "reward": "110 cr carried | 1 ammo",
+        "supportBonus": "Cover Me bonus | +40 cr | +1 ammo // Shift Fire live: frontline rifles turn the break into a richer lock-in",
+        "progress": "0/2 kills",
+        "completed": false
+      },
+      {
+        "id": "pocket-objective-2",
+        "pocketLabel": "Relay Spur",
+        "role": "secondary-hot",
+        "rewardLabel": "Kill 1 scav in the split hot lane",
+        "reward": "75 cr carried",
+        "supportBonus": "Pull Eyes Off bonus | +35 cr | +1 med // Draw Heat live: decoys muddy the split and make the cut pay harder",
+        "progress": "0/1 kills",
+        "completed": false
+      },
+      {
+        "id": "pocket-objective-3",
+        "pocketLabel": "Outer Antenna",
+        "role": "thin",
+        "rewardLabel": "Hold the thin lane for 3.5s",
+        "reward": "85 cr carried | 1 med",
+        "supportBonus": "Screen Exfil bonus | +30 cr | +1 ammo // Secure Exfil live: the fallback screen turns this thin lane into a safer stash bank",
+        "progress": "0.0/3.5s hold",
+        "completed": false
+      },
+      {
+        "id": "pocket-objective-4",
+        "pocketLabel": "North Lift",
+        "role": "reserve",
+        "rewardLabel": "Hold the reserve lane for 3s",
+        "reward": "70 cr carried | 1 ammo",
+        "supportBonus": "Screen Exfil bonus | +35 cr | +1 med // Secure Exfil live: reserve bodies bank cleaner once the fallback lane is screened",
+        "progress": "0.0/3.0s hold",
+        "completed": false
+      }
+    ]
+  },
+  "battlefield": null,
+  "raid": null,
+  "dialogue": {
+    "squadComms": {
+      "speaker": "Rook",
+      "tone": "steady",
+      "channel": "Quiet Walk",
+      "line": "Boys are cold at Broken Signal. Pick a route, then we step in together."
+    },
+    "hostileComms": {
+      "speaker": "Blue Sergeant",
+      "tapeId": "blue",
+      "tone": "steady",
+      "channel": "Blue Net",
+      "line": "Blue line is cold at Broken Signal. Hold the lane and wait for movement."
+    },
+    "currentSquadEvent": null,
+    "recentSquadEvents": [],
+    "currentHostileEvent": null,
+    "recentHostileEvents": [],
+    "raidMemories": [
+      {
+        "id": "rook",
+        "name": "Rook",
+        "memories": []
+      },
+      {
+        "id": "makar",
+        "name": "Makar",
+        "memories": []
+      },
+      {
+        "id": "yara",
+        "name": "Yara",
+        "memories": []
+      }
+    ],
+    "rosterMemories": []
+  },
+  "frontline": {
+    "focusedIncidentId": null,
+    "activeSupportOrderId": null,
+    "supportOrderTimer": 0,
+    "supportOrderCooldown": 0,
+    "supportOrderPayoff": {
+      "orderId": null,
+      "title": "Net ready",
+      "metric": "Z cover | X draw | C exfil | B hold | V breach",
+      "detail": "The boys are clear to take the next lane order whenever the raid needs a shove.",
+      "tone": "ready"
+    },
+    "incidents": [],
+    "supportOrders": [
+      {
+        "id": "shift-fire",
+        "title": "Cover Me",
+        "active": false,
+        "cooldownReady": true,
+        "duration": 7.5
+      },
+      {
+        "id": "draw-heat",
+        "title": "Pull Eyes Off",
+        "active": false,
+        "cooldownReady": true,
+        "duration": 8
+      },
+      {
+        "id": "secure-exfil",
+        "title": "Screen Exfil",
+        "active": false,
+        "cooldownReady": true,
+        "duration": 7
+      },
+      {
+        "id": "hold-position",
+        "title": "Hold Position",
+        "active": false,
+        "cooldownReady": true,
+        "duration": 8.2
+      },
+      {
+        "id": "breach-push",
+        "title": "Stack Breach",
+        "active": false,
+        "cooldownReady": true,
+        "duration": 7.2
+      }
+    ],
+    "ukrainianCombatants": {
+      "count": 0,
+      "health": {
+        "count": 0,
+        "totalHealth": 0,
+        "averageHealth": 0,
+        "averageMaxHealth": 0,
+        "averageHealthPercent": 0,
+        "minHealth": 0
+      },
+      "combatStrength": 0,
+      "samplePositions": []
+    },
+    "russianCombatants": {
+      "count": 1,
+      "playerHealthPercent": 100,
+      "combatStrength": 0,
+      "samplePositions": [
+        {
+          "id": "player",
+          "x": 930,
+          "y": 3751
+        }
+      ]
+    },
+    "metrics": {
+      "fps": 11.9,
+      "frameTimeMs": 90.3,
+      "uptimeSeconds": 3.35,
+      "actorTotals": {
+        "enemies": 0,
+        "incidentSpots": 0,
+        "supports": 0
+      },
+      "noise": {
+        "pressure": 0,
+        "responseLevel": 0,
+        "recentPulse": 0
+      },
+      "combat": {
+        "nearestEnemyDistance": null,
+        "nearestSupportDistance": null,
+        "contestedRadiusCount": 0,
+        "activeIncidentCount": 0,
+        "playerEngagementState": "isolated",
+        "frontlineSpanLabel": "Pocket fight",
+        "frontlineSpan": 0,
+        "battlefieldSpan": {
+          "width": 0,
+          "height": 0,
+          "center": {
+            "x": 930,
+            "y": 3751
+          }
+        },
+        "playerJitter": null
+      },
+      "player": {
+        "health": 100,
+        "maxHealth": 100,
+        "reserveAmmo": 102,
+        "ammoInMag": 18,
+        "position": {
+          "x": 930,
+          "y": 3751
+        }
+      }
+    }
+  },
+  "regression": {
+    "inspectLayerVersion": 3,
+    "legacyToggles": {
+      "frontlineIncidentsEnabled": false,
+      "playerSideSupportsEnabled": false
+    },
+    "legacyRuntime": {
+      "active": false,
+      "supportCount": 0,
+      "incidentCount": 0
+    },
+    "overlayTruth": {
+      "frontDoorOpen": true,
+      "stashOpen": false,
+      "briefingOpen": false,
+      "storyFinalePending": false
+    }
+  },
+  "options": {
+    "routes": [
+      {
+        "id": "crosswind-docks",
+        "name": "Crosswind Docks"
+      },
+      {
+        "id": "broken-signal",
+        "name": "Broken Signal"
+      },
+      {
+        "id": "sundered-run",
+        "name": "Sundered Run"
+      }
+    ],
+    "routeIdentities": [
+      {
+        "routeId": "crosswind-docks",
+        "routeName": "Crosswind Docks",
+        "identityLabel": "Dock-crossing peel",
+        "summary": "Crosswind Docks is the long-lane greed route: exposed dock roads, crane pressure, salvage temptation, and extract timing that gets worse the longer you insist on one more touch.",
+        "dominantAsk": "Break the first road owner, cross the open dock under pressure, then choose whether the salvage lane is still worth the peel risk.",
+        "doctrineCall": "Treat this as a crossing-and-exfil operation. Own the crane road, watch the pull lane, and bank the run before the docks make greed feel clever.",
+        "operationOutlook": "Crosswind Docks should feel like a dockside operation with ugly peel math: longer lanes, visible greed, and a route that punishes staying one pocket too long.",
+        "landmarkProblems": [
+          "Crane Lane road owner",
+          "Dock road exposed crossing",
+          "North Lift peel decision"
+        ],
+        "landmarkSummary": "Crane Lane road owner | Dock road exposed crossing | North Lift peel decision",
+        "mustClearStructures": [
+          {
+            "label": "Customs Block",
+            "tacticalRead": "Threshold hold",
+            "solveCall": "Clear the first block or every dock crossing keeps paying tax to the same room line.",
+            "status": "Must-own anchor"
+          },
+          {
+            "label": "Container Yard",
+            "tacticalRead": "PKM lane owner",
+            "solveCall": "Kill the yard gun before you spend a second crossing between containers.",
+            "status": "Must-own anchor"
+          },
+          {
+            "label": "Pier Trench Belt",
+            "tacticalRead": "Peel-risk trench chain",
+            "solveCall": "Break the lower pier lip or the peel stays hot even after a clean first pocket.",
+            "status": "Must-own anchor"
+          }
+        ],
+        "mustClearSummary": "Customs Block (Threshold hold) | Container Yard (PKM lane owner) | Pier Trench Belt (Peel-risk trench chain)",
+        "mustOwnCount": 3,
+        "guardedCount": 1
+      },
+      {
+        "routeId": "broken-signal",
+        "routeName": "Broken Signal",
+        "identityLabel": "Relay-house room clear",
+        "summary": "Broken Signal is the occupied-structure route: relay houses, dirty dish lanes, and one cellar reset pocket that rewards deliberate room clearing instead of lazy long peeks.",
+        "dominantAsk": "Cross the PKM-owned relay lane, clear the first owned house, then decide whether the cellar is worth the second commitment.",
+        "doctrineCall": "Treat this as a house-solving operation. Open one lane, own one threshold, and do not let the relay mouth turn into a static duel.",
+        "operationOutlook": "Broken Signal should feel like a relay-cut operation, not a generic firefight: house first, back room second, peel before the reserve lane hardens.",
+        "landmarkProblems": [
+          "Dish Houses entry",
+          "Uplink Yard PKM crossing",
+          "Relay Cellar counterhold"
+        ],
+        "landmarkSummary": "Dish Houses entry | Uplink Yard PKM crossing | Relay Cellar counterhold",
+        "mustClearStructures": [
+          {
+            "label": "Dish Houses",
+            "tacticalRead": "Threshold hold",
+            "solveCall": "Own the first door before the relay reserve stretches the lane back out.",
+            "status": "Must-own anchor"
+          },
+          {
+            "label": "Uplink Yard",
+            "tacticalRead": "PKM lane owner",
+            "solveCall": "Cut the yard gun, then cross the cable lane on your timing instead of the route's.",
+            "status": "Must-own anchor"
+          },
+          {
+            "label": "Relay Cellar",
+            "tacticalRead": "Cellar compression",
+            "solveCall": "Hold the mouth, then clear deeper before the pocket turns into a burial hole.",
+            "status": "Must-own anchor"
+          }
+        ],
+        "mustClearSummary": "Dish Houses (Threshold hold) | Uplink Yard (PKM lane owner) | Relay Cellar (Cellar compression)",
+        "mustOwnCount": 3,
+        "guardedCount": 1
+      },
+      {
+        "routeId": "sundered-run",
+        "routeName": "Sundered Run",
+        "identityLabel": "Trench-and-bunker grind",
+        "summary": "Sundered Run is the brutal line-fight route: trench lips, bunker mouths, mortar brackets, and half-held footholds that stay ugly even when you are technically winning.",
+        "dominantAsk": "Break the trench lip, survive the med-lane shove, then decide whether the bunker mouth is a foothold or a trap.",
+        "doctrineCall": "Treat this as a bad-ground operation. Keep the boys tight, respect mortar timing, and protect the one concrete pocket that keeps the whole line from reopening.",
+        "operationOutlook": "Sundered Run should feel like surviving a broken line under pressure: trench first, bunker second, leave before the med lane taxes the whole squad.",
+        "landmarkProblems": [
+          "Med Lane trench lip",
+          "Underpass Strongpoint bunker mouth",
+          "Clinic Row mortar break"
+        ],
+        "landmarkSummary": "Med Lane trench lip | Underpass Strongpoint bunker mouth | Clinic Row mortar break",
+        "mustClearStructures": [
+          {
+            "label": "Clinic Row",
+            "tacticalRead": "Back-room threat",
+            "solveCall": "Break the first rooms clean or the clinic strip turns into a chained interior fight.",
+            "status": "Must-own anchor"
+          },
+          {
+            "label": "Med Lane Trench",
+            "tacticalRead": "Trench-entry denial",
+            "solveCall": "Suppress the lip, then cross before the strip reopens and taxes the whole squad.",
+            "status": "Must-own anchor"
+          },
+          {
+            "label": "Underpass Strongpoint",
+            "tacticalRead": "Bunker mouth plus rear pocket",
+            "solveCall": "Own the concrete mouth, then clear the hidden rear pocket before the line re-seats.",
+            "status": "Must-own anchor"
+          }
+        ],
+        "mustClearSummary": "Clinic Row (Back-room threat) | Med Lane Trench (Trench-entry denial) | Underpass Strongpoint (Bunker mouth plus rear pocket)",
+        "mustOwnCount": 3,
+        "guardedCount": 1
+      }
+    ],
+    "weapons": [
+      {
+        "id": "none",
+        "name": "No Primary",
+        "raidCost": 0
+      },
+      {
+        "id": "knife",
+        "name": "Field Knife",
+        "raidCost": 20
+      },
+      {
+        "id": "pistol",
+        "name": "Civic-9 Sidearm",
+        "raidCost": 35
+      },
+      {
+        "id": "worn-ak",
+        "name": "Worn AK",
+        "raidCost": 48
+      },
+      {
+        "id": "short-mosin",
+        "name": "Cut-Down Mosin",
+        "raidCost": 65
+      },
+      {
+        "id": "rifle",
+        "name": "VKR Rifle",
+        "raidCost": 120
+      },
+      {
+        "id": "smg",
+        "name": "Kite SMG",
+        "raidCost": 95
+      },
+      {
+        "id": "shotgun",
+        "name": "Morrow Shotgun",
+        "raidCost": 110
+      },
+      {
+        "id": "pkm",
+        "name": "PKM Support Gun",
+        "raidCost": 165
+      },
+      {
+        "id": "amr",
+        "name": "Bastion AMR",
+        "raidCost": 245
+      }
+    ],
+    "tacticalServices": [
+      {
+        "id": "signal-jammer",
+        "name": "Signal Jammer",
+        "cost": 75
+      },
+      {
+        "id": "uplink-kit",
+        "name": "Uplink Toolkit",
+        "cost": 70
+      },
+      {
+        "id": "cut-rig",
+        "name": "Cut-Rig Harness",
+        "cost": 60
+      }
+    ],
+    "contracts": [
+      {
+        "id": "scavCull",
+        "title": "Thin The Patrols"
+      },
+      {
+        "id": "lootSweep",
+        "title": "Sweep For Spare Value"
+      },
+      {
+        "id": "quickIntel",
+        "title": "Fast First Touch"
+      }
+    ],
+    "topTabs": [
+      "gear",
+      "operator",
+      "health",
+      "skills",
+      "map",
+      "tasks"
+    ],
+    "commandTabs": [
+      "forecast",
+      "operations",
+      "debrief",
+      "ledger"
+    ],
+    "showcases": [
+      "briefing",
+      "carried-storage",
+      "squad-roster",
+      "debrief",
+      "memorial-wall",
+      "dialogue-aftermath",
+      "next-push-gear",
+      "frontline-aftermath",
+      "breach",
+      "breach-push",
+      "boys-command",
+      "grenade-pocket",
+      "extract-clean",
+      "extract-collapse",
+      "extract-pressure",
+      "room-clear",
+      "room-clear-chain",
+      "frontline-supply",
+      "field-coffee",
+      "burner-coffee",
+      "expanded-frontline",
+      "hostile-lane-chatter",
+      "noise-discipline",
+      "drone-sweep",
+      "intel-alarm",
+      "war-beat-focus",
+      "body-recovery",
+      "persistent-body-return",
+      "dish-house-breach",
+      "recovery-corridor-payoff",
+      "caravan-trap",
+      "white-van-ambush",
+      "armored-drop",
+      "armored-evac",
+      "trench-assault",
+      "bunker-foothold",
+      "cellar-counterhold",
+      "shed-hide",
+      "civilian-window",
+      "hunter-search",
+      "blue-carried-fire",
+      "blue-carried-extract-success",
+      "blue-body-extract",
+      "wounded-soldier",
+      "surrender-window",
+      "territory-claims",
+      "territory-retake",
+      "relay-counterpush",
+      "ambulance-counterhold",
+      "mortar-bracket",
+      "retake-peel",
+      "pinned-pressure",
+      "boys-frag-runtime",
+      "suppression-runtime",
+      "covering-crossing",
+      "combat-audio",
+      "combat-presentation",
+      "hardcore-start",
+      "weapon-doctrine",
+      "field-capture",
+      "field-pivot",
+      "broker-cashout",
+      "chair-handoff",
+      "handgun-recovery",
+      "knife-extreme",
+      "final-stronghold",
+      "final-stronghold-launch",
+      "final-stronghold-setback",
+      "true-escape",
+      "endgame-amr",
+      "amr-counter-lane"
+    ]
+  }
+}

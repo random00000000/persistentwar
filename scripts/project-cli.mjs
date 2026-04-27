@@ -8,7 +8,7 @@ import { chromium } from "playwright";
 import viewportModule from "../automation-artifacts/playwright-viewport.cjs";
 
 const host = "127.0.0.1";
-const port = 4173;
+const port = 5847;
 const existingServerProbeMs = 4000;
 const defaultUrl = `http://${host}:${port}/`;
 const { DESKTOP_VIEWPORT } = viewportModule;
@@ -162,6 +162,501 @@ function parseBoolean(value) {
   }
 
   throw new Error(`Expected true/false, received "${value}".`);
+}
+
+function getTownWarSoldiers(war) {
+  if (Array.isArray(war?.townWar?.soldiers)) {
+    return war.townWar.soldiers;
+  }
+  if (Array.isArray(war?.soldiers)) {
+    return war.soldiers;
+  }
+  return [];
+}
+
+function formatWarSkillName(skill) {
+  return String(skill ?? "")
+    .split("-")
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+function getTopWarSkills(skills, count = 2) {
+  if (!skills || typeof skills !== "object") {
+    return [];
+  }
+
+  return Object.entries(skills)
+    .filter(([, value]) => Number.isFinite(value))
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, count)
+    .map(([skill, value]) => ({ skill, label: formatWarSkillName(skill), value }));
+}
+
+function summarizeWarSoldierIdentity(soldier) {
+  const topSkills = getTopWarSkills(soldier?.skills, 2);
+  const bestSkillsText =
+    soldier?.identitySummary?.bestSkills ??
+    topSkills.map((entry) => `${entry.label} ${entry.value}`).join(", ") ??
+    "unknown";
+  const primaryTrait = Array.isArray(soldier?.traits) && soldier.traits.length > 0 ? soldier.traits[0] : null;
+  const trust = soldier?.identitySummary?.trust ?? "unknown";
+  const currentNeed = soldier?.currentNeed ?? soldier?.identitySummary?.currentNeed ?? "unknown";
+  const usefulSkill =
+    soldier?.identitySummary?.usefulSkill ??
+    (topSkills[0] ? `${topSkills[0].label} ${topSkills[0].value}` : "unknown");
+  const risk = soldier?.identitySummary?.risk ?? "unknown";
+
+  return {
+    id: soldier?.id ?? null,
+    name: soldier?.displayName ?? soldier?.id ?? null,
+    faction: soldier?.faction ?? null,
+    role: soldier?.role ?? null,
+    archetype: soldier?.archetype ?? null,
+    bestSkills: bestSkillsText,
+    usefulSkill,
+    risk,
+    trait: primaryTrait,
+    currentNeed,
+    trust,
+    readable:
+      `${soldier?.displayName ?? soldier?.id ?? "soldier"} | Best skills: ${bestSkillsText || "unknown"} | ` +
+      `Trait: ${primaryTrait ?? "none"} | Current need: ${currentNeed} | Trust: ${trust} | Risk: ${risk}`
+  };
+}
+
+function summarizeWarTaskDecision(soldier) {
+  const decision = soldier?.taskDecision ?? null;
+  const topCandidates = Array.isArray(decision?.candidates) ? decision.candidates.slice(0, 4) : [];
+  return {
+    soldierId: soldier?.id ?? null,
+    name: soldier?.displayName ?? soldier?.id ?? null,
+    faction: soldier?.faction ?? null,
+    role: soldier?.role ?? null,
+    selectedWork: decision?.selectedWork ?? null,
+    selectedScore: decision?.selectedScore ?? null,
+    selectedReason: decision?.selectedReason ?? null,
+    blockedReason: decision?.blockedReason ?? null,
+    currentTask: soldier?.task?.kind ?? null,
+    priorities: {
+      Build: soldier?.workPriorities?.Build ?? null,
+      Rescue: soldier?.workPriorities?.Rescue ?? null,
+      Resupply: soldier?.workPriorities?.Resupply ?? null,
+      Defend: soldier?.workPriorities?.Defend ?? null,
+      Suppress: soldier?.workPriorities?.Suppress ?? null,
+      Rest: soldier?.workPriorities?.Rest ?? null
+    },
+    topCandidates: topCandidates.map((candidate) => ({
+      work: candidate?.work ?? null,
+      taskKind: candidate?.taskKind ?? null,
+      score: candidate?.score ?? null,
+      blockedReason: candidate?.blockedReason ?? null,
+      reason: candidate?.reason ?? null,
+      scoreParts: candidate?.scoreParts ?? null
+    })),
+    readable: `${soldier?.displayName ?? soldier?.id ?? "soldier"} | selected ${decision?.selectedWork ?? "none"} (${decision?.selectedScore ?? 0}) | ` +
+      `Build ${soldier?.workPriorities?.Build ?? "?"} Rescue ${soldier?.workPriorities?.Rescue ?? "?"} Resupply ${soldier?.workPriorities?.Resupply ?? "?"} ` +
+      `Defend ${soldier?.workPriorities?.Defend ?? "?"} Suppress ${soldier?.workPriorities?.Suppress ?? "?"} Rest ${soldier?.workPriorities?.Rest ?? "?"}`
+  };
+}
+
+function buildWarPriorityWarnings(rows) {
+  const campARows = rows.filter((row) => row?.faction === "camp-a");
+  const highBuilders = campARows.filter((row) => (row?.priorities?.Build ?? 0) >= 4).length;
+  const highSuppressors = campARows.filter((row) => (row?.priorities?.Suppress ?? 0) >= 4).length;
+  const highMedics = campARows.filter((row) => (row?.priorities?.Rescue ?? 0) >= 4).length;
+  const highResupply = campARows.filter((row) => (row?.priorities?.Resupply ?? 0) >= 4).length;
+  const tiredIgnored = campARows.some((row) => row?.selectedWork !== "Rest" && row?.blockedReason === "rest priority overrides noncritical work");
+  const warnings = [];
+  if (highBuilders > 0 && highSuppressors === 0) {
+    warnings.push("All builders, no cover");
+  }
+  if (highMedics === 0) {
+    warnings.push("No medic assigned");
+  }
+  if (highResupply > 0 && highSuppressors === 0) {
+    warnings.push("Ammo hauling uncovered");
+  }
+  if (campARows.some((row) => row?.selectedWork === "Build" && row?.blockedReason === "low nerve resists exposed work")) {
+    warnings.push("Best builder exposed");
+  }
+  if (tiredIgnored) {
+    warnings.push("Rest ignored: fatigue rising");
+  }
+  return warnings;
+}
+
+function buildTownWarBrief(war) {
+  if (!war || typeof war !== "object") {
+    return null;
+  }
+
+  const activeSector = war.town?.activeSector;
+  const sector =
+    activeSector && typeof activeSector === "object"
+      ? {
+          routeName: activeSector.routeName ?? null,
+          zoneLabel: activeSector.zoneLabel ?? null,
+          control: activeSector.control ?? null,
+          pressure: activeSector.pressure ?? null,
+          fortification: activeSector.fortification ?? null
+        }
+      : null;
+
+  const camps = Array.isArray(war.camps)
+    ? war.camps.map((camp) => ({
+        id: camp.id ?? null,
+        label: camp.label ?? null,
+        spawn: camp.spawn ?? null,
+        spawnedSoldiers: camp.spawnedSoldiers ?? null,
+        health: camp.health ?? null,
+        maxHealth: camp.maxHealth ?? null,
+        supply: camp.supply ?? null,
+        readiness: Number.isFinite(camp?.sustainment?.readiness) ? camp.sustainment.readiness : camp?.control?.readiness ?? null,
+        sustainment: camp.sustainment ?? null,
+        destroyed: camp.destroyed ?? null
+      }))
+    : [];
+
+  const officer =
+    war.officer && typeof war.officer === "object"
+      ? {
+          faction: war.officer.faction ?? null,
+          position: war.officer.position ?? null,
+          focusedLane: war.officer.focusedLane ?? null,
+          lastCommandRead: war.officer.lastCommandRead ?? null
+        }
+      : null;
+
+  const orders = Array.isArray(war.townWar?.orders) ? war.townWar.orders : [];
+  const soldiers = getTownWarSoldiers(war);
+  const ammoCrates = Array.isArray(war.townWar?.ammoCrates) ? war.townWar.ammoCrates : [];
+  const casualties = Array.isArray(war.casualties) ? war.casualties : Array.isArray(war.townWar?.casualties) ? war.townWar.casualties : [];
+  const chatter = Array.isArray(war.townWar?.chatter) ? war.townWar.chatter : [];
+  const dialogue = war.dialogue ?? war.townWar?.dialogue ?? null;
+  const aiThreats = war.aiThreats ?? war.townWar?.aiThreats ?? null;
+  const aiTactics = war.aiTactics ?? war.townWar?.aiTactics ?? null;
+  const dramaMemories = Array.isArray(war.dramaMemories) ? war.dramaMemories : Array.isArray(war.townWar?.dramaMemories) ? war.townWar.dramaMemories : [];
+  const dramaBeat = war.dramaBeat ?? war.townWar?.dramaBeat ?? null;
+  const debriefEchoes = Array.isArray(war.debriefEchoes) ? war.debriefEchoes : Array.isArray(war.townWar?.debriefEchoes) ? war.townWar.debriefEchoes : [];
+  const flankPressures = Array.isArray(war.flankPressures) ? war.flankPressures : Array.isArray(war.townWar?.flankPressures) ? war.townWar.flankPressures : [];
+  const skillDebrief = war.skillDebrief ?? war.townWar?.skillDebrief ?? null;
+  const storyPackAudit = war.storyPackAudit ?? war.townWar?.storyPackAudit ?? null;
+  const locationScars = Array.isArray(war.locationScars)
+    ? war.locationScars
+    : Array.isArray(war.townWar?.locationScars)
+      ? war.townWar.locationScars
+      : [];
+  const focusedLocationScar = war.focusedLocationScar ?? war.townWar?.focusedLocationScar ?? null;
+  const byCamp = {};
+  const spawnedFromByCamp = {};
+  let spawnOriginMismatches = 0;
+
+  for (const soldier of soldiers) {
+    const campId = soldier?.faction ?? "unknown";
+    const spawnedFrom = soldier?.spawnedFromCampId ?? "unknown";
+    const taskKind = soldier?.task?.kind ?? "unknown";
+    const role = soldier?.role ?? "unknown";
+    const pressure = Number.isFinite(soldier?.morale?.pressure) ? soldier.morale.pressure : null;
+
+    if (!byCamp[campId]) {
+      byCamp[campId] = { count: 0, maxPressure: 0, tasks: {}, roles: {} };
+    }
+
+    byCamp[campId].count += 1;
+    byCamp[campId].tasks[taskKind] = (byCamp[campId].tasks[taskKind] ?? 0) + 1;
+    byCamp[campId].roles[role] = (byCamp[campId].roles[role] ?? 0) + 1;
+    if (pressure !== null) {
+      byCamp[campId].maxPressure = Math.max(byCamp[campId].maxPressure, pressure);
+    }
+
+    spawnedFromByCamp[spawnedFrom] = (spawnedFromByCamp[spawnedFrom] ?? 0) + 1;
+    if (spawnedFrom !== "unknown" && campId !== "unknown" && spawnedFrom !== campId) {
+      spawnOriginMismatches += 1;
+    }
+  }
+
+  const orderByKind = {};
+  let ordersCompleted = 0;
+
+  for (const order of orders) {
+    const kind = order?.kind ?? "unknown";
+    const status = order?.status ?? "unknown";
+    orderByKind[kind] = (orderByKind[kind] ?? 0) + 1;
+    if (status === "completed") {
+      ordersCompleted += 1;
+    }
+  }
+
+  const crateByCamp = {};
+  const crateByRisk = {};
+  let crateAmmoRemaining = 0;
+  let cratesDestroyed = 0;
+
+  for (const crate of ammoCrates) {
+    const campId = crate?.faction ?? "unknown";
+    const riskTier = crate?.riskTier ?? "unknown";
+    crateByRisk[riskTier] = (crateByRisk[riskTier] ?? 0) + 1;
+    if (!crateByCamp[campId]) {
+      crateByCamp[campId] = { count: 0, ammoRemaining: 0, destroyed: 0 };
+    }
+
+    crateByCamp[campId].count += 1;
+    const ammo = Number.isFinite(crate?.ammo) ? crate.ammo : 0;
+    crateAmmoRemaining += ammo;
+    crateByCamp[campId].ammoRemaining += ammo;
+
+    if (crate?.destroyedAtSeconds !== null && crate?.destroyedAtSeconds !== undefined) {
+      cratesDestroyed += 1;
+      crateByCamp[campId].destroyed += 1;
+    }
+  }
+
+  return {
+    sector,
+    officer,
+    camps,
+    chatter: chatter.slice(-12).map((entry) => ({
+      stamp: Number.isFinite(entry?.atSeconds) ? `${entry.atSeconds.toFixed(1)}s` : null,
+      faction: entry?.faction ?? null,
+      channel: entry?.channel ?? null,
+      text: entry?.text ?? null,
+      tags: Array.isArray(entry?.tags) ? entry.tags : []
+    })),
+    orders: {
+      total: orders.length,
+      completed: ordersCompleted,
+      byKind: orderByKind
+    },
+    soldiers: {
+      total: soldiers.length,
+      byCamp,
+      spawnedFromByCamp,
+      spawnOriginMismatches,
+      targetIntents: soldiers.slice(0, 12).map((soldier) => ({
+        id: soldier?.id ?? null,
+        faction: soldier?.faction ?? null,
+        role: soldier?.role ?? null,
+        task: soldier?.task?.kind ?? null,
+        targetKind: soldier?.targetIntent?.targetKind ?? null,
+        targetId: soldier?.targetIntent?.targetId ?? null,
+        targetScore: Number.isFinite(soldier?.targetIntent?.targetScore) ? soldier.targetIntent.targetScore : null,
+        reason: soldier?.targetIntent?.reason ?? null
+      })),
+      tacticalIntents: soldiers.slice(0, 12).map((soldier) => ({
+        id: soldier?.id ?? null,
+        faction: soldier?.faction ?? null,
+        role: soldier?.role ?? null,
+        state: soldier?.tacticalIntent?.state ?? null,
+        reason: soldier?.tacticalIntent?.reason ?? null,
+        coverSlotId: soldier?.tacticalIntent?.coverSlotId ?? null,
+        coverState: soldier?.coverIntent?.state ?? null,
+        pressureRatio: Number.isFinite(soldier?.tacticalIntent?.pressureRatio) ? soldier.tacticalIntent.pressureRatio : null
+      })),
+      memory: soldiers.slice(0, 8).map((soldier) => ({
+        id: soldier?.id ?? null,
+        faction: soldier?.faction ?? null,
+        role: soldier?.role ?? null,
+        dramaMemoryTags: Array.isArray(soldier?.dramaMemoryTags) ? soldier.dramaMemoryTags : [],
+        witnessedEventCount: Number.isFinite(soldier?.witnessedEventCount) ? soldier.witnessedEventCount : 0,
+        trustInOfficer: Number.isFinite(soldier?.dramaArc?.trustInOfficer) ? soldier.dramaArc.trustInOfficer : null,
+        relationshipPressure: soldier?.dramaArc?.relationshipPressure ?? null,
+        dramaArc: soldier?.dramaArc ?? null
+      })),
+      identity: soldiers.slice(0, 12).map((soldier) => summarizeWarSoldierIdentity(soldier))
+    },
+    ammoCrates: {
+      total: ammoCrates.length,
+      destroyed: cratesDestroyed,
+      ammoRemaining: crateAmmoRemaining,
+      byRisk: crateByRisk,
+      byCamp: crateByCamp
+    },
+    sustainment: {
+      camps: camps.map((camp) => ({
+        id: camp.id,
+        label: camp.label,
+        readiness: camp.readiness,
+        fatigueAverage: Number.isFinite(camp?.sustainment?.fatigueAverage) ? camp.sustainment.fatigueAverage : null,
+        hungerAverage: Number.isFinite(camp?.sustainment?.hungerAverage) ? camp.sustainment.hungerAverage : null,
+        moraleAverage: Number.isFinite(camp?.sustainment?.moraleAverage) ? camp.sustainment.moraleAverage : null,
+        ammoFlow: Number.isFinite(camp?.sustainment?.ammoFlow) ? camp.sustainment.ammoFlow : null,
+        cookEffect: Number.isFinite(camp?.sustainment?.cookEffect) ? camp.sustainment.cookEffect : null,
+        restCycle: Number.isFinite(camp?.sustainment?.restCycle) ? camp.sustainment.restCycle : null,
+        bottleneckReason: camp?.sustainment?.bottleneckReason ?? null,
+        warnings: Array.isArray(camp?.sustainment?.warnings) ? camp.sustainment.warnings : [],
+        workPriorities: camp?.sustainment?.workPriorities ?? null
+      })),
+      warnings: camps.flatMap((camp) => (Array.isArray(camp?.sustainment?.warnings) ? camp.sustainment.warnings.map((warning) => `${camp.id}: ${warning}`) : []))
+    },
+    casualties: {
+      total: casualties.length,
+      active: casualties.filter((casualty) => casualty?.status === "wounded" || casualty?.status === "downed").length,
+      stabilized: casualties.filter((casualty) => casualty?.status === "stabilized").length,
+      lost: casualties.filter((casualty) => casualty?.status === "lost").length,
+      recent: casualties.slice(0, 8).map((casualty) => ({
+        id: casualty?.id ?? null,
+        soldierId: casualty?.soldierId ?? null,
+        severity: casualty?.severity ?? null,
+        status: casualty?.status ?? null,
+        assignedMedicId: casualty?.assignedMedicId ?? null,
+        rescueScore: Number.isFinite(casualty?.rescueScore) ? casualty.rescueScore : null,
+        pathRisk: Number.isFinite(casualty?.pathRisk) ? casualty.pathRisk : null,
+        coveredPath: Number.isFinite(casualty?.coveredPath) ? casualty.coveredPath : null,
+        outcomeCause: casualty?.outcomeCause ?? null,
+        causeChain: Array.isArray(casualty?.causeChain) ? casualty.causeChain : []
+      }))
+    },
+    dialogue: {
+      lastDramaEvent: dialogue?.lastDramaEvent ?? null,
+      activeOfficerWarTags: Array.isArray(dialogue?.activeOfficerWarTags) ? dialogue.activeOfficerWarTags : [],
+      activeScarTags: Array.isArray(dialogue?.activeScarTags) ? dialogue.activeScarTags : [],
+      recentDramaEvents: Array.isArray(dialogue?.recentDramaEvents)
+        ? dialogue.recentDramaEvents.slice(0, 8).map((event) => ({
+            stamp: Number.isFinite(event?.atSeconds) ? `${event.atSeconds.toFixed(1)}s` : null,
+            kind: event?.kind ?? null,
+            faction: event?.faction ?? null,
+            summary: event?.summary ?? null,
+            speaker: event?.speaker ?? null,
+            text: event?.text ?? null,
+            tags: Array.isArray(event?.tags) ? event.tags : []
+          }))
+        : []
+    },
+    aiThreats: aiThreats
+      ? {
+          playerThreatShare: Number.isFinite(aiThreats?.playerThreatShare) ? aiThreats.playerThreatShare : null,
+          playerThreatScore: Number.isFinite(aiThreats?.playerThreatScore) ? aiThreats.playerThreatScore : null,
+          playerThreatReason: aiThreats?.playerThreatReason ?? null,
+          frontlineFocus: aiThreats?.frontlineFocus ?? null,
+          contacts: Array.isArray(aiThreats?.contacts)
+            ? aiThreats.contacts.slice(0, 8).map((contact) => ({
+                faction: contact?.faction ?? null,
+                sourceId: contact?.sourceId ?? null,
+                sourceKind: contact?.sourceKind ?? null,
+                score: Number.isFinite(contact?.score) ? contact.score : null,
+                reason: contact?.reason ?? null
+              }))
+            : []
+        }
+      : null,
+    aiTactics: aiTactics
+      ? {
+          coverSlots: Array.isArray(aiTactics?.coverSlots)
+            ? aiTactics.coverSlots.slice(0, 12).map((slot) => ({
+                id: slot?.id ?? null,
+                faction: slot?.faction ?? null,
+                label: slot?.label ?? null,
+                sourceKind: slot?.sourceKind ?? null,
+                protection: Number.isFinite(slot?.protection) ? slot.protection : null,
+                occupiedBySoldierId: slot?.occupiedBySoldierId ?? null
+              }))
+            : [],
+          suppressionFields: Array.isArray(aiTactics?.suppressionFields) ? aiTactics.suppressionFields : [],
+          tacticalPairs: Array.isArray(aiTactics?.tacticalPairs) ? aiTactics.tacticalPairs : [],
+          completedConstructionImpact: Array.isArray(aiTactics?.completedConstructionImpact) ? aiTactics.completedConstructionImpact : []
+        }
+      : null,
+    dramaMemories: dramaMemories.slice(0, 8).map((memory) => ({
+      id: memory?.id ?? null,
+      eventKind: memory?.eventKind ?? null,
+      tag: memory?.tag ?? null,
+      cause: memory?.cause ?? null,
+      responsibility: memory?.responsibility ?? null,
+      subjectId: memory?.subjectId ?? null,
+      subjectName: memory?.subjectName ?? null,
+      locationName: memory?.locationName ?? null,
+      orderId: memory?.orderId ?? null,
+      witnessIds: Array.isArray(memory?.witnessIds) ? memory.witnessIds : [],
+      emotionalWeight: Number.isFinite(memory?.emotionalWeight) ? memory.emotionalWeight : null,
+      lastReferencedAt: Number.isFinite(memory?.lastReferencedAt) ? memory.lastReferencedAt : null,
+      summary: memory?.summary ?? null
+    })),
+    locationScars: locationScars.slice(0, 12).map((scar) => ({
+      id: scar?.id ?? null,
+      label: scar?.label ?? null,
+      kind: scar?.kind ?? null,
+      position: scar?.position ?? null,
+      tags: Array.isArray(scar?.tags) ? scar.tags : [],
+      subjectNames: Array.isArray(scar?.subjectNames) ? scar.subjectNames : [],
+      orderId: scar?.orderId ?? null,
+      controlSide: scar?.controlSide ?? null,
+      emotionalWeight: Number.isFinite(scar?.emotionalWeight) ? scar.emotionalWeight : null,
+      timesReferenced: Number.isFinite(scar?.timesReferenced) ? scar.timesReferenced : 0,
+      lastChangedAt: Number.isFinite(scar?.lastChangedAt) ? scar.lastChangedAt : null
+    })),
+    focusedLocationScar: focusedLocationScar
+      ? {
+          id: focusedLocationScar.id ?? null,
+          label: focusedLocationScar.label ?? null,
+          kind: focusedLocationScar.kind ?? null,
+          position: focusedLocationScar.position ?? null,
+          tags: Array.isArray(focusedLocationScar.tags) ? focusedLocationScar.tags : [],
+          subjectNames: Array.isArray(focusedLocationScar.subjectNames) ? focusedLocationScar.subjectNames : [],
+          orderId: focusedLocationScar.orderId ?? null,
+          controlSide: focusedLocationScar.controlSide ?? null,
+          emotionalWeight: Number.isFinite(focusedLocationScar.emotionalWeight) ? focusedLocationScar.emotionalWeight : null,
+          timesReferenced: Number.isFinite(focusedLocationScar.timesReferenced) ? focusedLocationScar.timesReferenced : 0,
+          lastChangedAt: Number.isFinite(focusedLocationScar.lastChangedAt) ? focusedLocationScar.lastChangedAt : null
+        }
+      : null,
+    dramaBeat: dramaBeat
+      ? {
+          current: dramaBeat.current ?? null,
+          chain: Array.isArray(dramaBeat.chain)
+            ? dramaBeat.chain.slice(0, 8).map((entry) => ({
+                beat: entry?.beat ?? null,
+                eventKind: entry?.eventKind ?? null,
+                orderId: entry?.orderId ?? null,
+                locationLabel: entry?.locationLabel ?? null,
+                summary: entry?.summary ?? null,
+                tags: Array.isArray(entry?.tags) ? entry.tags : []
+              }))
+            : [],
+          lastPayoff: dramaBeat.lastPayoff ?? null
+        }
+      : null,
+    debriefEchoes: debriefEchoes.slice(0, 8).map((echo) => ({
+      beat: echo?.beat ?? null,
+      eventKind: echo?.eventKind ?? null,
+      category: echo?.category ?? null,
+      text: echo?.text ?? null,
+      sourceSummary: echo?.sourceSummary ?? null,
+      tags: Array.isArray(echo?.tags) ? echo.tags : []
+    })),
+    skillEmergence: {
+      flanks: flankPressures.slice(0, 8).map((flank) => ({
+        id: flank?.id ?? null,
+        lane: flank?.lane ?? null,
+        pressure: flank?.pressure ?? null,
+        status: flank?.status ?? null,
+        scoutId: flank?.scoutId ?? null,
+        scoutScore: Number.isFinite(flank?.scoutScore) ? flank.scoutScore : null,
+        outcome: flank?.outcome ?? null,
+        causeChain: Array.isArray(flank?.causeChain) ? flank.causeChain : [],
+        readable: flank?.readable ?? null
+      })),
+      debrief: skillDebrief
+        ? {
+            lastOutcome: skillDebrief.lastOutcome ?? null,
+            outcomes: Array.isArray(skillDebrief.outcomes) ? skillDebrief.outcomes.slice(0, 6) : [],
+            recommendedNextPlan: skillDebrief.recommendedNextPlan ?? null,
+            causeChain: Array.isArray(skillDebrief.causeChain) ? skillDebrief.causeChain : [],
+            summary: skillDebrief.summary ?? null
+          }
+        : null
+    },
+    storyPackAudit: storyPackAudit
+      ? {
+          ok: storyPackAudit.ok === true,
+          errorCount: Array.isArray(storyPackAudit.errors) ? storyPackAudit.errors.length : 0,
+          warningCount: Array.isArray(storyPackAudit.warnings) ? storyPackAudit.warnings.length : 0,
+          totals: storyPackAudit.totals ?? null,
+          byFamily: Array.isArray(storyPackAudit.byFamily) ? storyPackAudit.byFamily : []
+        }
+      : null
+  };
 }
 
 async function applyRaidAction(page, options) {
@@ -1344,6 +1839,1087 @@ async function runRegressionVerification(page, verificationId, options) {
 async function runAnyVerification(page, verificationId, options = {}) {
   if (isRegressionVerificationId(verificationId)) {
     return runRegressionVerification(page, verificationId, options);
+  }
+
+  if (verificationId === "war-roster-skills") {
+    await callAgent(page, "stageState", "town-war");
+    const snapshot = await callAgent(page, "getSnapshot");
+    const war = snapshot?.war ?? null;
+    const soldiers = getTownWarSoldiers(war);
+    const builders = soldiers.filter((soldier) => soldier?.role === "builder");
+    const firstBuilder = builders[0] ?? null;
+    const secondBuilder = builders[1] ?? null;
+    const rosterBrief = buildTownWarBrief(war);
+    const rosterIdentity = rosterBrief?.soldiers?.identity ?? [];
+    const trenchOrder = await callAgent(page, "orderTownWarTrench", { campId: "camp-a", x: 1250, y: 720 });
+    const snapshotSoldiers = Array.isArray(war?.soldiers) ? war.soldiers : [];
+    const checks = [
+      {
+        label: "soldiers expose identity stats in the CLI snapshot",
+        passed:
+          soldiers.length > 0 &&
+          soldiers.every(
+            (soldier) =>
+              typeof soldier?.displayName === "string" &&
+              typeof soldier?.archetype === "string" &&
+              soldier?.skills &&
+              Number.isFinite(soldier.skills.construction) &&
+              Number.isFinite(soldier.skills.nerve) &&
+              Array.isArray(soldier?.traits) &&
+              soldier?.needs &&
+              Number.isFinite(soldier.needs.fatigue) &&
+              soldier?.workPriorities &&
+              Number.isFinite(soldier.workPriorities.Build) &&
+              typeof soldier?.currentNeed === "string" &&
+              soldier?.experience &&
+              Number.isFinite(soldier.experience.operations)
+          ),
+        details: `soldiers=${soldiers.length}`
+      },
+      {
+        label: "top-level war.soldiers exposes roster fields for automation",
+        passed:
+          snapshotSoldiers.length > 0 &&
+          snapshotSoldiers.some(
+            (soldier) =>
+              soldier?.skills &&
+              Number.isFinite(soldier.skills.construction) &&
+              Array.isArray(soldier?.traits) &&
+              soldier?.needs &&
+              soldier?.workPriorities
+          ),
+        details: `snapshotSoldiers=${snapshotSoldiers.length}`
+      },
+      {
+        label: "spawned builders differ in construction or nerve",
+        passed:
+          firstBuilder !== null &&
+          secondBuilder !== null &&
+          (firstBuilder.skills?.construction !== secondBuilder.skills?.construction ||
+            firstBuilder.skills?.nerve !== secondBuilder.skills?.nerve),
+        details:
+          `builderA=${firstBuilder?.id ?? "none"} construction=${firstBuilder?.skills?.construction ?? "none"} nerve=${
+            firstBuilder?.skills?.nerve ?? "none"
+          } | builderB=${secondBuilder?.id ?? "none"} construction=${secondBuilder?.skills?.construction ?? "none"} nerve=${
+            secondBuilder?.skills?.nerve ?? "none"
+          }`
+      },
+      {
+        label: "roster brief explains useful skill and risk",
+        passed:
+          Array.isArray(rosterIdentity) &&
+          rosterIdentity.some(
+            (entry) =>
+              typeof entry?.usefulSkill === "string" &&
+              entry.usefulSkill.length > 0 &&
+              typeof entry?.risk === "string" &&
+              entry.risk.length > 0
+          ),
+        details: rosterIdentity[0]?.readable ?? "none"
+      },
+      {
+        label: "existing trench order command path still works after identity state",
+        passed: trenchOrder?.ok === true && typeof (trenchOrder?.assignedSoldierId ?? trenchOrder?.order?.assignedSoldierId) === "string",
+        details: `ok=${trenchOrder?.ok ?? false} assigned=${trenchOrder?.assignedSoldierId ?? trenchOrder?.order?.assignedSoldierId ?? "none"}`
+      }
+    ];
+    const screenshotPath = await captureVerificationScreenshot(page, options);
+    return {
+      ...buildVerificationResult(
+        verificationId,
+        "Stage the town-war roster and prove named soldiers expose skills, traits, needs, priorities, risk, and useful skill reads.",
+        checks
+      ),
+      screenshotPath,
+      roster: rosterIdentity,
+      snapshot: war,
+      trenchOrder,
+      brief: rosterBrief
+    };
+  }
+
+  if (verificationId === "war-priority-skill-choice") {
+    await callAgent(page, "stageState", "town-war");
+    await callAgent(page, "setTownWarPriority", { soldierId: "town-war-soldier-2", work: "Build", priority: 5 });
+    await callAgent(page, "setTownWarPriority", { soldierId: "town-war-soldier-2", work: "Defend", priority: 1 });
+    const trenchOrder = await callAgent(page, "orderTownWarTrench", { campId: "camp-a", x: 1250, y: 720 });
+    const buildWar = trenchOrder?.war ?? null;
+    const buildSoldiers = getTownWarSoldiers(buildWar);
+    const highBuildSoldier = buildSoldiers.find((soldier) => soldier?.id === "town-war-soldier-2") ?? null;
+
+    await callAgent(page, "stageState", "town-war");
+    await callAgent(page, "setTownWarPriority", { soldierId: "town-war-soldier-2", work: "Suppress", priority: 5 });
+    await callAgent(page, "setTownWarPriority", { soldierId: "town-war-soldier-2", work: "Defend", priority: 1 });
+    const focusResult = await callAgent(page, "focusTownWarLane", { campId: "camp-a", lane: "mid" });
+    const focusWar = focusResult?.war ?? null;
+    const suppressSoldier =
+      getTownWarSoldiers(focusWar).find((soldier) => soldier?.id === "town-war-soldier-2" && soldier?.task?.kind === "suppress") ?? null;
+
+    await callAgent(page, "stageState", "town-war");
+    await callAgent(page, "setTownWarPriority", { soldierId: "town-war-soldier-2", work: "Resupply", priority: 5 });
+    await callAgent(page, "setTownWarPriority", { soldierId: "town-war-soldier-2", work: "Defend", priority: 1 });
+    await callAgent(page, "setTownWarPriority", { soldierId: "town-war-soldier-2", work: "Build", priority: 0 });
+    await callAgent(page, "setTownWarPriority", { soldierId: "town-war-soldier-2", work: "Suppress", priority: 0 });
+    const resupplyFocus = await callAgent(page, "focusTownWarLane", { campId: "camp-a", lane: "mid" });
+    const resupplySoldier =
+      getTownWarSoldiers(resupplyFocus?.war).find((soldier) => soldier?.id === "town-war-soldier-2" && soldier?.task?.kind === "resupply") ??
+      null;
+
+    await callAgent(page, "stageState", "town-war");
+    await callAgent(page, "presetTownWarPriority", { soldierId: "town-war-soldier-2", preset: "rest-cycle" });
+    await callAgent(page, "setTownWarSoldierNeeds", { soldierId: "town-war-soldier-2", fatigue: 0.9, morale: 0.35 });
+    const restFocus = await callAgent(page, "focusTownWarLane", { campId: "camp-a", lane: "mid" });
+    const tiredSoldier = getTownWarSoldiers(restFocus?.war).find((soldier) => soldier?.id === "town-war-soldier-2") ?? null;
+
+    await callAgent(page, "stageState", "town-war");
+    const baselineCandidates = await callAgent(page, "getTownWarTaskCandidates", { soldierId: "town-war-soldier-2" });
+    await callAgent(page, "setTownWarPriority", { soldierId: "town-war-soldier-2", work: "Build", priority: 5 });
+    const changedCandidates = await callAgent(page, "getTownWarTaskCandidates", { soldierId: "town-war-soldier-2" });
+    const baselineTop = baselineCandidates?.result?.candidates?.[0]?.work ?? null;
+    const changedTop = changedCandidates?.result?.candidates?.[0]?.work ?? null;
+
+    const checks = [
+      {
+        label: "high-Build soldier prefers construction when a build order exists",
+        passed:
+          trenchOrder?.ok === true &&
+          (trenchOrder?.order?.assignedSoldierId === "town-war-soldier-2" || highBuildSoldier?.taskDecision?.selectedWork === "Build"),
+        details:
+          `assigned=${trenchOrder?.order?.assignedSoldierId ?? "none"} | ` +
+          `selected=${highBuildSoldier?.taskDecision?.selectedWork ?? "none"} | score=${highBuildSoldier?.taskDecision?.selectedScore ?? "n/a"}`
+      },
+      {
+        label: "high-Suppress soldier covers the lane instead of default defense",
+        passed: suppressSoldier !== null && suppressSoldier?.taskDecision?.selectedWork === "Suppress",
+        details: `task=${suppressSoldier?.task?.kind ?? "none"} | selected=${suppressSoldier?.taskDecision?.selectedWork ?? "none"}`
+      },
+      {
+        label: "high-Resupply soldier runs ammo when resupply is prioritized",
+        passed: resupplySoldier !== null && resupplySoldier?.taskDecision?.selectedWork === "Resupply",
+        details: `task=${resupplySoldier?.task?.kind ?? "none"} | selected=${resupplySoldier?.taskDecision?.selectedWork ?? "none"}`
+      },
+      {
+        label: "tired high-Rest soldier avoids noncritical lane work",
+        passed: tiredSoldier?.task?.kind === "hold" && tiredSoldier?.taskDecision?.selectedWork === "Rest",
+        details:
+          `task=${tiredSoldier?.task?.kind ?? "none"} | selected=${tiredSoldier?.taskDecision?.selectedWork ?? "none"} | ` +
+          `need=${tiredSoldier?.currentNeed ?? "unknown"} | blocked=${tiredSoldier?.taskDecision?.blockedReason ?? "none"}`
+      },
+      {
+        label: "changing priority changes the top task candidate",
+        passed: baselineTop !== null && changedTop === "Build" && baselineTop !== changedTop,
+        details: `baselineTop=${baselineTop ?? "none"} | changedTop=${changedTop ?? "none"}`
+      }
+    ];
+    const screenshotPath = await captureVerificationScreenshot(page, options);
+    return {
+      ...buildVerificationResult(
+        verificationId,
+        "Stage the town-war priority matrix and prove priorities, skills, fatigue, and task candidates change soldier assignment.",
+        checks
+      ),
+      screenshotPath,
+      trenchOrder,
+      focusResult,
+      resupplyFocus,
+      restFocus,
+      baselineCandidates,
+      changedCandidates,
+      brief: buildTownWarBrief(changedCandidates?.war ?? null)
+    };
+  }
+
+  if (verificationId === "war-build-skill-under-fire") {
+    await callAgent(page, "stageState", "town-war");
+    const nervousOrder = await callAgent(page, "orderTownWarBuildTest", {
+      builderId: "town-war-soldier-1",
+      x: 7200,
+      y: 3110
+    });
+    await callAgent(page, "advanceTownWar", { seconds: 30, tickSeconds: 0.25 });
+    const nervousReport = await callAgent(page, "getTownWarBuildReport", { orderId: nervousOrder?.order?.orderId });
+
+    await callAgent(page, "stageState", "town-war");
+    const steadyOrder = await callAgent(page, "orderTownWarBuildTest", {
+      builderId: "town-war-soldier-4",
+      x: 4300,
+      y: 3110
+    });
+    await callAgent(page, "advanceTownWar", { seconds: 30, tickSeconds: 0.25 });
+    const steadyReport = await callAgent(page, "getTownWarBuildReport", { orderId: steadyOrder?.order?.orderId });
+
+    await callAgent(page, "stageState", "town-war");
+    const coveredOrder = await callAgent(page, "orderTownWarBuildTest", {
+      builderId: "town-war-soldier-1",
+      coveredById: "town-war-soldier-3",
+      x: 7200,
+      y: 3110
+    });
+    await callAgent(page, "advanceTownWar", { seconds: 30, tickSeconds: 0.25 });
+    const coveredReport = await callAgent(page, "getTownWarBuildReport", { orderId: coveredOrder?.order?.orderId });
+
+    await callAgent(page, "stageState", "town-war");
+    await callAgent(page, "setTownWarSoldierAmmo", { soldierId: "town-war-soldier-3", inMag: 0, reserve: 0 });
+    const dryOrder = await callAgent(page, "orderTownWarBuildTest", {
+      builderId: "town-war-soldier-1",
+      coveredById: "town-war-soldier-3",
+      x: 7200,
+      y: 3110
+    });
+    await callAgent(page, "advanceTownWar", { seconds: 30, tickSeconds: 0.25 });
+    const dryReport = await callAgent(page, "getTownWarBuildReport", { orderId: dryOrder?.order?.orderId });
+
+    await callAgent(page, "stageState", "town-war");
+    const completeOrder = await callAgent(page, "orderTownWarBuildTest", {
+      builderId: "town-war-soldier-1",
+      coveredById: "town-war-soldier-3",
+      x: 7480,
+      y: 3110
+    });
+    await callAgent(page, "advanceTownWar", { seconds: 55, tickSeconds: 0.25 });
+    const completeReport = await callAgent(page, "getTownWarBuildReport", { orderId: completeOrder?.order?.orderId });
+
+    const nervousBuild = nervousReport?.report?.order?.build ?? null;
+    const steadyBuild = steadyReport?.report?.order?.build ?? null;
+    const coveredBuild = coveredReport?.report?.order?.build ?? null;
+    const dryBuild = dryReport?.report?.order?.build ?? null;
+    const completeBuild = completeReport?.report?.order?.build ?? null;
+
+    const checks = [
+      {
+        label: "different Construction and Nerve produce different exposed build progress",
+        passed:
+          nervousBuild !== null &&
+          steadyBuild !== null &&
+          Math.abs((nervousBuild?.progress ?? 0) - (steadyBuild?.progress ?? 0)) >= 5,
+        details:
+          `nervous=${nervousBuild?.progress ?? "n/a"} stall=${nervousBuild?.stallReason ?? "none"} | ` +
+          `steady=${steadyBuild?.progress ?? "n/a"} stall=${steadyBuild?.stallReason ?? "none"}`
+      },
+      {
+        label: "friendly suppression reduces exposed-build stall pressure",
+        passed:
+          coveredBuild !== null &&
+          nervousBuild !== null &&
+          (coveredBuild?.coverFireSupport ?? 0) > (nervousBuild?.coverFireSupport ?? 0) &&
+          (coveredBuild?.progress ?? 0) > (nervousBuild?.progress ?? 0),
+        details:
+          `coveredProgress=${coveredBuild?.progress ?? "n/a"} support=${coveredBuild?.coverFireSupport ?? "n/a"} | ` +
+          `uncoveredProgress=${nervousBuild?.progress ?? "n/a"} support=${nervousBuild?.coverFireSupport ?? "n/a"}`
+      },
+      {
+        label: "low ammo removes suppression protection",
+        passed:
+          dryBuild !== null &&
+          coveredBuild !== null &&
+          dryBuild?.supportAmmoState === "dry" &&
+          (dryBuild?.progress ?? 0) < (coveredBuild?.progress ?? 0),
+        details:
+          `dryProgress=${dryBuild?.progress ?? "n/a"} ammo=${dryBuild?.supportAmmoState ?? "n/a"} | ` +
+          `coveredProgress=${coveredBuild?.progress ?? "n/a"} ammo=${coveredBuild?.supportAmmoState ?? "n/a"}`
+      },
+      {
+        label: "build report exposes cause chain and completion explanation",
+        passed:
+          completeReport?.report?.order?.status === "completed" &&
+          typeof completeBuild?.outcomeCause === "string" &&
+          Array.isArray(completeBuild?.causeChain) &&
+          completeBuild.causeChain.length > 0,
+        details:
+          `status=${completeReport?.report?.order?.status ?? "none"} | cause=${completeBuild?.outcomeCause ?? "none"} | ` +
+          `chain=${(completeBuild?.causeChain ?? []).join(">") || "none"}`
+      }
+    ];
+    const screenshotPath = await captureVerificationScreenshot(page, options);
+    return {
+      ...buildVerificationResult(
+        verificationId,
+        "Stage exposed trench builds and prove Construction, Nerve, suppression, Logistics/ammo, and fatigue drive build progress and debrief causes.",
+        checks
+      ),
+      screenshotPath,
+      nervousReport,
+      steadyReport,
+      coveredReport,
+      dryReport,
+      completeReport,
+      snapshot: completeReport?.war ?? null,
+      brief: buildTownWarBrief(completeReport?.war ?? null)
+    };
+  }
+
+  if (verificationId === "war-medical-rescue-emergence") {
+    await callAgent(page, "stageState", "town-war");
+    const rescueStage = await callAgent(page, "stageTownWarCasualty", {
+      soldierId: "town-war-soldier-1",
+      x: 6200,
+      y: 3110,
+      severity: "critical"
+    });
+    const rescueOrder = await callAgent(page, "orderTownWarMedicRescue", {
+      medicId: "town-war-soldier-7",
+      targetSoldierId: "town-war-soldier-1",
+      coveredById: "town-war-soldier-3"
+    });
+    await callAgent(page, "advanceTownWar", { seconds: 45, tickSeconds: 0.25 });
+    const rescueReport = await callAgent(page, "getTownWarRescueReport");
+    const rescuedCasualty = rescueReport?.war?.townWar?.casualties?.find((casualty) => casualty?.soldierId === "town-war-soldier-1") ?? null;
+    const rescueMedic = getTownWarSoldiers(rescueReport?.war).find((soldier) => soldier?.id === "town-war-soldier-7") ?? null;
+
+    await callAgent(page, "stageState", "town-war");
+    await callAgent(page, "stageTownWarCasualty", {
+      soldierId: "town-war-soldier-2",
+      x: 7200,
+      y: 3110,
+      severity: "critical"
+    });
+    const lowNerveOrder = await callAgent(page, "orderTownWarMedicRescue", {
+      medicId: "town-war-soldier-1",
+      targetSoldierId: "town-war-soldier-2"
+    });
+
+    await callAgent(page, "stageState", "town-war");
+    await callAgent(page, "stageTownWarCasualty", {
+      soldierId: "town-war-soldier-2",
+      x: 6200,
+      y: 3110,
+      severity: "critical"
+    });
+    const uncoveredOrder = await callAgent(page, "orderTownWarMedicRescue", {
+      medicId: "town-war-soldier-7",
+      targetSoldierId: "town-war-soldier-2"
+    });
+
+    await callAgent(page, "stageState", "town-war");
+    await callAgent(page, "stageTownWarCasualty", {
+      soldierId: "town-war-soldier-2",
+      x: 6200,
+      y: 3110,
+      severity: "critical"
+    });
+    const coveredOrder = await callAgent(page, "orderTownWarMedicRescue", {
+      medicId: "town-war-soldier-7",
+      targetSoldierId: "town-war-soldier-2",
+      coveredById: "town-war-soldier-3"
+    });
+
+    await callAgent(page, "stageState", "town-war");
+    await callAgent(page, "stageTownWarCasualty", {
+      soldierId: "town-war-soldier-1",
+      x: 7200,
+      y: 3110,
+      severity: "critical"
+    });
+    await callAgent(page, "advanceTownWar", { seconds: 50, tickSeconds: 0.25 });
+    const failedReport = await callAgent(page, "getTownWarRescueReport");
+    const failedCasualty = failedReport?.war?.townWar?.casualties?.find((casualty) => casualty?.soldierId === "town-war-soldier-1") ?? null;
+    const failedDrama = failedReport?.war?.dialogue?.lastDramaEvent ?? null;
+
+    const checks = [
+      {
+        label: "high-Medical high-Rescue medic attempts and completes recovery",
+        passed: rescueOrder?.ok === true && rescuedCasualty?.status === "stabilized" && (rescueMedic?.experience?.rescuesCompleted ?? 0) > 0,
+        details:
+          `order=${rescueOrder?.ok ?? false} | status=${rescuedCasualty?.status ?? "none"} | ` +
+          `rescues=${rescueMedic?.experience?.rescuesCompleted ?? "n/a"}`
+      },
+      {
+        label: "low Nerve or high exposure can delay a rescue",
+        passed: lowNerveOrder?.ok === false && typeof lowNerveOrder?.result?.casualty?.outcomeCause === "string",
+        details: `ok=${lowNerveOrder?.ok ?? false} | reason=${lowNerveOrder?.result?.casualty?.outcomeCause ?? lowNerveOrder?.reason ?? "none"}`
+      },
+      {
+        label: "suppression or covered path can flip the medic decision",
+        passed:
+          uncoveredOrder?.ok === false &&
+          coveredOrder?.ok === true &&
+          (coveredOrder?.result?.casualty?.coveredPath ?? 0) > (uncoveredOrder?.result?.casualty?.coveredPath ?? 0),
+        details:
+          `uncoveredOk=${uncoveredOrder?.ok ?? false} cover=${uncoveredOrder?.result?.casualty?.coveredPath ?? "n/a"} | ` +
+          `coveredOk=${coveredOrder?.ok ?? false} cover=${coveredOrder?.result?.casualty?.coveredPath ?? "n/a"}`
+      },
+      {
+        label: "successful rescue creates memory and trust pressure",
+        passed:
+          Array.isArray(rescueReport?.war?.dramaMemories) &&
+          rescueReport.war.dramaMemories.some((memory) => memory?.tag === "wounded-stabilized") &&
+          (rescueMedic?.dramaArc?.protectiveOfSoldierIds ?? []).includes("town-war-soldier-1"),
+        details:
+          `memoryTags=${(rescueReport?.war?.dramaMemories ?? []).map((memory) => memory?.tag).join(",") || "none"} | ` +
+          `protective=${(rescueMedic?.dramaArc?.protectiveOfSoldierIds ?? []).join(",") || "none"}`
+      },
+      {
+        label: "failed rescue creates readable debrief truth",
+        passed:
+          failedCasualty?.status === "lost" &&
+          failedDrama?.kind === "wounded-lost" &&
+          Array.isArray(failedReport?.war?.debriefEchoes) &&
+          failedReport.war.debriefEchoes.some((echo) => echo?.eventKind === "wounded-lost"),
+        details:
+          `status=${failedCasualty?.status ?? "none"} | drama=${failedDrama?.kind ?? "none"} | ` +
+          `cause=${failedCasualty?.outcomeCause ?? "none"}`
+      }
+    ];
+    const screenshotPath = await captureVerificationScreenshot(page, options);
+    return {
+      ...buildVerificationResult(
+        verificationId,
+        "Stage casualty rescue scenarios and prove Medical, Nerve, Social, cover, suppression, memory, and debrief truth drive recovery.",
+        checks
+      ),
+      screenshotPath,
+      rescueStage,
+      rescueOrder,
+      rescueReport,
+      lowNerveOrder,
+      uncoveredOrder,
+      coveredOrder,
+      failedReport,
+      brief: buildTownWarBrief(rescueReport?.war ?? null)
+    };
+  }
+
+  if (verificationId === "war-logistics-camp-readiness") {
+    await callAgent(page, "stageState", "town-war");
+    const baseline = await callAgent(page, "getTownWarSustainmentReport");
+    const baselineCamp = baseline?.report?.camps?.find((camp) => camp.campId === "camp-a") ?? null;
+
+    const ammoPressure = await callAgent(page, "stageTownWarAmmoPressure", { campId: "camp-a" });
+    const pressuredCamp = ammoPressure?.report?.camps?.find((camp) => camp.campId === "camp-a") ?? null;
+    const pressuredOrder = await callAgent(page, "orderTownWarBuildTest", {
+      builderId: "town-war-soldier-1",
+      coveredById: "town-war-soldier-3",
+      x: 7200,
+      y: 3110
+    });
+    await callAgent(page, "advanceTownWar", { seconds: 24, tickSeconds: 0.25 });
+    const pressuredReport = await callAgent(page, "getTownWarBuildReport", { orderId: pressuredOrder?.order?.orderId ?? "" });
+
+    await callAgent(page, "stageState", "town-war");
+    const tiredStage = await callAgent(page, "stageTownWarFatigue", { campId: "camp-a", level: 0.82 });
+    const tiredBefore = tiredStage?.report?.camps?.find((camp) => camp.campId === "camp-a") ?? null;
+    await callAgent(page, "setTownWarCampWork", { campId: "camp-a", work: "Cook", priority: 0 });
+    await callAgent(page, "setTownWarCampWork", { campId: "camp-a", work: "Rest", priority: 0 });
+    await callAgent(page, "advanceTownWar", { seconds: 30, tickSeconds: 0.5 });
+    const neglected = await callAgent(page, "getTownWarSustainmentReport");
+    const neglectedCamp = neglected?.report?.camps?.find((camp) => camp.campId === "camp-a") ?? null;
+
+    await callAgent(page, "stageState", "town-war");
+    await callAgent(page, "stageTownWarFatigue", { campId: "camp-a", level: 0.82 });
+    await callAgent(page, "setTownWarCampWork", { campId: "camp-a", work: "Cook", priority: 5 });
+    await callAgent(page, "setTownWarCampWork", { campId: "camp-a", work: "Rest", priority: 5 });
+    await callAgent(page, "advanceTownWar", { seconds: 30, tickSeconds: 0.5 });
+    const recovered = await callAgent(page, "getTownWarSustainmentReport");
+    const recoveredCamp = recovered?.report?.camps?.find((camp) => camp.campId === "camp-a") ?? null;
+
+    const restedSoldiers = getTownWarSoldiers(recovered?.war ?? null).filter((soldier) => soldier?.faction === "camp-a");
+    const tiredSoldiers = getTownWarSoldiers(neglected?.war ?? null).filter((soldier) => soldier?.faction === "camp-a");
+    const recoveredFatigue =
+      restedSoldiers.reduce((total, soldier) => total + (Number.isFinite(soldier?.needs?.fatigue) ? soldier.needs.fatigue : 0), 0) /
+      Math.max(1, restedSoldiers.length);
+    const neglectedFatigue =
+      tiredSoldiers.reduce((total, soldier) => total + (Number.isFinite(soldier?.needs?.fatigue) ? soldier.needs.fatigue : 0), 0) /
+      Math.max(1, tiredSoldiers.length);
+
+    const healthyOrder = await callAgent(page, "orderTownWarBuildTest", {
+      builderId: "town-war-soldier-1",
+      coveredById: "town-war-soldier-3",
+      x: 7200,
+      y: 3110
+    });
+    await callAgent(page, "advanceTownWar", { seconds: 24, tickSeconds: 0.25 });
+    const healthyReport = await callAgent(page, "getTownWarBuildReport", { orderId: healthyOrder?.order?.orderId ?? "" });
+    const finalWar = healthyReport?.war ?? recovered?.war ?? null;
+
+    const checks = [
+      {
+        label: "sustainment snapshot exposes readiness/fatigue/hunger/ammo flow",
+        passed:
+          baselineCamp &&
+          Number.isFinite(baselineCamp.readiness) &&
+          Number.isFinite(baselineCamp.fatigueAverage) &&
+          Number.isFinite(baselineCamp.hungerAverage) &&
+          Number.isFinite(baselineCamp.ammoFlow),
+        details: `readiness=${baselineCamp?.readiness ?? "?"} fatigue=${baselineCamp?.fatigueAverage ?? "?"} hunger=${baselineCamp?.hungerAverage ?? "?"} ammoFlow=${baselineCamp?.ammoFlow ?? "?"}`
+      },
+      {
+        label: "low Logistics/ammo pressure degrades support",
+        passed:
+          pressuredCamp &&
+          baselineCamp &&
+          pressuredCamp.ammoFlow < baselineCamp.ammoFlow &&
+          (pressuredReport?.report?.order?.build?.supportAmmoState === "low" || pressuredReport?.report?.order?.build?.supportAmmoState === "dry"),
+        details: `baselineFlow=${baselineCamp?.ammoFlow ?? "?"} pressuredFlow=${pressuredCamp?.ammoFlow ?? "?"} support=${pressuredReport?.report?.order?.build?.supportAmmoState ?? "?"}`
+      },
+      {
+        label: "cook/rest priorities improve recovery and readiness",
+        passed:
+          recoveredCamp &&
+          neglectedCamp &&
+          recoveredCamp.readiness > neglectedCamp.readiness &&
+          recoveredFatigue < neglectedFatigue,
+        details: `neglected readiness=${neglectedCamp?.readiness ?? "?"} fatigue=${neglectedFatigue.toFixed(2)} | recovered readiness=${recoveredCamp?.readiness ?? "?"} fatigue=${recoveredFatigue.toFixed(2)}`
+      },
+      {
+        label: "rest cycle creates labor opportunity cost",
+        passed: recoveredCamp?.restCycle > neglectedCamp?.restCycle && recoveredCamp?.warnings?.includes("Rest cycle active"),
+        details: `rest neglected=${neglectedCamp?.restCycle ?? "?"} recovered=${recoveredCamp?.restCycle ?? "?"} warnings=${(recoveredCamp?.warnings ?? []).join(",")}`
+      },
+      {
+        label: "sustainment affects build/hold behavior",
+        passed:
+          pressuredReport?.report?.order?.build?.supportAmmoState === "dry" &&
+          recoveredCamp?.readiness > pressuredCamp?.readiness,
+        details:
+          `healthySupport=${healthyReport?.report?.order?.build?.supportAmmoState ?? "?"} ` +
+          `pressuredSupport=${pressuredReport?.report?.order?.build?.supportAmmoState ?? "?"} ` +
+          `healthyReadiness=${recoveredCamp?.readiness ?? "?"} pressuredReadiness=${pressuredCamp?.readiness ?? "?"}`
+      },
+      {
+        label: "debrief can distinguish bad sustainment",
+        passed:
+          Array.isArray(pressuredReport?.report?.order?.build?.causeChain) &&
+          (pressuredReport.report.order.build.causeChain.includes("ammo-support-low") ||
+            pressuredReport.report.order.build.causeChain.includes("ammo-support-dry") ||
+            pressuredReport.report.order.build.causeChain.includes("bad-sustainment")),
+        details: `cause=${(pressuredReport?.report?.order?.build?.causeChain ?? []).join(">")}`
+      }
+    ];
+    const screenshotPath = await captureVerificationScreenshot(page, options);
+    return {
+      ...buildVerificationResult(
+        "war-logistics-camp-readiness",
+        "Verifies Logistics, Cooking, Endurance, Rest, fatigue, ammo flow, and readiness as one sustainment loop.",
+        checks
+      ),
+      screenshotPath,
+      baseline,
+      ammoPressure,
+      pressuredReport,
+      neglected,
+      recovered,
+      healthyReport,
+      snapshot: finalWar,
+      brief: buildTownWarBrief(finalWar)
+    };
+  }
+
+  if (verificationId === "war-skill-emergence-loop") {
+    await callAgent(page, "stageState", "town-war");
+    const demo = await callAgent(page, "runTownWarSkillEmergenceDemo");
+    const debrief = await callAgent(page, "getTownWarSkillDebrief");
+    const war = debrief?.war ?? demo?.war ?? null;
+    const brief = buildTownWarBrief(war);
+    const outcomes = Array.isArray(debrief?.debrief?.outcomes) ? debrief.debrief.outcomes : [];
+    const heldOutcome = outcomes.find((outcome) => typeof outcome?.outcome === "string" && outcome.outcome.startsWith("held-")) ?? null;
+    const failedOutcome = outcomes.find((outcome) => typeof outcome?.outcome === "string" && outcome.outcome.startsWith("failed-")) ?? null;
+    const memoryTags = Array.isArray(war?.soldiers)
+      ? war.soldiers.flatMap((soldier) => (Array.isArray(soldier?.dramaMemoryTags) ? soldier.dramaMemoryTags : []))
+      : [];
+    const checks = [
+      {
+        label: "Demo resolves one hold outcome",
+        passed: Boolean(heldOutcome),
+        details: `held=${heldOutcome?.outcome ?? "none"}`
+      },
+      {
+        label: "Demo resolves one failure outcome",
+        passed: Boolean(failedOutcome),
+        details: `failed=${failedOutcome?.outcome ?? "none"}`
+      },
+      {
+        label: "Debrief explains real cause chain",
+        passed:
+          typeof debrief?.debrief?.summary === "string" &&
+          debrief.debrief.summary.length > 20 &&
+          Array.isArray(debrief?.debrief?.causeChain) &&
+          debrief.debrief.causeChain.length >= 2,
+        details: debrief?.debrief?.summary ?? "none"
+      },
+      {
+        label: "Memory and scars were changed by flank outcomes",
+        passed:
+          memoryTags.includes("skill-emergence") &&
+          Array.isArray(war?.locationScars) &&
+          war.locationScars.some((scar) => Array.isArray(scar?.tags) && scar.tags.includes("flank")),
+        details: `memoryTags=${memoryTags.slice(0, 8).join(",")} scars=${war?.locationScars?.length ?? 0}`
+      },
+      {
+        label: "CLI brief exposes better next plan",
+        passed: typeof brief?.skillEmergence?.debrief?.recommendedNextPlan === "string" && brief.skillEmergence.debrief.recommendedNextPlan.length > 20,
+        details: brief?.skillEmergence?.debrief?.recommendedNextPlan ?? "none"
+      }
+    ];
+    const screenshotPath = await captureVerificationScreenshot(page, options);
+    return {
+      ...buildVerificationResult(
+        "war-skill-emergence-loop",
+        "Verifies Perception, Scout priority, Nerve, Shooting, sustainment, memories, scars, and debrief recommendations as one flank-emergence loop.",
+        checks
+      ),
+      screenshotPath,
+      demo,
+      debrief,
+      snapshot: war,
+      brief
+    };
+  }
+
+  if (verificationId === "war-drama-responsibility") {
+    await callAgent(page, "stageState", "town-war");
+    const firstOrder = await callAgent(page, "orderTownWarTrench", { campId: "camp-a", x: 1250, y: 720 });
+    const firstWar = firstOrder?.war ?? null;
+    const secondOrder = await callAgent(page, "orderTownWarTrench", { campId: "camp-a", x: 1230, y: 740 });
+    const secondWar = secondOrder?.war ?? null;
+    const memories = Array.isArray(secondWar?.dramaMemories) ? secondWar.dramaMemories : [];
+    const soldiers = Array.isArray(secondWar?.townWar?.soldiers) ? secondWar.townWar.soldiers : [];
+    const lastDramaEvent = secondWar?.dialogue?.lastDramaEvent ?? null;
+    const witnessCount = memories.reduce((total, memory) => total + (Array.isArray(memory?.witnessIds) ? memory.witnessIds.length : 0), 0);
+    const soldierWitnessCount = soldiers.reduce(
+      (total, soldier) => total + (Number.isFinite(soldier?.witnessedEventCount) ? soldier.witnessedEventCount : 0),
+      0
+    );
+    const referencedMemoryTag = lastDramaEvent?.referencedMemoryTag ?? null;
+    const checks = [
+      {
+        label: "first risky order creates responsibility memory",
+        passed: Array.isArray(firstWar?.dramaMemories) && firstWar.dramaMemories.some((memory) => memory?.tag === "order-exposed-builder"),
+        details: `memoryTags=${(firstWar?.dramaMemories ?? []).map((memory) => memory?.tag).join(",") || "none"}`
+      },
+      {
+        label: "memory records witnesses",
+        passed: witnessCount > 0 && soldierWitnessCount > 0,
+        details: `memoryWitnesses=${witnessCount} | soldierWitnessCount=${soldierWitnessCount}`
+      },
+      {
+        label: "later risky order references earlier responsibility",
+        passed: referencedMemoryTag === "order-exposed-builder" || referencedMemoryTag === "officer-cost",
+        details: `lastDrama=${lastDramaEvent?.kind ?? "none"} | referencedMemoryTag=${referencedMemoryTag ?? "none"} | text=${lastDramaEvent?.text ?? "none"}`
+      }
+    ];
+    const screenshotPath = await captureVerificationScreenshot(page, options);
+    return {
+      ...buildVerificationResult(
+        verificationId,
+        "Stage two risky trench orders and prove the second line can reference earlier officer responsibility memory.",
+        checks
+      ),
+      screenshotPath,
+      firstOrder,
+      secondOrder,
+      snapshot: secondWar,
+      brief: buildTownWarBrief(secondWar)
+    };
+  }
+
+  if (verificationId === "war-drama-relationships") {
+    await callAgent(page, "stageState", "town-war");
+    const firstOrder = await callAgent(page, "orderTownWarTrench", { campId: "camp-a", x: 1250, y: 720 });
+    const firstLine = firstOrder?.war?.dialogue?.lastDramaEvent ?? null;
+    await callAgent(page, "orderTownWarTrench", { campId: "camp-a", x: 1230, y: 740 });
+    const thirdOrder = await callAgent(page, "orderTownWarTrench", { campId: "camp-a", x: 1210, y: 760 });
+    const thirdWar = thirdOrder?.war ?? null;
+    const thirdLine = thirdWar?.dialogue?.lastDramaEvent ?? null;
+    const soldiers = Array.isArray(thirdWar?.townWar?.soldiers) ? thirdWar.townWar.soldiers : [];
+    const arcedSoldier = soldiers.find((soldier) => Number.isFinite(soldier?.dramaArc?.resentment) && soldier.dramaArc.resentment > 0) ?? null;
+    const arcTags = Array.isArray(arcedSoldier?.dramaMemoryTags) ? arcedSoldier.dramaMemoryTags : [];
+    const checks = [
+      {
+        label: "soldier arc pressure changes after repeated officer-cost memories",
+        passed:
+          Number.isFinite(arcedSoldier?.dramaArc?.trustInOfficer) &&
+          arcedSoldier.dramaArc.trustInOfficer < 0.55 &&
+          Number.isFinite(arcedSoldier?.dramaArc?.resentment) &&
+          arcedSoldier.dramaArc.resentment > 0,
+        details:
+          `trust=${arcedSoldier?.dramaArc?.trustInOfficer ?? "none"} | ` +
+          `resentment=${arcedSoldier?.dramaArc?.resentment ?? "none"} | tags=${arcTags.join(",") || "none"}`
+      },
+      {
+        label: "arc state is exposed in the CLI brief",
+        passed: thirdWar?.soldiers?.some((soldier) => soldier?.dramaArc && Number.isFinite(soldier?.trustInOfficer)) === true,
+        details: `snapshotSoldiers=${thirdWar?.soldiers?.length ?? 0}`
+      },
+      {
+        label: "similar later event gets a long-haul arc callback",
+        passed:
+          thirdLine?.channel === "Long Haul" &&
+          typeof thirdLine?.text === "string" &&
+          thirdLine.text !== firstLine?.text,
+        details: `first="${firstLine?.text ?? "none"}" | later="${thirdLine?.text ?? "none"}" | channel=${thirdLine?.channel ?? "none"}`
+      }
+    ];
+    const screenshotPath = await captureVerificationScreenshot(page, options);
+    return {
+      ...buildVerificationResult(
+        verificationId,
+        "Stage repeated risky trench orders and prove soldier arc pressure changes later dialogue selection.",
+        checks
+      ),
+      screenshotPath,
+      firstOrder,
+      thirdOrder,
+      snapshot: thirdWar,
+      brief: buildTownWarBrief(thirdWar)
+    };
+  }
+
+  if (verificationId === "war-drama-location-scars") {
+    await callAgent(page, "stageState", "town-war");
+    const firstOrder = await callAgent(page, "orderTownWarTrench", { campId: "camp-a", x: 1250, y: 720 });
+    const firstWar = firstOrder?.war ?? null;
+    const firstLine = firstWar?.dialogue?.lastDramaEvent ?? null;
+    const secondOrder = await callAgent(page, "orderTownWarTrench", { campId: "camp-a", x: 1250, y: 720 });
+    const secondWar = secondOrder?.war ?? null;
+    const secondLine = secondWar?.dialogue?.lastDramaEvent ?? null;
+    const scars = Array.isArray(secondWar?.locationScars) ? secondWar.locationScars : [];
+    const focusedScar = secondWar?.focusedLocationScar ?? null;
+    const activeScarTags = Array.isArray(secondWar?.dialogue?.activeScarTags) ? secondWar.dialogue.activeScarTags : [];
+    const scarTags = scars.flatMap((scar) => (Array.isArray(scar?.tags) ? scar.tags : []));
+    const checks = [
+      {
+        label: "first risky lane order creates a location scar",
+        passed: scarTags.includes("builder-hit-here"),
+        details: `scarTags=${scarTags.join(",") || "none"}`
+      },
+      {
+        label: "repeat order focuses the same scarred location",
+        passed:
+          Array.isArray(focusedScar?.tags) &&
+          focusedScar.tags.includes("builder-hit-here") &&
+          activeScarTags.includes("builder-hit-here"),
+        details:
+          `focused=${focusedScar?.label ?? "none"} | ` +
+          `focusedTags=${Array.isArray(focusedScar?.tags) ? focusedScar.tags.join(",") : "none"} | ` +
+          `activeScarTags=${activeScarTags.join(",") || "none"}`
+      },
+      {
+        label: "later dialogue changes because the lane is scarred",
+        passed:
+          secondLine?.channel === "Scarred Town" &&
+          secondLine?.referencedMemoryTag === "builder-hit-here" &&
+          typeof secondLine?.text === "string" &&
+          secondLine.text !== firstLine?.text,
+        details:
+          `first="${firstLine?.text ?? "none"}" | ` +
+          `later="${secondLine?.text ?? "none"}" | ` +
+          `channel=${secondLine?.channel ?? "none"} | referenced=${secondLine?.referencedMemoryTag ?? "none"}`
+      }
+    ];
+    const screenshotPath = await captureVerificationScreenshot(page, options);
+    return {
+      ...buildVerificationResult(
+        verificationId,
+        "Stage two trench orders at the same lane and prove the second line can echo that location's history.",
+        checks
+      ),
+      screenshotPath,
+      firstOrder,
+      secondOrder,
+      snapshot: secondWar,
+      brief: buildTownWarBrief(secondWar)
+    };
+  }
+
+  if (verificationId === "war-drama-beat-chain") {
+    await callAgent(page, "stageState", "town-war");
+    const orderResult = await callAgent(page, "orderTownWarTrench", { campId: "camp-a", x: 7590, y: 3159 });
+    const advanceResult = await callAgent(page, "advanceTownWar", { seconds: 12, tickSeconds: 0.25 });
+    const war = advanceResult?.war ?? orderResult?.war ?? null;
+    const beatChain = Array.isArray(war?.dramaBeat?.chain) ? war.dramaBeat.chain : [];
+    const beatKinds = beatChain.map((entry) => entry?.beat).filter(Boolean);
+    const debriefEchoes = Array.isArray(war?.debriefEchoes) ? war.debriefEchoes : [];
+    const currentBeat = war?.dramaBeat?.current ?? null;
+    const lastPayoff = war?.dramaBeat?.lastPayoff ?? null;
+    const checks = [
+      {
+        label: "trench order produces a setup beat",
+        passed: beatKinds.includes("setup"),
+        details: `beats=${beatKinds.join(",") || "none"}`
+      },
+      {
+        label: "under-fire trench order produces pressure or complication",
+        passed: beatKinds.includes("complication") || beatKinds.includes("rising-pressure"),
+        details: `beats=${beatKinds.join(",") || "none"}`
+      },
+      {
+        label: "completed trench produces payoff or cost",
+        passed: beatKinds.includes("payoff") || beatKinds.includes("cost"),
+        details: `current=${currentBeat?.beat ?? "none"} | lastPayoff=${lastPayoff?.beat ?? "none"}`
+      },
+      {
+        label: "debrief echoes summarize tracked events",
+        passed:
+          debriefEchoes.length > 0 &&
+          debriefEchoes.every((echo) => typeof echo?.sourceSummary === "string" && echo.sourceSummary.length > 0),
+        details: `echoes=${debriefEchoes.length} | latest=${debriefEchoes[0]?.text ?? "none"}`
+      },
+      {
+        label: "CLI brief exposes beat state",
+        passed: buildTownWarBrief(war)?.dramaBeat?.chain?.length > 0 && buildTownWarBrief(war)?.debriefEchoes?.length > 0,
+        details: `briefBeat=${buildTownWarBrief(war)?.dramaBeat?.current?.beat ?? "none"}`
+      }
+    ];
+    const screenshotPath = await captureVerificationScreenshot(page, options);
+    return {
+      ...buildVerificationResult(
+        verificationId,
+        "Stage a risky trench order and prove the system records setup, pressure, payoff/cost, and debrief echoes from real events.",
+        checks
+      ),
+      screenshotPath,
+      orderResult,
+      advanceResult,
+      snapshot: war,
+      brief: buildTownWarBrief(war)
+    };
+  }
+
+  if (verificationId === "frontline-ai-player-decenter") {
+    await callAgent(page, "stageState", "town-war");
+    await callAgent(page, "deployTownWarOfficer", { campId: "camp-a" });
+    await callAgent(page, "focusTownWarLane", { campId: "camp-a", lane: "mid" });
+    await callAgent(page, "focusTownWarLane", { campId: "camp-b", lane: "mid" });
+    const advanceResult = await callAgent(page, "advanceTownWar", { seconds: 28, tickSeconds: 0.25 });
+    const war = advanceResult?.war ?? null;
+    const soldiers = Array.isArray(war?.townWar?.soldiers) ? war.townWar.soldiers : [];
+    const aiThreats = war?.aiThreats ?? war?.townWar?.aiThreats ?? null;
+    const targetIntents = soldiers.map((soldier) => soldier?.targetIntent).filter(Boolean);
+    const nonPlayerTargets = targetIntents.filter((intent) => intent?.targetKind && intent.targetKind !== "player" && intent.targetKind !== "none");
+    const reasonedTargets = targetIntents.filter((intent) => typeof intent?.reason === "string" && intent.reason.length > 0);
+    const byCamp = soldiers.reduce((summary, soldier) => {
+      const faction = soldier?.faction ?? "unknown";
+      summary[faction] = (summary[faction] ?? 0) + 1;
+      return summary;
+    }, {});
+    const pressure = aiThreats?.frontlineFocus?.pressure ?? {};
+    const checks = [
+      {
+        label: "both camps field active NPC soldiers",
+        passed: (byCamp["camp-a"] ?? 0) >= 3 && (byCamp["camp-b"] ?? 0) >= 3,
+        details: `camp-a=${byCamp["camp-a"] ?? 0} | camp-b=${byCamp["camp-b"] ?? 0}`
+      },
+      {
+        label: "frontline focus is the shared attention anchor",
+        passed:
+          aiThreats?.frontlineFocus?.lane === "mid" &&
+          typeof aiThreats?.frontlineFocus?.label === "string" &&
+          aiThreats.frontlineFocus.label.includes("road crossing"),
+        details: `focus=${aiThreats?.frontlineFocus?.label ?? "none"} | lane=${aiThreats?.frontlineFocus?.lane ?? "none"}`
+      },
+      {
+        label: "idle officer does not consume hostile attention",
+        passed: Number.isFinite(aiThreats?.playerThreatShare) && aiThreats.playerThreatShare <= 0.28,
+        details: `playerThreatShare=${aiThreats?.playerThreatShare ?? "n/a"} | reason=${aiThreats?.playerThreatReason ?? "none"}`
+      },
+      {
+        label: "combatants choose NPC or objective threats instead of player lock-on",
+        passed: nonPlayerTargets.length >= 4 && targetIntents.every((intent) => intent?.targetKind !== "player"),
+        details:
+          `targets=${targetIntents.map((intent) => `${intent?.targetKind ?? "none"}:${intent?.targetId ?? "none"}`).join(",") || "none"}`
+      },
+      {
+        label: "target choices carry readable reasons",
+        passed: reasonedTargets.length >= 5,
+        details: `reasons=${reasonedTargets.map((intent) => intent?.reason).slice(0, 5).join(" | ") || "none"}`
+      },
+      {
+        label: "both sides exert frontline pressure",
+        passed:
+          Number.isFinite(pressure?.["camp-a"]) &&
+          Number.isFinite(pressure?.["camp-b"]) &&
+          pressure["camp-a"] > 0 &&
+          pressure["camp-b"] > 0,
+        details: `camp-a=${pressure?.["camp-a"] ?? "n/a"} | camp-b=${pressure?.["camp-b"] ?? "n/a"}`
+      }
+    ];
+    const screenshotPath = await captureVerificationScreenshot(page, options);
+    return {
+      ...buildVerificationResult(
+        verificationId,
+        "Advance the first-town NPC war and prove frontline threat scoring de-centers the idle officer while both teams target battlefield threats.",
+        checks
+      ),
+      screenshotPath,
+      advanceResult,
+      snapshot: war,
+      brief: buildTownWarBrief(war)
+    };
+  }
+
+  if (verificationId === "frontline-ai-cover-suppression") {
+    await callAgent(page, "stageState", "town-war");
+    await callAgent(page, "deployTownWarOfficer", { campId: "camp-a" });
+    const trenchOrder = await callAgent(page, "orderTownWarTrench", { campId: "camp-a", x: 5910, y: 3140 });
+    await callAgent(page, "focusTownWarLane", { campId: "camp-a", lane: "mid" });
+    await callAgent(page, "focusTownWarLane", { campId: "camp-b", lane: "mid" });
+    const advanceResult = await callAgent(page, "advanceTownWar", { seconds: 38, tickSeconds: 0.25 });
+    const war = advanceResult?.war ?? trenchOrder?.war ?? null;
+    const soldiers = Array.isArray(war?.townWar?.soldiers) ? war.townWar.soldiers : [];
+    const aiTactics = war?.aiTactics ?? war?.townWar?.aiTactics ?? null;
+    const coverSlots = Array.isArray(aiTactics?.coverSlots) ? aiTactics.coverSlots : [];
+    const suppressionFields = Array.isArray(aiTactics?.suppressionFields) ? aiTactics.suppressionFields : [];
+    const tacticalPairs = Array.isArray(aiTactics?.tacticalPairs) ? aiTactics.tacticalPairs : [];
+    const constructionImpact = Array.isArray(aiTactics?.completedConstructionImpact) ? aiTactics.completedConstructionImpact : [];
+    const tacticalIntents = soldiers.map((soldier) => soldier?.tacticalIntent).filter(Boolean);
+    const coverIntents = soldiers.map((soldier) => soldier?.coverIntent).filter(Boolean);
+    const pressureStates = new Set(tacticalIntents.map((intent) => intent?.state).filter(Boolean));
+    const occupiedCover = coverSlots.filter((slot) => typeof slot?.occupiedBySoldierId === "string" && slot.occupiedBySoldierId.length > 0);
+    const checks = [
+      {
+        label: "cover slots exist around the contested frontline",
+        passed: coverSlots.length >= 4,
+        details: `coverSlots=${coverSlots.map((slot) => `${slot?.label ?? "cover"}:${slot?.sourceKind ?? "kind"}`).join(",") || "none"}`
+      },
+      {
+        label: "completed trench creates a new cover payoff",
+        passed:
+          constructionImpact.some((impact) => impact?.kind === "trench" && typeof impact?.coverSlotId === "string") &&
+          coverSlots.some((slot) => slot?.sourceKind === "trench"),
+        details:
+          `impact=${constructionImpact.map((impact) => `${impact?.kind ?? "kind"}:${impact?.coverSlotId ?? "none"}`).join(",") || "none"}`
+      },
+      {
+        label: "suppression fields report pressure and pinned soldiers",
+        passed:
+          suppressionFields.length >= 2 &&
+          suppressionFields.some((field) => Number.isFinite(field?.pressure) && field.pressure > 0) &&
+          suppressionFields.some((field) => Array.isArray(field?.pinnedSoldierIds) && field.pinnedSoldierIds.length > 0),
+        details:
+          `fields=${suppressionFields.map((field) => `${field?.faction ?? "faction"}:${field?.pressure ?? "n/a"}:${Array.isArray(field?.pinnedSoldierIds) ? field.pinnedSoldierIds.length : 0}`).join(" | ") || "none"}`
+      },
+      {
+        label: "soldiers expose cover-aware tactical states",
+        passed:
+          pressureStates.has("seek-cover") ||
+          pressureStates.has("hold-cover") ||
+          pressureStates.has("reload-behind-cover") ||
+          pressureStates.has("cover-builder") ||
+          pressureStates.has("suppress-area"),
+        details:
+          `states=${[...pressureStates].join(",") || "none"} | reasons=${tacticalIntents.map((intent) => intent?.reason).slice(0, 6).join(" | ") || "none"}`
+      },
+      {
+        label: "cover intent is attached to combatants",
+        passed: coverIntents.filter((intent) => typeof intent?.coverSlotId === "string").length >= 4,
+        details:
+          `coverIntents=${coverIntents.map((intent) => `${intent?.state ?? "none"}:${intent?.coverSlotId ?? "none"}`).join(",") || "none"}`
+      },
+      {
+        label: "small-unit pair behavior is inspectable",
+        passed: tacticalPairs.length > 0,
+        details: `pairs=${tacticalPairs.map((pair) => `${pair?.state ?? "state"}:${pair?.suppressorId ?? "none"}->${pair?.moverId ?? "none"}`).join(",") || "none"}`
+      },
+      {
+        label: "cover slots can be occupied after pressure",
+        passed: occupiedCover.length > 0,
+        details: `occupied=${occupiedCover.map((slot) => `${slot?.label ?? "cover"}:${slot?.occupiedBySoldierId ?? "none"}`).join(",") || "none"}`
+      }
+    ];
+    const screenshotPath = await captureVerificationScreenshot(page, options);
+    return {
+      ...buildVerificationResult(
+        verificationId,
+        "Advance a town-war trench fight and prove cover slots, suppression fields, tactical intents, and small-unit cover pairs are inspectable.",
+        checks
+      ),
+      screenshotPath,
+      trenchOrder,
+      advanceResult,
+      snapshot: war,
+      brief: buildTownWarBrief(war)
+    };
+  }
+
+  if (verificationId === "emergent-war-drama") {
+    await callAgent(page, "stageState", "town-war");
+    const firstOrder = await callAgent(page, "orderTownWarTrench", { campId: "camp-a", x: 1250, y: 720 });
+    const secondOrder = await callAgent(page, "orderTownWarTrench", { campId: "camp-a", x: 1250, y: 720 });
+    await callAgent(page, "orderTownWarTrench", { campId: "camp-a", x: 1230, y: 740 });
+    await callAgent(page, "orderTownWarTrench", { campId: "camp-a", x: 1210, y: 760 });
+    const payoffOrder = await callAgent(page, "orderTownWarTrench", { campId: "camp-a", x: 7590, y: 3159 });
+    const advanceResult = await callAgent(page, "advanceTownWar", { seconds: 12, tickSeconds: 0.25 });
+    const war = advanceResult?.war ?? payoffOrder?.war ?? secondOrder?.war ?? firstOrder?.war ?? null;
+    const memories = Array.isArray(war?.dramaMemories) ? war.dramaMemories : [];
+    const scars = Array.isArray(war?.locationScars) ? war.locationScars : [];
+    const soldiers = Array.isArray(war?.townWar?.soldiers) ? war.townWar.soldiers : [];
+    const beatChain = Array.isArray(war?.dramaBeat?.chain) ? war.dramaBeat.chain : [];
+    const beatKinds = beatChain.map((entry) => entry?.beat).filter(Boolean);
+    const debriefEchoes = Array.isArray(war?.debriefEchoes) ? war.debriefEchoes : [];
+    const storyPackAudit = war?.storyPackAudit ?? null;
+    const secondLine = secondOrder?.war?.dialogue?.lastDramaEvent ?? null;
+    const arcedSoldier = soldiers.find(
+      (soldier) =>
+        Number.isFinite(soldier?.dramaArc?.resentment) &&
+        soldier.dramaArc.resentment > 0 &&
+        Number.isFinite(soldier?.dramaArc?.trustInOfficer) &&
+        soldier.dramaArc.trustInOfficer < 0.55
+    );
+    const checks = [
+      {
+        label: "officer-war event packets appear",
+        passed: Array.isArray(war?.dialogue?.recentDramaEvents) && war.dialogue.recentDramaEvents.length > 0,
+        details: `events=${war?.dialogue?.recentDramaEvents?.map((event) => event?.kind).join(",") || "none"}`
+      },
+      {
+        label: "cause/witness memory is created",
+        passed: memories.some((memory) => Array.isArray(memory?.witnessIds) && memory.witnessIds.length > 0),
+        details: `memories=${memories.map((memory) => `${memory?.tag}:${memory?.witnessIds?.length ?? 0}`).join(",") || "none"}`
+      },
+      {
+        label: "location scar state persists",
+        passed: scars.some((scar) => Array.isArray(scar?.tags) && scar.tags.includes("builder-hit-here")),
+        details: `scars=${scars.map((scar) => `${scar?.label}:${Array.isArray(scar?.tags) ? scar.tags.join("/") : "none"}`).join(" || ") || "none"}`
+      },
+      {
+        label: "character arc pressure changes",
+        passed: Boolean(arcedSoldier),
+        details:
+          `trust=${arcedSoldier?.dramaArc?.trustInOfficer ?? "none"} | ` +
+          `resentment=${arcedSoldier?.dramaArc?.resentment ?? "none"} | ` +
+          `relationship=${arcedSoldier?.dramaArc?.relationshipPressure?.summary ?? "none"}`
+      },
+      {
+        label: "later dialogue references tracked truth",
+        passed: secondLine?.referencedMemoryTag === "builder-hit-here" || secondLine?.referencedMemoryTag === "order-exposed-builder",
+        details: `channel=${secondLine?.channel ?? "none"} | referenced=${secondLine?.referencedMemoryTag ?? "none"} | text=${secondLine?.text ?? "none"}`
+      },
+      {
+        label: "beat chain appears",
+        passed: beatKinds.includes("setup") && (beatKinds.includes("complication") || beatKinds.includes("rising-pressure")) && (beatKinds.includes("payoff") || beatKinds.includes("cost")),
+        details: `beats=${beatKinds.join(",") || "none"}`
+      },
+      {
+        label: "debrief echo references tracked state",
+        passed:
+          debriefEchoes.length > 0 &&
+          debriefEchoes.some((echo) => typeof echo?.sourceSummary === "string" && typeof echo?.text === "string" && echo.text.includes(echo.sourceSummary)),
+        details: `latest=${debriefEchoes[0]?.text ?? "none"}`
+      },
+      {
+        label: "story packs validate cleanly",
+        passed: storyPackAudit?.ok === true && Array.isArray(storyPackAudit?.errors) && storyPackAudit.errors.length === 0,
+        details:
+          `errors=${Array.isArray(storyPackAudit?.errors) ? storyPackAudit.errors.length : "n/a"} | ` +
+          `warnings=${Array.isArray(storyPackAudit?.warnings) ? storyPackAudit.warnings.length : "n/a"} | ` +
+          `packs=${storyPackAudit?.totals?.packs ?? "n/a"} | squad=${storyPackAudit?.totals?.squadTemplates ?? "n/a"} | hostile=${storyPackAudit?.totals?.hostileTemplates ?? "n/a"}`
+      }
+    ];
+    const screenshotPath = await captureVerificationScreenshot(page, options);
+    return {
+      ...buildVerificationResult(
+        verificationId,
+        "Stage the first-town officer drama loop and prove events, memory, scars, arcs, beats, debriefs, and story-pack validation in one gate.",
+        checks
+      ),
+      screenshotPath,
+      firstOrder,
+      secondOrder,
+      payoffOrder,
+      advanceResult,
+      snapshot: war,
+      brief: buildTownWarBrief(war)
+    };
   }
 
   const macroResult = await runMacro(page, verificationId, options);
@@ -5790,9 +7366,17 @@ async function waitForAgentApi(page, timeoutMs = 15000) {
 }
 
 function getSnapshotUptimeSeconds(snapshot) {
-  return typeof snapshot?.frontline?.metrics?.uptimeSeconds === "number"
-    ? snapshot.frontline.metrics.uptimeSeconds
-    : null;
+  const uptimeSeconds = snapshot?.frontline?.metrics?.uptimeSeconds;
+  if (typeof uptimeSeconds === "number") {
+    return uptimeSeconds;
+  }
+
+  if (typeof uptimeSeconds === "string") {
+    const parsed = Number(uptimeSeconds);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
 }
 
 async function readAgentSnapshot(page) {
@@ -5967,7 +7551,7 @@ async function scaffoldStoryPack(options) {
 }
 
 function printHelp() {
-  console.log(`Top Down Extraction Shooter Project CLI
+  console.log(`Frontline Officer Project CLI
 
 Usage:
   npm run game:cli -- <command> [options]
@@ -5975,12 +7559,59 @@ Usage:
 Commands:
   snapshot
   status
+  cutover
+  war-quickstart [--side <camp-a|camp-b>]
+  war-one-minute [--side <camp-a|camp-b>] [--seconds <n>] [--tick-seconds <n>] [--order <trench|ammo-crate>] [--no-reinforce]
+  war-deploy-officer --id <camp-a|camp-b>
+  war-damage-camp --id <camp-a|camp-b> --amount <n>
+  war-reinforce --id <camp-a|camp-b> [--role <builder|rifleman|suppressor|medic|defender>] [--count <n>] [--damage-before <n>] [--advance-seconds <n>]
+  war-loot-ammo-crate --faction <camp-a|camp-b> (--id <crate-id> | --seed <camp-a|camp-b>) [--x <n> --y <n>] [--advance-seconds <n>]
+  war-roster [--camp <camp-a|camp-b>]
+  war-soldier --id <soldier-id>
+  war-priority list [--camp <camp-a|camp-b>]
+  war-priority set --soldier <id> --work <Build|Rescue|Resupply|Defend|Suppress|Rest> --priority <0-5>
+  war-priority preset --soldier <id> --preset <builder|medic|quartermaster|suppressor|rifleman|scout|rest-cycle>
+  war-task-candidates --soldier <id>
+  war-build-test --builder <id> [--covered-by <id>] [--x <n> --y <n>] [--advance-seconds <n>]
+  war-build-report --order <order-id>
+  war-stage-casualty --soldier <id> [--x <n> --y <n>] [--severity <light|serious|critical>]
+  war-medic-order --medic <id> --target <id> [--covered-by <id>] [--advance-seconds <n>]
+  war-rescue-report
+  war-sustainment
+  war-set-camp-work --camp <camp-a|camp-b> --work <Cook|Resupply|Rest> --priority <0-5>
+  war-stage-ammo-pressure --camp <camp-a|camp-b>
+  war-stage-fatigue --camp <camp-a|camp-b> --level <0-1>
+  war-stage-flank --lane <north|mid|south> --pressure <low|medium|high> [--camp <camp-a|camp-b>]
+  war-operation prepare [--ammo <n> --build <n> --food <n> --med <n>]
+  war-operation start
+  war-operation end
+  war-operation report
+  war-skill-emergence-demo
+  war-skill-debrief
+  war-order-trench --id <camp-a|camp-b> [--x <n> --y <n>] [--advance-seconds <n>]
+  war-order-dugout --id <camp-a|camp-b> [--x <n> --y <n>] [--facing <radians>] [--advance-seconds <n>]
+  war-order-ammo-crate --id <camp-a|camp-b> [--x <n> --y <n>] [--advance-seconds <n>]
+  war-dugout-report
+  war-damage-dugout --id <dugout-id> --amount <n>
+  war-focus-lane --id <camp-a|camp-b> --lane <north|mid|south> [--advance-seconds <n>]
+  war-advance --seconds <n> [--tick-seconds <n>]
+  verify --id war-roster-skills
+  verify --id war-priority-skill-choice
+  verify --id war-build-skill-under-fire
+  verify --id war-medical-rescue-emergence
+  verify --id war-logistics-camp-readiness
+  verify --id war-skill-emergence-loop
+  verify --id war-drama-responsibility
+  verify --id war-drama-relationships
+  verify --id war-drama-location-scars
+  verify --id war-drama-beat-chain
+  verify --id emergent-war-drama
   list
   telemetry
   regression-gate [--path <png>]
 verify --id <main-menu-to-stash|stash-to-raid|equip-major-weapons|equip-low-tier-guns|wave-target-discipline|same-room-reinforcement-guard|no-immortal-runtime|legacy-crossfire-disabled|legacy-runtime-clean-states|doorway-regression|room-clear-drill|room-clear-chain|expanded-frontline|blue-carried-fire|blue-carried-extract-success|blue-body-extract|extract-clean|extract-collapse|body-recovery|intel-alarm|drone-sweep|hostile-lane-chatter|caravan-trap|persistent-body-return|dialogue-aftermath|field-coffee|burner-coffee|surrender-window|armored-evac|combat-presentation|combat-audio|boys-frag-runtime|suppression-runtime|covering-crossing|pinned-pressure|fireteam-audit|territory-claims|hardcore-start|first-session-hook|route-identity-pass|must-clear-structure-pass|stash-consequence-pass|weapon-doctrine|field-capture|field-pivot|broker-cashout|chair-handoff|handgun-recovery|knife-extreme|final-stronghold|recovery-corridor-payoff|endgame-amr|amr-counter-lane|final-stronghold-launch|final-stronghold-setback|true-escape|trench-assault|bunker-foothold|cellar-counterhold|shed-hide|territory-retake|relay-counterpush|ambulance-counterhold|mortar-bracket|retake-peel|civilian-window|hunter-search|wounded-soldier|white-van-ambush|armored-drop> [--path <png>]
   configure --route <id> --weapon <id> --service <id> --contract <id> --medkits <n> --ammo-packs <n> --top-tab <id> --command-tab <id>
-  stage-state --id <front-door|stash|briefing|raid|extract-ready|extract-hold-active|intel-live|intel-crash-pending|body-alarm-pending|room-clear-pocket>
+  stage-state --id <front-door|stash|briefing|town-war|raid|extract-ready|extract-hold-active|intel-live|intel-crash-pending|body-alarm-pending|room-clear-pocket>
   start-raid
   raid-action [--start-raid] [--move up|down|left|right|upleft|upright|downleft|downright|<x,y>] [--duration <ms>] [--aim <x,y>] [--fire <ms>] [--focus <ms>] [--reload] [--interact] [--heal] [--support-order <id>] [--focus-incident <incidentId|index:N|clear>]
       macro --id <breach-drill|extract-drill|frontline-pressure|expanded-frontline|doorway-regression|room-clear-drill|room-clear-chain|blue-carried-fire|blue-carried-extract-success|blue-body-extract|extract-clean|extract-collapse|body-recovery|intel-alarm|drone-sweep|hostile-lane-chatter|caravan-trap|persistent-body-return|dialogue-aftermath|field-coffee|burner-coffee|surrender-window|armored-evac|combat-presentation|combat-audio|boys-frag-runtime|suppression-runtime|covering-crossing|pinned-pressure|fireteam-audit|territory-claims|hardcore-start|first-session-hook|route-identity-pass|must-clear-structure-pass|stash-consequence-pass|weapon-doctrine|field-capture|field-pivot|broker-cashout|chair-handoff|handgun-recovery|knife-extreme|final-stronghold|recovery-corridor-payoff|endgame-amr|amr-counter-lane|final-stronghold-launch|final-stronghold-setback|true-escape|trench-assault|bunker-foothold|cellar-counterhold|shed-hide|territory-retake|relay-counterpush|ambulance-counterhold|mortar-bracket|retake-peel|civilian-window|hunter-search|wounded-soldier|white-van-ambush|armored-drop> [--path <png>]
@@ -6160,6 +7791,716 @@ async function run() {
   const result = await withRuntime(options, async (page) => {
   if (command === "status" || command === "snapshot") {
       return callAgent(page, "getSnapshot");
+    }
+
+    if (command === "cutover") {
+      const snapshot = await callAgent(page, "getSnapshot");
+      return snapshot.war ?? null;
+    }
+
+    if (command === "war-quickstart") {
+      await callAgent(page, "stageState", "town-war");
+      if (typeof options.side === "string") {
+        const campId = options.side;
+        if (campId !== "camp-a" && campId !== "camp-b") {
+          throw new Error("war-quickstart --side must be camp-a or camp-b.");
+        }
+        await callAgent(page, "deployTownWarOfficer", { campId });
+      }
+      const snapshot = await callAgent(page, "getSnapshot");
+      const war = snapshot.war ?? null;
+      const campSummary =
+        war && Array.isArray(war.camps)
+          ? war.camps.map((camp) => `${camp.label ?? camp.id ?? "camp"} ${camp.health ?? "?"}/${camp.maxHealth ?? "?"}`).join(" | ")
+          : "no camps";
+
+      return {
+        ok: true,
+        summary: `Town ${war?.town?.id ?? "unknown"} (route ${war?.town?.routeId ?? "unknown"}) | ${campSummary}`,
+        recommendedNextCommand: "npm run game:cli -- cutover",
+        war,
+        brief: buildTownWarBrief(war)
+      };
+    }
+
+    if (command === "war-one-minute") {
+      const seconds = parseNumber(options.seconds, 60);
+      const tickSeconds = options["tick-seconds"] === undefined ? 0.25 : parseNumber(options["tick-seconds"], 0.25);
+
+      const campId = typeof options.side === "string" ? options.side : "camp-a";
+      if (campId !== "camp-a" && campId !== "camp-b") {
+        throw new Error("war-one-minute --side must be camp-a or camp-b.");
+      }
+
+      const orderKind = typeof options.order === "string" ? options.order.trim().toLowerCase() : "trench";
+      if (orderKind !== "trench" && orderKind !== "ammo-crate") {
+        throw new Error('war-one-minute --order must be "trench" or "ammo-crate".');
+      }
+
+      await callAgent(page, "stageState", "town-war");
+      await callAgent(page, "deployTownWarOfficer", { campId });
+      const reinforcementEvents = [];
+      if (!options["no-reinforce"]) {
+        const opposingCampId = campId === "camp-a" ? "camp-b" : "camp-a";
+        const reinforcements = [
+          { campId: "camp-a", role: "rifleman", count: 3 },
+          { campId: "camp-b", role: "rifleman", count: 3 },
+          { campId, role: "builder", count: 1 },
+          { campId: opposingCampId, role: "builder", count: 1 }
+        ];
+
+        for (const reinforcement of reinforcements) {
+          reinforcementEvents.push(await callAgent(page, "reinforceTownWar", reinforcement));
+        }
+
+        await callAgent(page, "focusTownWarLane", { campId: "camp-a", lane: "mid" });
+        await callAgent(page, "focusTownWarLane", { campId: "camp-b", lane: "mid" });
+      }
+
+      const seededSnapshot = await callAgent(page, "getSnapshot");
+      const seededWar = seededSnapshot?.war ?? null;
+      const campASpawn = seededWar?.townWar?.camps?.find((camp) => camp.id === "camp-a")?.spawn?.position ?? null;
+      const campBSpawn = seededWar?.townWar?.camps?.find((camp) => camp.id === "camp-b")?.spawn?.position ?? null;
+      const midX = campASpawn && campBSpawn ? (campASpawn.x + campBSpawn.x) / 2 : null;
+      const midY = campASpawn && campBSpawn ? (campASpawn.y + campBSpawn.y) / 2 : null;
+      const trenchX = midX !== null ? midX + (campId === "camp-a" ? 500 : -500) : undefined;
+      const trenchY = midY !== null ? midY + (campId === "camp-a" ? -80 : 80) : undefined;
+
+      const order =
+        orderKind === "ammo-crate"
+          ? await callAgent(page, "orderTownWarAmmoCrate", { campId, x: trenchX, y: trenchY })
+          : await callAgent(page, "orderTownWarTrench", { campId, x: trenchX, y: trenchY });
+      const afterOrderWar = order?.war ?? null;
+      const startBrief = buildTownWarBrief(seededWar);
+      const afterOrderBrief = buildTownWarBrief(afterOrderWar);
+
+      const reaction = await callAgent(page, "advanceTownWar", { seconds, tickSeconds });
+      const war = reaction?.war ?? null;
+      const brief = buildTownWarBrief(war);
+
+      const startSoldiers = afterOrderBrief?.soldiers?.total ?? startBrief?.soldiers?.total ?? null;
+      const endSoldiers = brief?.soldiers?.total ?? null;
+      const casualties =
+        startSoldiers !== null && endSoldiers !== null && Number.isFinite(startSoldiers) && Number.isFinite(endSoldiers)
+          ? Math.max(0, startSoldiers - endSoldiers)
+          : null;
+
+      const orderSummary = brief?.orders ? `${brief.orders.completed}/${brief.orders.total}` : "unknown";
+      const spawnMismatches = brief?.soldiers?.spawnOriginMismatches ?? null;
+      const pressureAStart = afterOrderBrief?.soldiers?.byCamp?.["camp-a"]?.maxPressure ?? startBrief?.soldiers?.byCamp?.["camp-a"]?.maxPressure ?? null;
+      const pressureAEnd = brief?.soldiers?.byCamp?.["camp-a"]?.maxPressure ?? null;
+      const pressureBStart = afterOrderBrief?.soldiers?.byCamp?.["camp-b"]?.maxPressure ?? startBrief?.soldiers?.byCamp?.["camp-b"]?.maxPressure ?? null;
+      const pressureBEnd = brief?.soldiers?.byCamp?.["camp-b"]?.maxPressure ?? null;
+
+      const startCampHealth = Object.fromEntries((startBrief?.camps ?? []).map((camp) => [camp.id, camp.health]));
+      const endCampHealth = Object.fromEntries((brief?.camps ?? []).map((camp) => [camp.id, camp.health]));
+      const campDeltaSummary = ["camp-a", "camp-b"]
+        .map((campKey) => `${campKey} ${(startCampHealth[campKey] ?? "?")}->${(endCampHealth[campKey] ?? "?")}`)
+        .join(" | ");
+      const campSummary =
+        Array.isArray(war?.camps) && war.camps.length > 0
+          ? war.camps.map((camp) => `${camp.label ?? camp.id} ${camp.health ?? "?"}/${camp.maxHealth ?? "?"}`).join(" | ")
+          : "no camps";
+
+      return {
+        ok: true,
+        summary: `One-minute slice (${seconds}s @ ${tickSeconds}s) | order ${orderKind} | casualties ${casualties ?? "?"} | pressure A ${pressureAStart ?? "?"}->${pressureAEnd ?? "?"} B ${pressureBStart ?? "?"}->${pressureBEnd ?? "?"} | spawn mismatches ${spawnMismatches ?? "?"} | orders ${orderSummary} | ${campDeltaSummary} | ${campSummary}`,
+        reinforcementEvents,
+        order,
+        reaction,
+        war,
+        brief,
+        startBrief,
+        afterOrderBrief
+      };
+    }
+
+    if (command === "war-deploy-officer") {
+      if (typeof options.id !== "string") {
+        throw new Error("war-deploy-officer requires --id camp-a|camp-b.");
+      }
+
+      const campId = options.id;
+      if (campId !== "camp-a" && campId !== "camp-b") {
+        throw new Error("war-deploy-officer --id must be camp-a or camp-b.");
+      }
+
+      if (!options["no-stage"]) {
+        await callAgent(page, "stageState", "town-war");
+      }
+      const result = await callAgent(page, "deployTownWarOfficer", { campId });
+      return { ...result, brief: buildTownWarBrief(result?.war ?? null) };
+    }
+
+    if (command === "war-damage-camp") {
+      if (typeof options.id !== "string") {
+        throw new Error("war-damage-camp requires --id camp-a|camp-b.");
+      }
+
+      const campId = options.id;
+      if (campId !== "camp-a" && campId !== "camp-b") {
+        throw new Error("war-damage-camp --id must be camp-a or camp-b.");
+      }
+
+      const amount = parseNumber(options.amount, 250);
+      if (!options["no-stage"]) {
+        await callAgent(page, "stageState", "town-war");
+      }
+      const snapshot = await callAgent(page, "damageTownWarCamp", { campId, amount });
+      const war = snapshot.war ?? null;
+      const camp = Array.isArray(war?.camps) ? war.camps.find((entry) => entry?.id === campId) : null;
+      const health = camp ? `${camp.health ?? "?"}/${camp.maxHealth ?? "?"}` : "?/?";
+
+      return {
+        ok: true,
+        summary: `Town war camp damaged: ${campId} -${amount} | health ${health}`,
+        campId,
+        amount,
+        war,
+        brief: buildTownWarBrief(war)
+      };
+    }
+
+    if (command === "war-reinforce") {
+      if (typeof options.id !== "string") {
+        throw new Error("war-reinforce requires --id camp-a|camp-b.");
+      }
+
+      const campId = options.id;
+      if (campId !== "camp-a" && campId !== "camp-b") {
+        throw new Error("war-reinforce --id must be camp-a or camp-b.");
+      }
+
+      const role = typeof options.role === "string" ? options.role : "rifleman";
+      if (role !== "builder" && role !== "rifleman" && role !== "suppressor" && role !== "medic" && role !== "defender") {
+        throw new Error("war-reinforce --role must be builder, rifleman, suppressor, medic, or defender.");
+      }
+
+      const count = parseNumber(options.count, 1);
+      const damageBefore = options["damage-before"] === undefined ? 0 : parseNumber(options["damage-before"], 0);
+      const advanceSeconds = options["advance-seconds"] === undefined ? 0 : parseNumber(options["advance-seconds"], 0);
+      const tickSeconds = options["tick-seconds"] === undefined ? 0.25 : parseNumber(options["tick-seconds"], 0.25);
+
+      if (!options["no-stage"]) {
+        await callAgent(page, "stageState", "town-war");
+      }
+      if (damageBefore > 0) {
+        await callAgent(page, "damageTownWarCamp", { campId, amount: damageBefore });
+      }
+      const result = await callAgent(page, "reinforceTownWar", { campId, role, count });
+      const reaction = advanceSeconds > 0 ? await callAgent(page, "advanceTownWar", { seconds: advanceSeconds, tickSeconds }) : null;
+      const war = reaction?.war ?? result?.war ?? null;
+
+      return { ...result, reaction, war, brief: buildTownWarBrief(war) };
+    }
+
+    if (command === "war-loot-ammo-crate") {
+      if (typeof options.faction !== "string") {
+        throw new Error("war-loot-ammo-crate requires --faction camp-a|camp-b.");
+      }
+
+      const looterFaction = options.faction;
+      if (looterFaction !== "camp-a" && looterFaction !== "camp-b") {
+        throw new Error("war-loot-ammo-crate --faction must be camp-a or camp-b.");
+      }
+
+      await callAgent(page, "stageState", "town-war");
+
+      if (typeof options.seed === "string") {
+        const campId = options.seed;
+        if (campId !== "camp-a" && campId !== "camp-b") {
+          throw new Error("war-loot-ammo-crate --seed must be camp-a or camp-b.");
+        }
+
+        const hasX = options.x !== undefined;
+        const hasY = options.y !== undefined;
+        if (hasX !== hasY) {
+          throw new Error("war-loot-ammo-crate requires both --x and --y when providing coordinates.");
+        }
+
+        const x = hasX ? parseNumber(options.x) : undefined;
+        const y = hasY ? parseNumber(options.y) : undefined;
+
+        const advanceSeconds = options["advance-seconds"] === undefined ? 8 : parseNumber(options["advance-seconds"], 8);
+        const tickSeconds = options["tick-seconds"] === undefined ? 0.25 : parseNumber(options["tick-seconds"], 0.25);
+
+        const seedOrder = await callAgent(page, "orderTownWarAmmoCrate", { campId, x, y });
+        const reaction = advanceSeconds > 0 ? await callAgent(page, "advanceTownWar", { seconds: advanceSeconds, tickSeconds }) : null;
+        const seededWar = reaction?.war ?? seedOrder?.war ?? null;
+        const crateId = seededWar?.townWar?.ammoCrates?.[0]?.id ?? null;
+
+        if (!crateId) {
+          return {
+            ok: false,
+            summary: "Town war ammo crate loot failed: seed did not create an ammo crate.",
+            seedOrder,
+            reaction,
+            crate: null,
+            war: seededWar,
+            brief: buildTownWarBrief(seededWar)
+          };
+        }
+
+        const result = await callAgent(page, "lootTownWarAmmoCrate", { crateId, looterFaction });
+        return { ...result, seedOrder, reaction, brief: buildTownWarBrief(result?.war ?? null) };
+      }
+
+      if (typeof options.id !== "string") {
+        throw new Error("war-loot-ammo-crate requires --id <crate-id> unless using --seed <camp-a|camp-b>.");
+      }
+
+      const crateId = options.id;
+      const result = await callAgent(page, "lootTownWarAmmoCrate", { crateId, looterFaction });
+      return { ...result, brief: buildTownWarBrief(result?.war ?? null) };
+    }
+
+    if (command === "war-roster") {
+      const campId = typeof options.camp === "string" ? options.camp : null;
+      if (campId !== null && campId !== "camp-a" && campId !== "camp-b") {
+        throw new Error("war-roster --camp must be camp-a or camp-b.");
+      }
+
+      await callAgent(page, "stageState", "town-war");
+      const snapshot = await callAgent(page, "getSnapshot");
+      const war = snapshot?.war ?? null;
+      const soldiers = getTownWarSoldiers(war);
+      const filtered = campId ? soldiers.filter((soldier) => soldier?.faction === campId) : soldiers;
+      const roster = filtered.map((soldier) => summarizeWarSoldierIdentity(soldier));
+
+      return {
+        ok: true,
+        summary: `Town war roster: ${roster.length}/${soldiers.length} soldiers${campId ? ` for ${campId}` : ""}.`,
+        campId,
+        roster,
+        war,
+        brief: buildTownWarBrief(war)
+      };
+    }
+
+    if (command === "war-soldier") {
+      if (typeof options.id !== "string") {
+        throw new Error("war-soldier requires --id <soldier-id>.");
+      }
+
+      await callAgent(page, "stageState", "town-war");
+      const snapshot = await callAgent(page, "getSnapshot");
+      const war = snapshot?.war ?? null;
+      const soldiers = getTownWarSoldiers(war);
+      const soldier = soldiers.find((entry) => entry?.id === options.id || entry?.displayName === options.id) ?? null;
+
+      return {
+        ok: soldier !== null,
+        summary: soldier
+          ? `${soldier.displayName ?? soldier.id}: ${summarizeWarSoldierIdentity(soldier).readable}`
+          : `No town-war soldier found for ${options.id}.`,
+        soldier,
+        readable: soldier ? summarizeWarSoldierIdentity(soldier) : null,
+        war,
+        brief: buildTownWarBrief(war)
+      };
+    }
+
+    if (command === "war-priority") {
+      if (subcommand === "list") {
+        const campId = typeof options.camp === "string" ? options.camp : null;
+        if (campId !== null && campId !== "camp-a" && campId !== "camp-b") {
+          throw new Error("war-priority list --camp must be camp-a or camp-b.");
+        }
+
+        await callAgent(page, "stageState", "town-war");
+        const result = await callAgent(page, "listTownWarPriorities", campId ? { campId } : {});
+        const soldiers = Array.isArray(result?.soldiers) ? result.soldiers : Array.isArray(result?.war?.townWar?.soldiers) ? result.war.townWar.soldiers : [];
+        const rows = soldiers.map((soldier) => summarizeWarTaskDecision(soldier));
+        return {
+          ok: true,
+          summary: `Town war priority matrix: ${rows.length} soldiers${campId ? ` in ${campId}` : ""}.`,
+          rows,
+          warnings: buildWarPriorityWarnings(rows),
+          brief: buildTownWarBrief(result?.war ?? null)
+        };
+      }
+
+      if (subcommand === "set") {
+        if (typeof options.soldier !== "string") {
+          throw new Error("war-priority set requires --soldier <id>.");
+        }
+        if (typeof options.work !== "string") {
+          throw new Error("war-priority set requires --work <Build|Rescue|Resupply|Defend|Suppress|Rest>.");
+        }
+        const priority = parseNumber(options.priority, Number.NaN);
+        await callAgent(page, "stageState", "town-war");
+        const result = await callAgent(page, "setTownWarPriority", {
+          soldierId: options.soldier,
+          work: options.work,
+          priority
+        });
+        return {
+          ...result,
+          readable: result?.result?.soldier ? summarizeWarTaskDecision(result.result.soldier) : null,
+          brief: buildTownWarBrief(result?.war ?? null)
+        };
+      }
+
+      if (subcommand === "preset") {
+        if (typeof options.soldier !== "string") {
+          throw new Error("war-priority preset requires --soldier <id>.");
+        }
+        if (typeof options.preset !== "string") {
+          throw new Error("war-priority preset requires --preset <builder|medic|quartermaster|suppressor|rifleman|scout|rest-cycle>.");
+        }
+        await callAgent(page, "stageState", "town-war");
+        const result = await callAgent(page, "presetTownWarPriority", {
+          soldierId: options.soldier,
+          preset: options.preset
+        });
+        return {
+          ...result,
+          readable: result?.result?.soldier ? summarizeWarTaskDecision(result.result.soldier) : null,
+          brief: buildTownWarBrief(result?.war ?? null)
+        };
+      }
+
+      throw new Error('war-priority requires a subcommand: "list", "set", or "preset".');
+    }
+
+    if (command === "war-task-candidates") {
+      if (typeof options.soldier !== "string") {
+        throw new Error("war-task-candidates requires --soldier <id>.");
+      }
+      await callAgent(page, "stageState", "town-war");
+      const result = await callAgent(page, "getTownWarTaskCandidates", { soldierId: options.soldier });
+      return {
+        ...result,
+        readable: result?.result?.soldier ? summarizeWarTaskDecision(result.result.soldier) : null,
+        candidates: result?.result?.candidates ?? [],
+        brief: buildTownWarBrief(result?.war ?? null)
+      };
+    }
+
+    if (command === "war-build-test") {
+      if (typeof options.builder !== "string") {
+        throw new Error("war-build-test requires --builder <soldier-id>.");
+      }
+      const x = options.x === undefined ? undefined : parseNumber(options.x);
+      const y = options.y === undefined ? undefined : parseNumber(options.y);
+      const advanceSeconds = options["advance-seconds"] === undefined ? 0 : parseNumber(options["advance-seconds"], 0);
+      const tickSeconds = options["tick-seconds"] === undefined ? 0.25 : parseNumber(options["tick-seconds"], 0.25);
+
+      await callAgent(page, "stageState", "town-war");
+      const result = await callAgent(page, "orderTownWarBuildTest", {
+        builderId: options.builder,
+        coveredById: typeof options["covered-by"] === "string" ? options["covered-by"] : undefined,
+        x,
+        y
+      });
+      const reaction = advanceSeconds > 0 ? await callAgent(page, "advanceTownWar", { seconds: advanceSeconds, tickSeconds }) : null;
+      const report =
+        result?.order?.orderId && advanceSeconds > 0 ? await callAgent(page, "getTownWarBuildReport", { orderId: result.order.orderId }) : null;
+      const war = report?.war ?? reaction?.war ?? result?.war ?? null;
+      return { ...result, reaction, report, war, summary: report?.summary ?? reaction?.summary ?? result.summary, brief: buildTownWarBrief(war) };
+    }
+
+    if (command === "war-build-report") {
+      if (typeof options.order !== "string") {
+        throw new Error("war-build-report requires --order <order-id>.");
+      }
+      const result = await callAgent(page, "getTownWarBuildReport", { orderId: options.order });
+      return { ...result, brief: buildTownWarBrief(result?.war ?? null) };
+    }
+
+    if (command === "war-stage-casualty") {
+      if (typeof options.soldier !== "string") {
+        throw new Error("war-stage-casualty requires --soldier <soldier-id>.");
+      }
+      const x = options.x === undefined ? undefined : parseNumber(options.x);
+      const y = options.y === undefined ? undefined : parseNumber(options.y);
+      const severity = typeof options.severity === "string" ? options.severity : "serious";
+      await callAgent(page, "stageState", "town-war");
+      const result = await callAgent(page, "stageTownWarCasualty", {
+        soldierId: options.soldier,
+        x,
+        y,
+        severity
+      });
+      return { ...result, brief: buildTownWarBrief(result?.war ?? null) };
+    }
+
+    if (command === "war-medic-order") {
+      if (typeof options.medic !== "string") {
+        throw new Error("war-medic-order requires --medic <soldier-id>.");
+      }
+      if (typeof options.target !== "string") {
+        throw new Error("war-medic-order requires --target <soldier-id>.");
+      }
+      const advanceSeconds = options["advance-seconds"] === undefined ? 0 : parseNumber(options["advance-seconds"], 0);
+      const tickSeconds = options["tick-seconds"] === undefined ? 0.25 : parseNumber(options["tick-seconds"], 0.25);
+      const result = await callAgent(page, "orderTownWarMedicRescue", {
+        medicId: options.medic,
+        targetSoldierId: options.target,
+        coveredById: typeof options["covered-by"] === "string" ? options["covered-by"] : undefined
+      });
+      let advance = null;
+      let report = null;
+      if (advanceSeconds > 0) {
+        advance = await callAgent(page, "advanceTownWar", { seconds: advanceSeconds, tickSeconds });
+        report = await callAgent(page, "getTownWarRescueReport");
+      }
+      return { ...result, advance, report, brief: buildTownWarBrief((report ?? result)?.war ?? null) };
+    }
+
+    if (command === "war-rescue-report") {
+      const result = await callAgent(page, "getTownWarRescueReport");
+      return { ...result, brief: buildTownWarBrief(result?.war ?? null) };
+    }
+
+    if (command === "war-sustainment") {
+      await callAgent(page, "stageState", "town-war");
+      const result = await callAgent(page, "getTownWarSustainmentReport");
+      return { ...result, brief: buildTownWarBrief(result?.war ?? null) };
+    }
+
+    if (command === "war-set-camp-work") {
+      const campId = typeof options.camp === "string" ? options.camp : null;
+      if (campId !== "camp-a" && campId !== "camp-b") {
+        throw new Error("war-set-camp-work requires --camp camp-a|camp-b.");
+      }
+      if (typeof options.work !== "string") {
+        throw new Error("war-set-camp-work requires --work Cook|Resupply|Rest.");
+      }
+      const priority = parseNumber(options.priority, Number.NaN);
+      await callAgent(page, "stageState", "town-war");
+      const result = await callAgent(page, "setTownWarCampWork", {
+        campId,
+        work: options.work,
+        priority
+      });
+      return { ...result, brief: buildTownWarBrief(result?.war ?? null) };
+    }
+
+    if (command === "war-stage-ammo-pressure") {
+      const campId = typeof options.camp === "string" ? options.camp : null;
+      if (campId !== "camp-a" && campId !== "camp-b") {
+        throw new Error("war-stage-ammo-pressure requires --camp camp-a|camp-b.");
+      }
+      await callAgent(page, "stageState", "town-war");
+      const result = await callAgent(page, "stageTownWarAmmoPressure", { campId });
+      return { ...result, brief: buildTownWarBrief(result?.war ?? null) };
+    }
+
+    if (command === "war-stage-fatigue") {
+      const campId = typeof options.camp === "string" ? options.camp : null;
+      if (campId !== "camp-a" && campId !== "camp-b") {
+        throw new Error("war-stage-fatigue requires --camp camp-a|camp-b.");
+      }
+      const level = parseNumber(options.level, Number.NaN);
+      await callAgent(page, "stageState", "town-war");
+      const result = await callAgent(page, "stageTownWarFatigue", { campId, level });
+      return { ...result, brief: buildTownWarBrief(result?.war ?? null) };
+    }
+
+    if (command === "war-stage-flank") {
+      const campId = typeof options.camp === "string" ? options.camp : "camp-a";
+      const lane = typeof options.lane === "string" ? options.lane : null;
+      const pressure = typeof options.pressure === "string" ? options.pressure : null;
+      if (campId !== "camp-a" && campId !== "camp-b") {
+        throw new Error("war-stage-flank requires --camp camp-a|camp-b when provided.");
+      }
+      if (lane !== "north" && lane !== "mid" && lane !== "south") {
+        throw new Error("war-stage-flank requires --lane north|mid|south.");
+      }
+      if (pressure !== "low" && pressure !== "medium" && pressure !== "high") {
+        throw new Error("war-stage-flank requires --pressure low|medium|high.");
+      }
+      await callAgent(page, "stageState", "town-war");
+      const result = await callAgent(page, "stageTownWarFlank", { campId, lane, pressure });
+      return { ...result, brief: buildTownWarBrief(result?.war ?? null) };
+    }
+
+    if (command === "war-operation") {
+      if (subcommand === "prepare") {
+        const payload = {
+          ammo: options.ammo === undefined ? undefined : parseNumber(options.ammo, 220),
+          build: options.build === undefined ? undefined : parseNumber(options.build, 220),
+          food: options.food === undefined ? undefined : parseNumber(options.food, 180),
+          med: options.med === undefined ? undefined : parseNumber(options.med, 90)
+        };
+        const result = await callAgent(page, "prepareTownWarOperation", payload);
+        return { ...result, brief: buildTownWarBrief(result?.war ?? null) };
+      }
+      if (subcommand === "start") {
+        const result = await callAgent(page, "startNextTownWarOperation");
+        return { ...result, brief: buildTownWarBrief(result?.war ?? null) };
+      }
+      if (subcommand === "end") {
+        const result = await callAgent(page, "endTownWarOperation");
+        return { ...result, brief: buildTownWarBrief(result?.war ?? null) };
+      }
+      if (subcommand === "report") {
+        const result = await callAgent(page, "getTownWarOperationReport");
+        return { ...result, brief: buildTownWarBrief(result?.war ?? null) };
+      }
+      throw new Error('war-operation requires a subcommand: "prepare", "start", "end", or "report".');
+    }
+
+    if (command === "war-skill-emergence-demo") {
+      await callAgent(page, "stageState", "town-war");
+      const result = await callAgent(page, "runTownWarSkillEmergenceDemo");
+      return { ...result, brief: buildTownWarBrief(result?.war ?? null) };
+    }
+
+    if (command === "war-skill-debrief") {
+      await callAgent(page, "stageState", "town-war");
+      const demo = await callAgent(page, "runTownWarSkillEmergenceDemo");
+      const result = await callAgent(page, "getTownWarSkillDebrief");
+      return { ...result, demo: demo?.result ?? null, brief: buildTownWarBrief(result?.war ?? null) };
+    }
+
+    if (command === "war-order-trench") {
+      if (typeof options.id !== "string") {
+        throw new Error("war-order-trench requires --id camp-a|camp-b.");
+      }
+
+      const campId = options.id;
+      if (campId !== "camp-a" && campId !== "camp-b") {
+        throw new Error("war-order-trench --id must be camp-a or camp-b.");
+      }
+
+      const hasX = options.x !== undefined;
+      const hasY = options.y !== undefined;
+      if (hasX !== hasY) {
+        throw new Error("war-order-trench requires both --x and --y when providing coordinates.");
+      }
+
+      const x = hasX ? parseNumber(options.x) : undefined;
+      const y = hasY ? parseNumber(options.y) : undefined;
+
+      const advanceSeconds = options["advance-seconds"] === undefined ? 0 : parseNumber(options["advance-seconds"], 0);
+      const tickSeconds = options["tick-seconds"] === undefined ? 0.25 : parseNumber(options["tick-seconds"], 0.25);
+
+      await callAgent(page, "stageState", "town-war");
+      const result = await callAgent(page, "orderTownWarTrench", { campId, x, y });
+
+      const reaction = advanceSeconds > 0 ? await callAgent(page, "advanceTownWar", { seconds: advanceSeconds, tickSeconds }) : null;
+      const war = reaction?.war ?? result?.war ?? null;
+
+      return { ...result, reaction, war, summary: reaction?.summary ?? result.summary, brief: buildTownWarBrief(war) };
+    }
+
+    if (command === "war-order-ammo" || command === "war-order-ammo-crate") {
+      if (typeof options.id !== "string") {
+        throw new Error("war-order-ammo-crate requires --id camp-a|camp-b.");
+      }
+
+      const campId = options.id;
+      if (campId !== "camp-a" && campId !== "camp-b") {
+        throw new Error("war-order-ammo-crate --id must be camp-a or camp-b.");
+      }
+
+      const hasX = options.x !== undefined;
+      const hasY = options.y !== undefined;
+      if (hasX !== hasY) {
+        throw new Error("war-order-ammo-crate requires both --x and --y when providing coordinates.");
+      }
+
+      const x = hasX ? parseNumber(options.x) : undefined;
+      const y = hasY ? parseNumber(options.y) : undefined;
+
+      const advanceSeconds = options["advance-seconds"] === undefined ? 0 : parseNumber(options["advance-seconds"], 0);
+      const tickSeconds = options["tick-seconds"] === undefined ? 0.25 : parseNumber(options["tick-seconds"], 0.25);
+
+      await callAgent(page, "stageState", "town-war");
+      const result = await callAgent(page, "orderTownWarAmmoCrate", { campId, x, y });
+
+      const reaction = advanceSeconds > 0 ? await callAgent(page, "advanceTownWar", { seconds: advanceSeconds, tickSeconds }) : null;
+      const war = reaction?.war ?? result?.war ?? null;
+
+      return { ...result, reaction, war, summary: reaction?.summary ?? result.summary, brief: buildTownWarBrief(war) };
+    }
+
+    if (command === "war-order-dugout") {
+      if (typeof options.id !== "string") {
+        throw new Error("war-order-dugout requires --id camp-a|camp-b.");
+      }
+
+      const campId = options.id;
+      if (campId !== "camp-a" && campId !== "camp-b") {
+        throw new Error("war-order-dugout --id must be camp-a or camp-b.");
+      }
+
+      const hasX = options.x !== undefined;
+      const hasY = options.y !== undefined;
+      if (hasX !== hasY) {
+        throw new Error("war-order-dugout requires both --x and --y when providing coordinates.");
+      }
+
+      const x = hasX ? parseNumber(options.x) : undefined;
+      const y = hasY ? parseNumber(options.y) : undefined;
+      const facingAngleRadians = options.facing === undefined ? undefined : parseNumber(options.facing);
+
+      const advanceSeconds = options["advance-seconds"] === undefined ? 0 : parseNumber(options["advance-seconds"], 0);
+      const tickSeconds = options["tick-seconds"] === undefined ? 0.25 : parseNumber(options["tick-seconds"], 0.25);
+
+      await callAgent(page, "stageState", "town-war");
+      const result = await callAgent(page, "orderTownWarDugout", { campId, x, y, facingAngleRadians });
+
+      const reaction = advanceSeconds > 0 ? await callAgent(page, "advanceTownWar", { seconds: advanceSeconds, tickSeconds }) : null;
+      const war = reaction?.war ?? result?.war ?? null;
+
+      return { ...result, reaction, war, summary: reaction?.summary ?? result.summary, brief: buildTownWarBrief(war) };
+    }
+
+    if (command === "war-dugout-report") {
+      await callAgent(page, "stageState", "town-war");
+      return callAgent(page, "getTownWarDugoutReport");
+    }
+
+    if (command === "war-damage-dugout") {
+      if (typeof options.id !== "string") {
+        throw new Error("war-damage-dugout requires --id <dugout-id>.");
+      }
+      const amount = options.amount === undefined ? 20 : parseNumber(options.amount, 20);
+      await callAgent(page, "stageState", "town-war");
+      return callAgent(page, "damageTownWarDugout", { dugoutId: options.id, amount });
+    }
+
+    if (command === "war-focus-lane") {
+      if (typeof options.id !== "string") {
+        throw new Error("war-focus-lane requires --id camp-a|camp-b.");
+      }
+
+      const campId = options.id;
+      if (campId !== "camp-a" && campId !== "camp-b") {
+        throw new Error("war-focus-lane --id must be camp-a or camp-b.");
+      }
+
+      if (typeof options.lane !== "string") {
+        throw new Error("war-focus-lane requires --lane north|mid|south.");
+      }
+
+      const lane = options.lane.toLowerCase().trim();
+      if (lane !== "north" && lane !== "mid" && lane !== "south") {
+        throw new Error("war-focus-lane --lane must be north, mid, or south.");
+      }
+
+      const advanceSeconds = options["advance-seconds"] === undefined ? 0 : parseNumber(options["advance-seconds"], 0);
+      const tickSeconds = options["tick-seconds"] === undefined ? 0.25 : parseNumber(options["tick-seconds"], 0.25);
+
+      await callAgent(page, "stageState", "town-war");
+      const result = await callAgent(page, "focusTownWarLane", { campId, lane });
+
+      const reaction = advanceSeconds > 0 ? await callAgent(page, "advanceTownWar", { seconds: advanceSeconds, tickSeconds }) : null;
+      const war = reaction?.war ?? result?.war ?? null;
+
+      return { ...result, reaction, war, summary: reaction?.summary ?? result.summary, brief: buildTownWarBrief(war) };
+    }
+
+    if (command === "war-advance") {
+      const seconds = parseNumber(options.seconds, 10);
+      const tickSeconds = parseNumber(options["tick-seconds"], 0.25);
+
+      await callAgent(page, "stageState", "town-war");
+      const result = await callAgent(page, "advanceTownWar", { seconds, tickSeconds });
+      return { ...result, brief: buildTownWarBrief(result?.war) };
     }
 
     if (command === "list") {

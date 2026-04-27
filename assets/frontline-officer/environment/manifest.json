@@ -1,0 +1,405 @@
+{
+  "pack": "frontline-officer-environment",
+  "use": "Shared first-town battlefield foliage and environmental props for camps, trench approaches, muddy roads, and ruined village dressing.",
+  "anchor": "top-down Phaser spritesheets; transparent PNG unless noted",
+  "files": [
+    {
+      "file": "foliage_32_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "frameSize": [
+        32,
+        32
+      ],
+      "role": "32 foliage frames: trees, bushes, grass tufts, rocks"
+    },
+    {
+      "file": "frontline_foliage_sheet_256x128.png",
+      "size": [
+        256,
+        128
+      ],
+      "frameSize": [
+        32,
+        32
+      ],
+      "role": "alternate 32-frame foliage sheet"
+    },
+    {
+      "file": "environmental_props_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "8 battlefield props: crater, burned car, rubble, wire/roadblock, generator, wire spool, supply cart, barricade"
+    },
+    {
+      "file": "frontline_environment_props_256x128.png",
+      "size": [
+        256,
+        128
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "alternate 8-frame environmental prop sheet"
+    },
+    {
+      "file": "muddy_road_tiles_64_sheet.png",
+      "size": [
+        256,
+        64
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4 muddy road tile variants"
+    },
+    {
+      "file": "trench_tiles_64_sheet.png",
+      "size": [
+        256,
+        64
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4 trench tile variants"
+    },
+    {
+      "file": "ruined_house_128.png",
+      "size": [
+        128,
+        128
+      ],
+      "role": "ruined town structure / fighting position dressing"
+    },
+    {
+      "file": "environment_preview_sheet.png",
+      "size": [
+        512,
+        256
+      ],
+      "role": "non-runtime visual index",
+      "opaque": true
+    },
+    {
+      "file": "battlefield_scars_64_sheet.png",
+      "size": [
+        256,
+        256
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4x4 64 px battlefield scar sheet for shell marks, mud churn, blast stains, and terrain damage"
+    },
+    {
+      "file": "tree_line_64_sheet.png",
+      "size": [
+        256,
+        256
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4x4 64 px tree-line and foliage blocker sheet"
+    },
+    {
+      "file": "village_war_props_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4x2 64 px ruined village and frontline environmental prop sheet"
+    },
+    {
+      "file": "mud_water_terrain_64_sheet.png",
+      "size": [
+        256,
+        256
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4x4 64 px muddy terrain, puddle, rut, and waterlogged crater sheet"
+    },
+    {
+      "file": "smoke_fire_fx_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4x2 64 px smoke and fire effect sheet for burning wrecks and camp damage"
+    },
+    {
+      "file": "ruined_town_scatter_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4x2 64 px ruined town scatter sheet for burned cars, blasted walls, rubble, wire, and improvised cover"
+    },
+    {
+      "file": "concealment_foliage_64_sheet.png",
+      "size": [
+        256,
+        256
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4x4 64 px concealment foliage sheet for bush clusters, tree-line breaks, and soft cover edges"
+    },
+    {
+      "file": "road_edge_tiles_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4x2 64 px muddy road edge tile sheet for horizontal and vertical supply route borders"
+    },
+    {
+      "file": "trench_edge_tiles_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4x2 64 px trench edge tile sheet for readable trench borders and damaged trench variants"
+    },
+    {
+      "file": "crater_field_tiles_64_sheet.png",
+      "size": [
+        256,
+        256
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4x4 64 px crater-field terrain sheet for shell-pocked open ground"
+    },
+    {
+      "file": "industrial_ruins_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4x2 64 px industrial ruin scatter sheet for broken sheds, walls, hard cover, and debris"
+    },
+    {
+      "file": "seasonal_foliage_64_sheet.png",
+      "size": [
+        256,
+        256
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4x4 64 px alternate foliage sheet for dry, pale, and weathered tree-line dressing"
+    },
+    {
+      "file": "artillery_aftermath_64_sheet.png",
+      "size": [
+        256,
+        256
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4x4 64 px artillery aftermath sheet for scorch, blast scars, churned dirt, and splintered ground"
+    },
+    {
+      "file": "rural_field_tiles_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4x2 64 px rural field tile sheet for crops, dirt lanes, trampled grass, and shallow shell marks"
+    },
+    {
+      "file": "hedgerow_foliage_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4x2 64 px hedgerow and bush-line foliage sheet for soft cover and field boundaries"
+    },
+    {
+      "file": "weather_overlay_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4x2 64 px transparent weather overlay sheet for rain streaks, haze, dust, and low-visibility puffs"
+    },
+    {
+      "file": "wet_mud_variants_64_sheet.png",
+      "size": [
+        256,
+        256
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4x4 64 px wet mud, puddle, rut, and saturated terrain variant sheet"
+    },
+    {
+      "file": "orchard_foliage_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "frameSize": [
+        64,
+        64
+      ],
+      "role": "4x2 64 px orchard and spaced tree-line foliage sheet for rural field edges"
+    },
+    {
+      "file": "woodland_terrain_64_sheet.png",
+      "size": [
+        256,
+        256
+      ],
+      "role": "4x4 woodland terrain sheet with 64 px grass, moss, dirt, mud, leaves, logs, stones, reeds, and track tiles",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "woodland_foliage_32_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "8x4 transparent foliage sheet with 32 px grass tufts, bush clumps, stumps, and rocks",
+      "frameSize": [
+        32,
+        32
+      ]
+    },
+    {
+      "file": "woodland_trees_96_sheet.png",
+      "size": [
+        384,
+        192
+      ],
+      "role": "4x2 transparent tree sheet with 96 px leafy and bare trees",
+      "frameSize": [
+        96,
+        96
+      ]
+    },
+    {
+      "file": "woodland_logs_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 transparent log and deadfall sheet with 64 px frames",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "woodland_treeline_128x96_sheet.png",
+      "size": [
+        512,
+        96
+      ],
+      "role": "4-frame transparent tree-line clump sheet for soft cover and map edges",
+      "frameSize": [
+        128,
+        96
+      ]
+    },
+    {
+      "file": "woodland_deadfall_cover_128x96.png",
+      "size": [
+        128,
+        96
+      ],
+      "role": "large fallen-log cover prop"
+    },
+    {
+      "file": "woodland_dense_bushline_128.png",
+      "size": [
+        128,
+        128
+      ],
+      "role": "dense bush-line cover prop"
+    },
+    {
+      "file": "woodland_bare_tree_96.png",
+      "size": [
+        96,
+        96
+      ],
+      "role": "bare tree / shattered trunk prop"
+    },
+    {
+      "file": "woodland_preview_sheet.png",
+      "size": [
+        512,
+        384
+      ],
+      "role": "non-runtime visual index for woodland terrain, foliage, and logs",
+      "opaque": true
+    }
+  ]
+}

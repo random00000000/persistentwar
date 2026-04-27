@@ -8,6 +8,15 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "game:cli": "node scripts/project-cli.mjs",
+    "smoke:town-war-colony": "node scripts/town-war-colony-wiring-smoke.mjs",
+    "smoke:town-war-loop": "node scripts/town-war-playable-loop.mjs",
+    "smoke:town-war-operation": "node scripts/town-war-operation-cycle-smoke.mjs",
+    "smoke:town-war-dugout": "node scripts/town-war-dugout-network-smoke.mjs",
+    "smoke:town-war-trench": "node scripts/town-war-trench-smoke.mjs",
+    "smoke:town-war-russian-dialogue": "node scripts/town-war-russian-dialogue-smoke.mjs",
+    "smoke:town-war-soldier-inspector": "node scripts/town-war-soldier-inspector-smoke.mjs",
+    "smoke:enemy-corner-unstick": "node scripts/enemy-corner-unstick-smoke.mjs",
+    "smoke:enemy-spawn-side": "node scripts/enemy-spawn-side-smoke.mjs",
     "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {

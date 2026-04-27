@@ -5,7 +5,8 @@ import {
   type ArenaDoorway,
   type RaidRouteDefinition,
   type RaidRouteId,
-  type ScenicPropDefinition
+  type ScenicPropDefinition,
+  type Vec2
 } from "../arena";
 import {
   getEnemyTapeDefinition,
@@ -62,6 +63,13 @@ import {
   type GroundTextureKind
 } from "./raidTextures";
 import {
+  FRONTLINE_CAMP_ASSETS,
+  getFrontlineCampAssetKey,
+  getFrontlineCampSheetKey,
+  type CampAssetRole,
+  type CampAssetSheet
+} from "./frontlineCampAssets";
+import {
   RAID_ACTION_KEY_CODES,
   RAID_MOVEMENT_KEY_CODES,
   RAID_SQUAD_COMMAND_KEY_CODES,
@@ -69,8 +77,18 @@ import {
   RAID_SUPPORT_ORDER_KEY_CODES
 } from "../controls";
 import { buildCombatAudioRead, CombatAudioEngine } from "../combatAudio";
+import {
+  TOWN_WAR_ENEMY_FACTION,
+  TOWN_WAR_PLAYER_FACTION,
+  townWarController,
+  type TownWarCampState,
+  type TownWarFactionId,
+  type TownWarRoleId,
+  type TownWarSoldierState
+} from "../townWar";
 
 type SpriteMap = Map<number, Phaser.GameObjects.Sprite>;
+type TownWarSpriteMap = Map<string, Phaser.GameObjects.Sprite>;
 type AlphaCapableGameObject = Phaser.GameObjects.GameObject & Phaser.GameObjects.Components.AlphaSingle;
 
 interface ObstacleRevealTarget {
@@ -2528,6 +2546,162 @@ function getCombatantTextureKey(archetypeId: EnemyArchetypeId, tapeId: EnemyTape
 
 function getFriendlyCombatantKey(archetypeId: EnemyArchetypeId): string {
   return getFriendlyCombatantTextureKey(archetypeId);
+}
+
+function getTownWarSoldierArchetype(role: TownWarRoleId): EnemyArchetypeId {
+  if (role === "builder" || role === "medic") {
+    return "skirmisher";
+  }
+
+  if (role === "suppressor" || role === "defender") {
+    return "rifleman";
+  }
+
+  return "rusher";
+}
+
+function getTownWarSoldierSpriteKey(soldier: TownWarSoldierState): string {
+  const archetypeId = getTownWarSoldierArchetype(soldier.role);
+  return soldier.faction === TOWN_WAR_PLAYER_FACTION ? getFriendlyCombatantKey(archetypeId) : getCombatantTextureKey(archetypeId, "blue");
+}
+
+function getTownWarSoldierRenderId(id: string): number {
+  return [...id].reduce((hash, char) => hash + char.charCodeAt(0), 0);
+}
+
+function getNearestTownWarEnemy(
+  origin: Vec2,
+  faction: TownWarFactionId,
+  combatants: ReadonlyArray<{ faction: TownWarFactionId; health: { current: number }; position: Vec2 }>
+): { faction: TownWarFactionId; health: { current: number }; position: Vec2 } | null {
+  return combatants.reduce<{ faction: TownWarFactionId; health: { current: number }; position: Vec2 } | null>((best, combatant) => {
+    if (combatant.faction === faction || combatant.health.current <= 0) {
+      return best;
+    }
+    if (!best) {
+      return combatant;
+    }
+    return Math.hypot(combatant.position.x - origin.x, combatant.position.y - origin.y) <
+      Math.hypot(best.position.x - origin.x, best.position.y - origin.y)
+      ? combatant
+      : best;
+  }, null);
+}
+
+function normalizeTownWarFacing(from: Vec2, to: Vec2): Vec2 | null {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.hypot(dx, dy);
+  return length > 0.01 ? { x: dx / length, y: dy / length } : null;
+}
+
+function getTownWarSoldierFacing(
+  soldier: TownWarSoldierState,
+  coverSlots: ReadonlyArray<{ id: string; sourceKind: string; position: Vec2; facingAngleRadians: number; occupiedBySoldierId?: string | null }>,
+  combatants: ReadonlyArray<{ faction: TownWarFactionId; health: { current: number }; position: Vec2 }>
+): Vec2 {
+  const coverSlot = soldier.coverIntent.coverSlotId ? coverSlots.find((slot) => slot.id === soldier.coverIntent.coverSlotId) ?? null : null;
+  if (soldier.coverIntent.state === "occupying" && coverSlot?.sourceKind === "trench" && coverSlot.occupiedBySoldierId === soldier.id) {
+    const nearestEnemy = getNearestTownWarEnemy(coverSlot.position, soldier.faction, combatants);
+    const enemyFacing = nearestEnemy ? normalizeTownWarFacing(coverSlot.position, nearestEnemy.position) : null;
+    if (enemyFacing) {
+      return enemyFacing;
+    }
+
+    const defaultFacing = soldier.faction === TOWN_WAR_PLAYER_FACTION ? { x: -1, y: 0 } : { x: 1, y: 0 };
+    const normalA = { x: -Math.sin(coverSlot.facingAngleRadians), y: Math.cos(coverSlot.facingAngleRadians) };
+    const normalB = { x: -normalA.x, y: -normalA.y };
+    return normalA.x * defaultFacing.x + normalA.y * defaultFacing.y >= normalB.x * defaultFacing.x + normalB.y * defaultFacing.y
+      ? normalA
+      : normalB;
+  }
+
+  const targetPosition = soldier.task.targetPosition;
+  if (targetPosition) {
+    const targetFacing = normalizeTownWarFacing(soldier.position, targetPosition);
+    if (targetFacing) {
+      return targetFacing;
+    }
+  }
+
+  if (coverSlot) {
+    return { x: Math.cos(coverSlot.facingAngleRadians), y: Math.sin(coverSlot.facingAngleRadians) };
+  }
+
+  return soldier.faction === TOWN_WAR_PLAYER_FACTION ? { x: -1, y: 0 } : { x: 1, y: 0 };
+}
+
+function getTownWarSoldierWeaponId(soldier: TownWarSoldierState): keyof typeof WEAPONS {
+  if (soldier.role === "suppressor") {
+    return "pkm";
+  }
+  if (soldier.role === "defender") {
+    return "short-mosin";
+  }
+  return "worn-ak";
+}
+
+function getTownWarSoldierAwareness(soldier: TownWarSoldierState): EnemyState["awareness"] {
+  return soldier.task.kind === "attack" || soldier.task.kind === "suppress" || soldier.tacticalIntent.state === "suppress-area"
+    ? "engaged"
+    : "investigating";
+}
+
+function getTownWarSoldierPressureType(soldier: TownWarSoldierState): EnemyState["pressureType"] {
+  const pressureRatio = soldier.morale.pressure / Math.max(1, soldier.morale.maxPressure);
+  if (pressureRatio >= 0.72) {
+    return "pinned";
+  }
+
+  if (pressureRatio >= 0.44) {
+    return "suppressed";
+  }
+
+  return null;
+}
+
+function getTownWarSoldierTint(soldier: TownWarSoldierState): number {
+  if (soldier.health.current <= 0) {
+    return 0x94a3b8;
+  }
+
+  if (soldier.task.kind === "build") {
+    return 0xfde68a;
+  }
+
+  if (soldier.coverIntent.state === "occupying" && soldier.coverIntent.coverSlotId) {
+    return 0xbbf7d0;
+  }
+
+  if (soldier.task.kind === "heal") {
+    return 0x86efac;
+  }
+
+  if (soldier.task.kind === "resupply") {
+    return 0xbfdbfe;
+  }
+
+  return 0xffffff;
+}
+
+function isTownWarPlayerFaction(faction: TownWarFactionId | null): boolean {
+  return faction === TOWN_WAR_PLAYER_FACTION;
+}
+
+function getTownWarFactionColor(faction: TownWarFactionId | null): number {
+  return isTownWarPlayerFaction(faction) ? 0xdc2626 : faction === TOWN_WAR_ENEMY_FACTION ? 0x2563eb : 0xd1d5db;
+}
+
+function getTownWarFactionAccent(faction: TownWarFactionId | null): number {
+  return isTownWarPlayerFaction(faction) ? 0xfacc15 : faction === TOWN_WAR_ENEMY_FACTION ? 0x93c5fd : 0xe5e7eb;
+}
+
+function getTownWarFactionTextColor(faction: TownWarFactionId | null): string {
+  return isTownWarPlayerFaction(faction) ? "#fde68a" : faction === TOWN_WAR_ENEMY_FACTION ? "#bfdbfe" : "#e5e7eb";
+}
+
+function getTownWarEnemyTextColor(faction: TownWarFactionId | null): string {
+  return isTownWarPlayerFaction(faction) ? "#fde68a" : "#dbeafe";
 }
 
 function getFrontlineModifierAnchors(route: RaidRouteDefinition): FrontlineModifierAnchor[] {
@@ -7543,6 +7717,7 @@ export class RaidScene extends Phaser.Scene {
   private playerAim!: Phaser.GameObjects.Rectangle;
   private enemySprites: SpriteMap = new Map();
   private friendlyCombatantSprites: SpriteMap = new Map();
+  private townWarSoldierSprites: TownWarSpriteMap = new Map();
   private fallenSquadBodySprites: SpriteMap = new Map();
   private fallenEnemyBodySprites: SpriteMap = new Map();
   private bulletSprites: SpriteMap = new Map();
@@ -7565,6 +7740,7 @@ export class RaidScene extends Phaser.Scene {
   private frontlineSupportGraphics!: Phaser.GameObjects.Graphics;
   private frontlineIncidentGraphics!: Phaser.GameObjects.Graphics;
   private frontlineImpactGraphics!: Phaser.GameObjects.Graphics;
+  private townWarCampGraphics!: Phaser.GameObjects.Graphics;
   private grenadeGraphics!: Phaser.GameObjects.Graphics;
   private enemyIntentGraphics!: Phaser.GameObjects.Graphics;
   private enemyStatusGraphics!: Phaser.GameObjects.Graphics;
@@ -7573,9 +7749,17 @@ export class RaidScene extends Phaser.Scene {
   private roomStackGraphics!: Phaser.GameObjects.Graphics;
   private edgeIndicatorGraphics!: Phaser.GameObjects.Graphics;
   private worldObjectiveLabels: ObjectiveLabelSlot[] = [];
+  private townWarFieldworkLabels: ObjectiveLabelSlot[] = [];
+  private townWarCampLabels: ObjectiveLabelSlot[] = [];
+  private townWarSelectedSoldierLabels: ObjectiveLabelSlot[] = [];
+  private townWarLookSoldierLabels: ObjectiveLabelSlot[] = [];
+  private townWarPlayerCampArtObjects: Phaser.GameObjects.GameObject[] = [];
+  private townWarPlayerCampArtVisible = true;
   private roomStackLabels: ObjectiveLabelSlot[] = [];
   private edgeObjectiveLabels: ObjectiveLabelSlot[] = [];
   private squadEscortLabels: ObjectiveLabelSlot[] = [];
+  private selectedTownWarSoldierId: string | null = null;
+  private townWarLookWorld: Vec2 | null = null;
   private revealableObstacleVisuals: ObstacleRevealVisual[] = [];
   private aimReticle!: Phaser.GameObjects.Graphics;
   private telemetryPanelBg!: Phaser.GameObjects.Rectangle;
@@ -7622,12 +7806,42 @@ export class RaidScene extends Phaser.Scene {
   private grenadeKey!: Phaser.Input.Keyboard.Key;
   private interactKey!: Phaser.Input.Keyboard.Key;
   private healKey!: Phaser.Input.Keyboard.Key;
-  private supportOrderKeys!: Record<"shiftFire" | "holdPosition", Phaser.Input.Keyboard.Key>;
+  private supportOrderKeys!: Record<"shiftFire" | "holdPosition" | "dropAmmoCrate", Phaser.Input.Keyboard.Key>;
   private squadSelectionKeys!: Record<"first" | "second" | "third", Phaser.Input.Keyboard.Key>;
   private squadCommandKeys!: Record<"follow" | "defend" | "attack", Phaser.Input.Keyboard.Key>;
 
   public constructor() {
     super("raid-scene");
+  }
+
+  public setTownWarSelectedSoldierId(soldierId: string | null): void {
+    this.selectedTownWarSoldierId = soldierId;
+  }
+
+  public setTownWarPlayerCampArtVisible(visible: boolean): void {
+    this.townWarPlayerCampArtVisible = visible;
+    for (const object of this.townWarPlayerCampArtObjects) {
+      if ("setVisible" in object && typeof object.setVisible === "function") {
+        object.setVisible(visible);
+      }
+    }
+  }
+
+  public preload(): void {
+    for (const asset of FRONTLINE_CAMP_ASSETS) {
+      if (this.textures.exists(asset.key)) {
+        continue;
+      }
+
+      if (asset.type === "spritesheet") {
+        this.load.spritesheet(asset.key, asset.url, {
+          frameWidth: asset.frameWidth,
+          frameHeight: asset.frameHeight
+        });
+      } else {
+        this.load.image(asset.key, asset.url);
+      }
+    }
   }
 
   public create(): void {
@@ -7672,6 +7886,7 @@ export class RaidScene extends Phaser.Scene {
     this.frontlineSupportGraphics = this.add.graphics();
     this.frontlineIncidentGraphics = this.add.graphics();
     this.frontlineImpactGraphics = this.add.graphics();
+    this.townWarCampGraphics = this.add.graphics();
     this.grenadeGraphics = this.add.graphics();
     this.enemyIntentGraphics = this.add.graphics();
     this.enemyStatusGraphics = this.add.graphics();
@@ -7957,8 +8172,9 @@ export class RaidScene extends Phaser.Scene {
     this.healKey = this.input.keyboard!.addKey(RAID_ACTION_KEY_CODES.heal);
       this.supportOrderKeys = this.input.keyboard!.addKeys({
       shiftFire: RAID_SUPPORT_ORDER_KEY_CODES.shiftFire,
-      holdPosition: RAID_SUPPORT_ORDER_KEY_CODES.holdPosition
-    }) as Record<"shiftFire" | "holdPosition", Phaser.Input.Keyboard.Key>;
+      holdPosition: RAID_SUPPORT_ORDER_KEY_CODES.holdPosition,
+      dropAmmoCrate: RAID_SUPPORT_ORDER_KEY_CODES.dropAmmoCrate
+    }) as Record<"shiftFire" | "holdPosition" | "dropAmmoCrate", Phaser.Input.Keyboard.Key>;
     this.squadSelectionKeys = this.input.keyboard!.addKeys({
       first: RAID_SQUAD_SELECTION_KEY_CODES.first,
       second: RAID_SQUAD_SELECTION_KEY_CODES.second,
@@ -7979,6 +8195,7 @@ export class RaidScene extends Phaser.Scene {
       x: pointer.worldX,
       y: pointer.worldY
     };
+    this.townWarLookWorld = { x: pointerWorld.x, y: pointerWorld.y };
 
     if (this.activeRouteId !== raidController.state.activeRouteId) {
       this.redrawArena(raidController.state.world.width, raidController.state.world.height);
@@ -8029,6 +8246,9 @@ export class RaidScene extends Phaser.Scene {
     }
     if (Phaser.Input.Keyboard.JustDown(this.supportOrderKeys.holdPosition)) {
       raidController.queueFrontlineSupportOrder("hold-position");
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.supportOrderKeys.dropAmmoCrate)) {
+      raidController.queueFrontlineSupportOrder("drop-ammo-crate");
     }
 
     raidController.update(deltaSeconds);
@@ -8419,6 +8639,8 @@ export class RaidScene extends Phaser.Scene {
     for (const prop of route.scenicProps) {
       this.addScenicProp(layerChildren, prop, route);
     }
+
+    this.drawTownWarStaticArt(layerChildren, route);
 
     this.arenaLayer = this.add.container(0, 0, layerChildren);
     this.arenaLayer.setDepth(-20);
@@ -9071,6 +9293,596 @@ export class RaidScene extends Phaser.Scene {
     layerChildren.push(sprite);
   }
 
+  private drawTownWarStaticArt(
+    layerChildren: Phaser.GameObjects.GameObject[],
+    route: RaidRouteDefinition
+  ): void {
+    townWarController.ensureDemoSeeded();
+    const snapshot = townWarController.getSnapshot();
+
+    this.drawFirstTownEnvironmentalArt(layerChildren, route, snapshot.camps);
+    this.townWarPlayerCampArtObjects = [];
+
+    for (const camp of snapshot.camps) {
+      const beforeCount = layerChildren.length;
+      this.drawTownWarCampCompound(layerChildren, route, camp);
+      if (isTownWarPlayerFaction(camp.id)) {
+        this.townWarPlayerCampArtObjects = layerChildren.slice(beforeCount);
+        for (const object of this.townWarPlayerCampArtObjects) {
+          if ("setVisible" in object && typeof object.setVisible === "function") {
+            object.setVisible(this.townWarPlayerCampArtVisible);
+          }
+        }
+      }
+    }
+  }
+
+  private drawFirstTownEnvironmentalArt(
+    layerChildren: Phaser.GameObjects.GameObject[],
+    route: RaidRouteDefinition,
+    camps: TownWarCampState[]
+  ): void {
+    const campA = camps.find((camp) => camp.id === "camp-a") ?? null;
+    const campB = camps.find((camp) => camp.id === "camp-b") ?? null;
+    if (!campA || !campB) {
+      return;
+    }
+
+    const midY = (campA.spawn.position.y + campB.spawn.position.y) / 2;
+    const roadCenterX = (campA.spawn.position.x + campB.spawn.position.x) / 2;
+    const roadWidth = Math.abs(campA.spawn.position.x - campB.spawn.position.x) + 320;
+    const roadMatte = this.add.rectangle(roadCenterX, midY, roadWidth, 88, route.sceneTheme.shadowColor, 0.16);
+    roadMatte.setRotation(-0.015);
+    roadMatte.setDepth(midY * 0.001 - 0.12);
+    layerChildren.push(roadMatte);
+
+    for (let index = 0; index < 13; index += 1) {
+      const progress = index / 12;
+      const x = Phaser.Math.Linear(campB.spawn.position.x - 160, campA.spawn.position.x + 160, progress);
+      const y = midY + Math.sin(progress * Math.PI * 2.1) * 18;
+      this.addEnvironmentSheetSprite(layerChildren, "frontline-env-road-64", index % 4, x, y, {
+        rotation: -0.02 + Math.sin(index) * 0.035,
+        scale: 1.08,
+        alpha: 0.84,
+        depthBias: -0.09
+      });
+    }
+
+    const foliageAnchors = [
+      { x: campB.spawn.position.x - 230, y: midY - 230 },
+      { x: campB.spawn.position.x + 180, y: midY + 245 },
+      { x: roadCenterX - 320, y: midY - 320 },
+      { x: roadCenterX + 240, y: midY + 310 },
+      { x: campA.spawn.position.x - 210, y: midY - 260 },
+      { x: campA.spawn.position.x + 220, y: midY + 240 }
+    ];
+
+    foliageAnchors.forEach((anchor, anchorIndex) => {
+      for (let index = 0; index < 7; index += 1) {
+        const angle = anchorIndex * 1.7 + index * 0.92;
+        const distance = 22 + (index % 4) * 18;
+        this.addEnvironmentSheetSprite(
+          layerChildren,
+          "frontline-env-foliage-32",
+          (anchorIndex * 3 + index) % 16,
+          anchor.x + Math.cos(angle) * distance,
+          anchor.y + Math.sin(angle) * distance,
+          {
+            rotation: angle * 0.08,
+            scale: 1.05 + (index % 3) * 0.1,
+            alpha: 0.92,
+            depthBias: -0.03
+          }
+        );
+      }
+    });
+
+    for (let index = 0; index < 10; index += 1) {
+      const progress = index / 9;
+      const x = Phaser.Math.Linear(campB.spawn.position.x - 130, campA.spawn.position.x + 130, progress);
+      const y = midY + Math.sin(progress * Math.PI * 2.1) * 18;
+      this.addEnvironmentSheetSprite(layerChildren, "frontline-env-road-edge-64", index % 8, x, y - 56, {
+        rotation: -0.02,
+        scale: 0.98,
+        alpha: 0.74,
+        depthBias: -0.1
+      });
+      this.addEnvironmentSheetSprite(layerChildren, "frontline-env-road-edge-64", (index + 4) % 8, x, y + 58, {
+        rotation: Math.PI + 0.02,
+        scale: 0.98,
+        alpha: 0.7,
+        depthBias: -0.1
+      });
+    }
+
+    this.addEnvironmentImage(layerChildren, "frontline-env-ruined-house-128", roadCenterX - 220, midY - 175, {
+      rotation: -0.08,
+      scale: 1.22,
+      alpha: 0.9,
+      depthBias: -0.04
+    });
+    this.addEnvironmentSheetSprite(layerChildren, "frontline-env-props-64", 3, roadCenterX + 190, midY + 145, {
+      rotation: 0.2,
+      scale: 1.05,
+      alpha: 0.9,
+      depthBias: -0.02
+    });
+    this.addEnvironmentSheetSprite(layerChildren, "frontline-env-trench-64", 1, roadCenterX - 40, midY - 118, {
+      rotation: -0.04,
+      scale: 1.28,
+      alpha: 0.88,
+      depthBias: -0.05
+    });
+    this.addEnvironmentSheetSprite(layerChildren, "frontline-env-trench-64", 2, roadCenterX + 42, midY - 115, {
+      rotation: -0.04,
+      scale: 1.28,
+      alpha: 0.88,
+      depthBias: -0.05
+    });
+    this.addEnvironmentSheetSprite(layerChildren, "frontline-env-trench-edge-64", 1, roadCenterX - 122, midY - 118, {
+      rotation: -0.04,
+      scale: 1.12,
+      alpha: 0.82,
+      depthBias: -0.055
+    });
+    this.addEnvironmentSheetSprite(layerChildren, "frontline-env-trench-edge-64", 5, roadCenterX + 124, midY - 112, {
+      rotation: Math.PI - 0.04,
+      scale: 1.12,
+      alpha: 0.82,
+      depthBias: -0.055
+    });
+
+    const scarPlacements = [
+      { x: roadCenterX - 420, y: midY + 86, frame: 2, scale: 1.16, rotation: 0.18 },
+      { x: roadCenterX - 305, y: midY - 74, frame: 7, scale: 0.96, rotation: -0.14 },
+      { x: roadCenterX + 320, y: midY + 78, frame: 9, scale: 1.08, rotation: 0.08 },
+      { x: roadCenterX + 425, y: midY - 96, frame: 13, scale: 1.24, rotation: -0.2 },
+      { x: campB.spawn.position.x + 310, y: campB.spawn.position.y - 22, frame: 4, scale: 1.12, rotation: 0.1 },
+      { x: campA.spawn.position.x - 315, y: campA.spawn.position.y + 26, frame: 11, scale: 1.08, rotation: -0.08 }
+    ];
+    for (const scar of scarPlacements) {
+      this.addEnvironmentSheetSprite(layerChildren, "frontline-env-scars-64", scar.frame, scar.x, scar.y, {
+        rotation: scar.rotation,
+        scale: scar.scale,
+        alpha: 0.68,
+        depthBias: -0.12
+      });
+    }
+
+    for (let index = 0; index < 8; index += 1) {
+      const x = roadCenterX - 520 + index * 150;
+      const y = midY - 365 + Math.sin(index * 1.3) * 22;
+      this.addEnvironmentSheetSprite(layerChildren, "frontline-env-treeline-64", index % 16, x, y, {
+        rotation: Math.sin(index) * 0.12,
+        scale: 1.05 + (index % 3) * 0.08,
+        alpha: 0.88,
+        depthBias: -0.04
+      });
+      this.addEnvironmentSheetSprite(layerChildren, "frontline-env-concealment-64", (index * 2) % 16, x + 48, y + 54, {
+        rotation: -0.12 + index * 0.03,
+        scale: 0.88,
+        alpha: 0.8,
+        depthBias: -0.035
+      });
+    }
+
+    const ruinedTownPlacements = [
+      { key: "frontline-env-village-props-64", frame: 0, x: roadCenterX - 170, y: midY - 255, rotation: 0.1, scale: 1.05 },
+      { key: "frontline-env-village-props-64", frame: 3, x: roadCenterX - 92, y: midY - 245, rotation: -0.08, scale: 0.96 },
+      { key: "frontline-env-ruined-town-64", frame: 4, x: roadCenterX + 245, y: midY + 225, rotation: 0.24, scale: 1.08 },
+      { key: "frontline-env-industrial-ruins-64", frame: 2, x: roadCenterX + 318, y: midY + 185, rotation: -0.16, scale: 0.98 },
+      { key: "frontline-env-crater-field-64", frame: 5, x: roadCenterX + 82, y: midY + 270, rotation: 0.08, scale: 1.16 },
+      { key: "frontline-env-mud-water-64", frame: 10, x: roadCenterX - 372, y: midY + 215, rotation: -0.12, scale: 1.06 },
+      { key: "frontline-env-seasonal-foliage-64", frame: 6, x: campA.spawn.position.x + 272, y: campA.spawn.position.y - 170, rotation: 0.06, scale: 0.92 },
+      { key: "frontline-env-woodland-terrain-64", frame: 12, x: campB.spawn.position.x - 286, y: campB.spawn.position.y + 184, rotation: -0.04, scale: 1.1 }
+    ];
+    for (const prop of ruinedTownPlacements) {
+      this.addEnvironmentSheetSprite(layerChildren, prop.key, prop.frame, prop.x, prop.y, {
+        rotation: prop.rotation,
+        scale: prop.scale,
+        alpha: 0.82,
+        depthBias: -0.045
+      });
+    }
+
+    for (let index = 0; index < 18; index += 1) {
+      const side = index % 2 === 0 ? -1 : 1;
+      const x = roadCenterX + side * (255 + (index % 5) * 64);
+      const y = midY + (index < 9 ? -1 : 1) * (220 + ((index * 17) % 92));
+      this.addEnvironmentSheetSprite(layerChildren, "frontline-env-woodland-foliage-32", (index * 3) % 32, x, y, {
+        rotation: index * 0.07,
+        scale: 1 + (index % 4) * 0.12,
+        alpha: 0.86,
+        depthBias: -0.03
+      });
+    }
+
+    const ruralFieldPlacements = [
+      { key: "frontline-env-rural-field-64", frame: 0, x: roadCenterX - 560, y: midY - 170, rotation: -0.06, scale: 1.18 },
+      { key: "frontline-env-rural-field-64", frame: 2, x: roadCenterX - 496, y: midY - 168, rotation: -0.06, scale: 1.18 },
+      { key: "frontline-env-rural-field-64", frame: 5, x: roadCenterX - 528, y: midY - 104, rotation: -0.06, scale: 1.18 },
+      { key: "frontline-env-rural-field-64", frame: 6, x: roadCenterX + 520, y: midY + 178, rotation: 0.08, scale: 1.12 },
+      { key: "frontline-env-rural-field-64", frame: 3, x: roadCenterX + 584, y: midY + 176, rotation: 0.08, scale: 1.12 },
+      { key: "frontline-env-wet-mud-64", frame: 9, x: roadCenterX - 470, y: midY + 102, rotation: 0.12, scale: 1.08 },
+      { key: "frontline-env-wet-mud-64", frame: 14, x: roadCenterX + 456, y: midY - 132, rotation: -0.08, scale: 1.1 },
+      { key: "frontline-env-artillery-aftermath-64", frame: 4, x: roadCenterX - 132, y: midY + 336, rotation: 0.02, scale: 1.18 },
+      { key: "frontline-env-artillery-aftermath-64", frame: 11, x: roadCenterX + 158, y: midY - 318, rotation: -0.16, scale: 1.14 },
+      { key: "frontline-env-artillery-aftermath-64", frame: 15, x: roadCenterX + 388, y: midY + 308, rotation: 0.2, scale: 1.08 }
+    ];
+    for (const prop of ruralFieldPlacements) {
+      this.addEnvironmentSheetSprite(layerChildren, prop.key, prop.frame, prop.x, prop.y, {
+        rotation: prop.rotation,
+        scale: prop.scale,
+        alpha: 0.74,
+        depthBias: -0.13
+      });
+    }
+
+    for (let index = 0; index < 10; index += 1) {
+      const x = roadCenterX - 590 + index * 132;
+      const northY = midY - 430 + Math.sin(index * 0.8) * 16;
+      const southY = midY + 410 + Math.cos(index * 0.7) * 18;
+      this.addEnvironmentSheetSprite(layerChildren, "frontline-env-hedgerow-64", index % 8, x, northY, {
+        rotation: -0.04 + index * 0.012,
+        scale: 1.08,
+        alpha: 0.84,
+        depthBias: -0.032
+      });
+      this.addEnvironmentSheetSprite(layerChildren, "frontline-env-orchard-64", (index + 3) % 8, x + 52, southY, {
+        rotation: 0.08 - index * 0.01,
+        scale: 0.96,
+        alpha: 0.82,
+        depthBias: -0.03
+      });
+    }
+
+    const woodlandProps = [
+      { key: "frontline-env-woodland-trees-96", frame: 1, x: campB.spawn.position.x - 352, y: campB.spawn.position.y - 242, rotation: -0.08, scale: 0.98 },
+      { key: "frontline-env-woodland-trees-96", frame: 5, x: campA.spawn.position.x + 342, y: campA.spawn.position.y + 244, rotation: 0.1, scale: 0.94 },
+      { key: "frontline-env-woodland-logs-64", frame: 3, x: roadCenterX - 282, y: midY + 346, rotation: -0.18, scale: 1.08 },
+      { key: "frontline-env-woodland-logs-64", frame: 6, x: roadCenterX + 304, y: midY - 356, rotation: 0.14, scale: 1.02 },
+      { key: "frontline-env-woodland-treeline-128x96", frame: 0, x: roadCenterX - 618, y: midY + 306, rotation: -0.04, scale: 1 },
+      { key: "frontline-env-woodland-treeline-128x96", frame: 2, x: roadCenterX + 640, y: midY - 286, rotation: 0.06, scale: 1 }
+    ];
+    for (const prop of woodlandProps) {
+      this.addEnvironmentSheetSprite(layerChildren, prop.key, prop.frame, prop.x, prop.y, {
+        rotation: prop.rotation,
+        scale: prop.scale,
+        alpha: 0.86,
+        depthBias: -0.028
+      });
+    }
+
+    this.addEnvironmentImage(layerChildren, "frontline-env-woodland-deadfall-128x96", roadCenterX + 500, midY + 48, {
+      rotation: -0.14,
+      scale: 0.9,
+      alpha: 0.84,
+      depthBias: -0.035
+    });
+    this.addEnvironmentImage(layerChildren, "frontline-env-woodland-bushline-128", roadCenterX - 622, midY + 72, {
+      rotation: 0.08,
+      scale: 0.84,
+      alpha: 0.82,
+      depthBias: -0.034
+    });
+    this.addEnvironmentImage(layerChildren, "frontline-env-woodland-bare-tree-96", roadCenterX + 632, midY + 92, {
+      rotation: -0.06,
+      scale: 0.9,
+      alpha: 0.82,
+      depthBias: -0.03
+    });
+
+    for (let index = 0; index < 8; index += 1) {
+      this.addEnvironmentSheetSprite(
+        layerChildren,
+        "frontline-env-weather-64",
+        index,
+        roadCenterX - 448 + index * 128,
+        midY - 52 + Math.sin(index * 1.1) * 42,
+        {
+          rotation: -0.1 + index * 0.025,
+          scale: 1.12,
+          alpha: 0.16,
+          depthBias: 0.12
+        }
+      );
+    }
+  }
+
+  private drawTownWarCampCompound(
+    layerChildren: Phaser.GameObjects.GameObject[],
+    route: RaidRouteDefinition,
+    camp: TownWarCampState
+  ): void {
+    const center = camp.spawn.position;
+    const facing = isTownWarPlayerFaction(camp.id) ? -1 : 1;
+    const healthRatio = camp.health.max > 0 ? camp.health.current / camp.health.max : 0;
+    const accentColor = getTownWarFactionAccent(camp.id);
+    const campTint = getTownWarFactionColor(camp.id);
+
+    const isPlayerCamp = isTownWarPlayerFaction(camp.id);
+    const compoundWidth = isPlayerCamp ? 540 : 430;
+    const compoundHeight = isPlayerCamp ? 372 : 300;
+    const ground = this.add.ellipse(center.x, center.y + 8, compoundWidth, compoundHeight, route.sceneTheme.shadowColor, 0.26);
+    ground.setDepth(center.y * 0.001 - 0.14);
+    layerChildren.push(ground);
+
+    const perimeter = this.add.ellipse(center.x, center.y, compoundWidth - 46, compoundHeight - 46, campTint, 0.06);
+    perimeter.setStrokeStyle(3, accentColor, 0.24);
+    perimeter.setDepth(center.y * 0.001 - 0.13);
+    layerChildren.push(perimeter);
+
+    if (isPlayerCamp) {
+      const rearPad = this.add.ellipse(center.x + 128, center.y + 98, 260, 150, 0x0f172a, 0.22);
+      rearPad.setRotation(-0.08);
+      rearPad.setDepth(center.y * 0.001 - 0.125);
+      layerChildren.push(rearPad);
+
+      const forwardPad = this.add.ellipse(center.x - 178, center.y - 82, 244, 132, campTint, 0.07);
+      forwardPad.setRotation(0.18);
+      forwardPad.setStrokeStyle(2, accentColor, 0.16);
+      forwardPad.setDepth(center.y * 0.001 - 0.124);
+      layerChildren.push(forwardPad);
+    }
+
+    const damageRole: CampAssetRole = healthRatio <= 0.45 ? "command-damaged" : "command";
+    const tentRole: CampAssetRole = healthRatio <= 0.3 ? "tent-damaged" : "tent";
+    const placements: Array<{
+      role: CampAssetRole;
+      x: number;
+      y: number;
+      rotation?: number;
+      scale?: number;
+      alpha?: number;
+    }> = [
+      { role: damageRole, x: center.x, y: center.y - 18, scale: 1.22 },
+      { role: tentRole, x: center.x - facing * 118, y: center.y - 76, rotation: -0.08 * facing, scale: 1.04 },
+      { role: "supply", x: center.x - facing * 118, y: center.y + 56, rotation: 0.04 * facing, scale: 1.02 },
+      { role: "large-supply", x: center.x - facing * 20, y: center.y + 112, rotation: 0.02 * facing, scale: 0.88 },
+      { role: "truck", x: center.x + facing * 122, y: center.y + 76, rotation: facing > 0 ? 0.03 : Math.PI - 0.03, scale: 0.96 },
+      { role: "watch", x: center.x + facing * 142, y: center.y - 92, rotation: 0.04 * facing, scale: 0.9 },
+      { role: "radio", x: center.x + facing * 46, y: center.y - 122, scale: 0.92 },
+      { role: "mortar", x: center.x + facing * 168, y: center.y + 2, rotation: -0.08 * facing, scale: 0.88 },
+      { role: "medical", x: center.x - facing * 190, y: center.y + 10, rotation: 0.05 * facing, scale: 0.9 },
+      { role: "generator", x: center.x + facing * 52, y: center.y + 146, rotation: -0.06 * facing, scale: 0.88 },
+      { role: "camo-storage", x: center.x - facing * 34, y: center.y - 142, rotation: 0.02 * facing, scale: 0.75 },
+      { role: "kitchen", x: center.x - facing * 190, y: center.y - 70, rotation: -0.03 * facing, scale: 0.94 },
+      { role: "fuel", x: center.x + facing * 190, y: center.y + 132, rotation: 0.04 * facing, scale: 0.9 },
+      { role: "ammo", x: center.x - facing * 178, y: center.y + 100, rotation: 0.08 * facing, scale: 0.94 },
+      { role: "wreck", x: center.x + facing * 236, y: center.y - 34, rotation: 0.18 * facing, scale: 0.82, alpha: 0.82 },
+      { role: "checkpoint", x: center.x - facing * 252, y: center.y, rotation: Math.PI / 2, scale: 1 },
+      { role: "trench", x: center.x - facing * 64, y: center.y - 190, rotation: -0.08 * facing, scale: 1.12 },
+      { role: "wire", x: center.x - facing * 40, y: center.y + 198, rotation: 0.06 * facing, scale: 1.08 },
+      { role: "sandbag", x: center.x + facing * 80, y: center.y - 184, rotation: -0.04 * facing, scale: 1.06 },
+      { role: "sandbag", x: center.x + facing * 84, y: center.y + 190, rotation: 0.05 * facing, scale: 1.06 },
+      { role: "command-core", x: center.x + facing * 12, y: center.y - 46, rotation: -0.02 * facing, scale: 0.88, alpha: 0.94 },
+      { role: "large-tent", x: center.x - facing * 206, y: center.y - 124, rotation: 0.08 * facing, scale: 0.92 },
+      { role: "motor-pool", x: center.x + facing * 206, y: center.y + 102, rotation: facing > 0 ? -0.08 : Math.PI + 0.08, scale: 0.84 },
+      { role: "supply-dump", x: center.x - facing * 216, y: center.y + 154, rotation: -0.06 * facing, scale: 0.82 },
+      { role: "trench-gate", x: center.x + facing * 162, y: center.y - 202, rotation: -0.09 * facing, scale: 0.9 }
+    ];
+
+    if (isPlayerCamp) {
+      placements.push(
+        { role: "command-core", x: center.x + 28, y: center.y - 24, rotation: 0.02, scale: 1.02 },
+        { role: "large-tent", x: center.x + 210, y: center.y - 126, rotation: 0.08, scale: 0.96 },
+        { role: "large-tent", x: center.x + 240, y: center.y + 18, rotation: -0.06, scale: 0.92 },
+        { role: "motor-pool", x: center.x + 222, y: center.y + 122, rotation: Math.PI - 0.09, scale: 0.92 },
+        { role: "supply-dump", x: center.x + 94, y: center.y + 214, rotation: -0.04, scale: 0.96 },
+        { role: "trench-gate", x: center.x - 240, y: center.y - 164, rotation: -0.16, scale: 1.04 },
+        { role: "trench-gate", x: center.x - 232, y: center.y + 162, rotation: 0.14, scale: 1.02 },
+        { role: "sandbag", x: center.x - 282, y: center.y - 28, rotation: Math.PI / 2 - 0.06, scale: 1.08 },
+        { role: "wire", x: center.x - 292, y: center.y + 76, rotation: Math.PI / 2 + 0.08, scale: 1.04 },
+        { role: "watch", x: center.x + 286, y: center.y - 58, rotation: -0.04, scale: 0.82 },
+        { role: "ammo", x: center.x + 168, y: center.y + 212, rotation: 0.1, scale: 0.86 }
+      );
+    }
+
+    for (const placement of placements) {
+      this.addCampAssetSprite(layerChildren, route, camp, placement.role, placement.x, placement.y, {
+        rotation: placement.rotation,
+        scale: placement.scale,
+        alpha: placement.alpha
+      });
+    }
+
+    const campSheetPlacements: Array<{
+      sheet: CampAssetSheet;
+      frame: number;
+      x: number;
+      y: number;
+      rotation?: number;
+      scale?: number;
+      alpha?: number;
+      shadow?: boolean;
+    }> = [
+      { sheet: "modules-64", frame: 0, x: center.x - facing * 72, y: center.y - 18, rotation: 0.04 * facing, scale: 0.9 },
+      { sheet: "modules-64", frame: 5, x: center.x + facing * 76, y: center.y + 38, rotation: -0.08 * facing, scale: 0.86 },
+      { sheet: "services-64", frame: 1, x: center.x - facing * 148, y: center.y - 18, rotation: 0.12 * facing, scale: 0.82 },
+      { sheet: "services-64", frame: 3, x: center.x + facing * 122, y: center.y + 132, rotation: -0.06 * facing, scale: 0.8 },
+      { sheet: "interiors-64", frame: 2, x: center.x - facing * 34, y: center.y + 44, rotation: -0.04 * facing, scale: 0.74 },
+      { sheet: "heavy-64", frame: 4, x: center.x + facing * 214, y: center.y - 98, rotation: 0.22 * facing, scale: 0.92 },
+      { sheet: "perimeter-64", frame: 1, x: center.x - facing * 222, y: center.y - 122, rotation: -0.18 * facing, scale: 1.04 },
+      { sheet: "perimeter-64", frame: 6, x: center.x - facing * 230, y: center.y + 128, rotation: 0.16 * facing, scale: 1.04 },
+      { sheet: "supply-stacks-64", frame: 3, x: center.x - facing * 92, y: center.y + 128, rotation: 0.06 * facing, scale: 0.9 },
+      { sheet: "supply-stacks-64", frame: 7, x: center.x - facing * 154, y: center.y + 142, rotation: -0.03 * facing, scale: 0.82 },
+      { sheet: "trench-modules-64", frame: 2, x: center.x + facing * 8, y: center.y - 222, rotation: -0.08 * facing, scale: 1.08 },
+      { sheet: "trench-modules-64", frame: 6, x: center.x - facing * 10, y: center.y + 228, rotation: Math.PI + 0.08 * facing, scale: 1.08 },
+      { sheet: "damage-64", frame: 5, x: center.x + facing * 20, y: center.y + 4, rotation: -0.16, scale: 1.06, alpha: 0.56, shadow: false },
+      { sheet: "damage-64", frame: healthRatio <= 0.45 ? 10 : 2, x: center.x + facing * 112, y: center.y - 28, rotation: 0.24, scale: 0.84, alpha: 0.46, shadow: false },
+      { sheet: "fieldwork-stages-64", frame: 2, x: center.x + facing * 196, y: center.y + 64, rotation: 0.12 * facing, scale: 0.78 },
+      { sheet: "logistics-markers-32", frame: 4, x: center.x - facing * 104, y: center.y + 6, rotation: 0.02, scale: 1.16, shadow: false },
+      { sheet: "signal-panels-32", frame: 1, x: center.x + facing * 68, y: center.y - 146, rotation: -0.05 * facing, scale: 1.14, shadow: false },
+      { sheet: "ground-markers-32", frame: 6, x: center.x - facing * 246, y: center.y + 54, rotation: 0.08 * facing, scale: 1.2, shadow: false },
+      { sheet: "props-32", frame: 8, x: center.x + facing * 158, y: center.y - 42, rotation: -0.1 * facing, scale: 1.05, shadow: false },
+      { sheet: "props-32", frame: 13, x: center.x - facing * 12, y: center.y + 154, rotation: 0.04 * facing, scale: 1.1, shadow: false },
+      { sheet: "abandoned-64", frame: 0, x: center.x + facing * 252, y: center.y + 22, rotation: -0.16 * facing, scale: 0.86, alpha: 0.76 },
+      { sheet: "abandoned-64", frame: 5, x: center.x - facing * 258, y: center.y - 38, rotation: 0.12 * facing, scale: 0.82, alpha: 0.72 },
+      { sheet: "camo-command-64", frame: 2, x: center.x + facing * 28, y: center.y - 166, rotation: -0.03 * facing, scale: 0.88, alpha: 0.86 },
+      { sheet: "camo-command-64", frame: 6, x: center.x - facing * 96, y: center.y - 154, rotation: 0.07 * facing, scale: 0.78, alpha: 0.82 },
+      { sheet: "night-watch-64", frame: 1, x: center.x + facing * 224, y: center.y - 150, rotation: 0.1 * facing, scale: 0.82, alpha: 0.88 },
+      { sheet: "night-watch-64", frame: 4, x: center.x - facing * 224, y: center.y + 204, rotation: -0.08 * facing, scale: 0.76, alpha: 0.74 },
+      { sheet: "recovery-medical-64", frame: 2, x: center.x - facing * 238, y: center.y + 44, rotation: 0.04 * facing, scale: 0.82, alpha: 0.9 },
+      { sheet: "recovery-medical-64", frame: 7, x: center.x - facing * 184, y: center.y + 164, rotation: -0.1 * facing, scale: 0.74, alpha: 0.84 }
+    ];
+
+    if (isPlayerCamp) {
+      campSheetPlacements.push(
+        { sheet: "camo-command-64", frame: 5, x: center.x - 22, y: center.y - 92, rotation: 0.04, scale: 1.1, alpha: 0.88 },
+        { sheet: "camo-command-64", frame: 9, x: center.x + 86, y: center.y - 76, rotation: -0.08, scale: 0.94, alpha: 0.86 },
+        { sheet: "night-watch-64", frame: 2, x: center.x + 292, y: center.y + 34, rotation: 0.12, scale: 0.86 },
+        { sheet: "night-watch-64", frame: 7, x: center.x - 292, y: center.y - 92, rotation: -0.14, scale: 0.88 },
+        { sheet: "recovery-medical-64", frame: 4, x: center.x + 188, y: center.y - 206, rotation: 0.07, scale: 0.92 },
+        { sheet: "recovery-medical-64", frame: 10, x: center.x + 146, y: center.y - 156, rotation: -0.1, scale: 0.86 },
+        { sheet: "abandoned-64", frame: 3, x: center.x - 124, y: center.y + 218, rotation: 0.18, scale: 0.92, alpha: 0.72 },
+        { sheet: "abandoned-64", frame: 11, x: center.x + 272, y: center.y + 178, rotation: -0.16, scale: 0.82, alpha: 0.68 },
+        { sheet: "ground-markers-32", frame: 12, x: center.x + 28, y: center.y + 92, rotation: 0.02, scale: 1.28, shadow: false },
+        { sheet: "logistics-markers-32", frame: 9, x: center.x + 244, y: center.y + 96, rotation: -0.04, scale: 1.2, shadow: false },
+        { sheet: "signal-panels-32", frame: 6, x: center.x + 18, y: center.y - 154, rotation: 0.05, scale: 1.12, shadow: false },
+        { sheet: "props-32", frame: 21, x: center.x + 118, y: center.y + 186, rotation: -0.08, scale: 1.08, shadow: false },
+        { sheet: "props-32", frame: 27, x: center.x - 252, y: center.y + 22, rotation: 0.16, scale: 1.04, shadow: false }
+      );
+    }
+
+    for (const placement of campSheetPlacements) {
+      this.addCampSheetSprite(layerChildren, route, camp, placement.sheet, placement.frame, placement.x, placement.y, {
+        rotation: placement.rotation,
+        scale: placement.scale,
+        alpha: placement.alpha,
+        shadow: placement.shadow
+      });
+    }
+
+    const label = this.add
+      .text(center.x, center.y - (isPlayerCamp ? 230 : 178), isPlayerCamp ? "RUSSIAN PLAYER CAMP" : "UKRAINIAN ENEMY CAMP", {
+        fontFamily: "monospace",
+        fontSize: "12px",
+        color: isPlayerCamp ? "#fde68a" : "#bfdbfe"
+      })
+      .setOrigin(0.5, 1)
+      .setAlpha(0.74);
+    label.setShadow(0, 1, "#020617", 5, false, true);
+    label.setDepth(center.y * 0.001 + 0.22);
+    layerChildren.push(label);
+  }
+
+  private addCampAssetSprite(
+    layerChildren: Phaser.GameObjects.GameObject[],
+    route: RaidRouteDefinition,
+    camp: TownWarCampState,
+    role: CampAssetRole,
+    x: number,
+    y: number,
+    options: {
+      rotation?: number;
+      scale?: number;
+      alpha?: number;
+    } = {}
+  ): void {
+    const textureKey = getFrontlineCampAssetKey(camp.id, role);
+    const scale = options.scale ?? 1;
+    const shadow = this.add.ellipse(x + 8, y + 10, 84 * scale, 34 * scale, route.sceneTheme.shadowColor, 0.28);
+    shadow.setRotation(options.rotation ?? 0);
+    shadow.setDepth(y * 0.001 - 0.03);
+    layerChildren.push(shadow);
+
+    if (!this.textures.exists(textureKey)) {
+      return;
+    }
+
+    const sprite = this.add.sprite(x, y, textureKey);
+    sprite.setRotation(options.rotation ?? 0);
+    sprite.setScale(scale);
+    sprite.setAlpha(options.alpha ?? (camp.destroyed ? 0.54 : 1));
+    sprite.setDepth(y * 0.001 + 0.02);
+    layerChildren.push(sprite);
+  }
+
+  private addCampSheetSprite(
+    layerChildren: Phaser.GameObjects.GameObject[],
+    route: RaidRouteDefinition,
+    camp: TownWarCampState,
+    sheet: CampAssetSheet,
+    frame: number,
+    x: number,
+    y: number,
+    options: {
+      rotation?: number;
+      scale?: number;
+      alpha?: number;
+      shadow?: boolean;
+    } = {}
+  ): void {
+    const textureKey = getFrontlineCampSheetKey(camp.id, sheet);
+    if (!this.textures.exists(textureKey)) {
+      return;
+    }
+
+    const scale = options.scale ?? 1;
+    if (options.shadow !== false) {
+      const shadow = this.add.ellipse(x + 6, y + 8, 46 * scale, 18 * scale, route.sceneTheme.shadowColor, 0.22);
+      shadow.setRotation(options.rotation ?? 0);
+      shadow.setDepth(y * 0.001 - 0.035);
+      layerChildren.push(shadow);
+    }
+
+    const sprite = this.add.sprite(x, y, textureKey, frame);
+    sprite.setRotation(options.rotation ?? 0);
+    sprite.setScale(scale);
+    sprite.setAlpha(options.alpha ?? (camp.destroyed ? 0.48 : 0.92));
+    sprite.setDepth(y * 0.001 + 0.018);
+    layerChildren.push(sprite);
+  }
+
+  private addEnvironmentSheetSprite(
+    layerChildren: Phaser.GameObjects.GameObject[],
+    textureKey: string,
+    frame: number,
+    x: number,
+    y: number,
+    options: {
+      rotation?: number;
+      scale?: number;
+      alpha?: number;
+      depthBias?: number;
+    } = {}
+  ): void {
+    if (!this.textures.exists(textureKey)) {
+      return;
+    }
+
+    const sprite = this.add.sprite(x, y, textureKey, frame);
+    sprite.setRotation(options.rotation ?? 0);
+    sprite.setScale(options.scale ?? 1);
+    sprite.setAlpha(options.alpha ?? 1);
+    sprite.setDepth(y * 0.001 + (options.depthBias ?? -0.02));
+    layerChildren.push(sprite);
+  }
+
+  private addEnvironmentImage(
+    layerChildren: Phaser.GameObjects.GameObject[],
+    textureKey: string,
+    x: number,
+    y: number,
+    options: {
+      rotation?: number;
+      scale?: number;
+      alpha?: number;
+      depthBias?: number;
+    } = {}
+  ): void {
+    if (!this.textures.exists(textureKey)) {
+      return;
+    }
+
+    const sprite = this.add.sprite(x, y, textureKey);
+    sprite.setRotation(options.rotation ?? 0);
+    sprite.setScale(options.scale ?? 1);
+    sprite.setAlpha(options.alpha ?? 1);
+    sprite.setDepth(y * 0.001 + (options.depthBias ?? -0.02));
+    layerChildren.push(sprite);
+  }
+
   private addGroundDecal(layerChildren: Phaser.GameObjects.GameObject[], decal: GroundDecalDefinition): Phaser.GameObjects.Sprite {
     const sprite = this.add.sprite(decal.position.x, decal.position.y, getGroundTextureKey(decal.kind));
     sprite.setRotation(decal.rotation ?? 0);
@@ -9184,7 +9996,7 @@ export class RaidScene extends Phaser.Scene {
 
   private isSupportRepresentedByFriendlyCombatant(
     support: FrontlineSupportState,
-    friendlyCombatants: ReadonlyArray<{ ownerKind: "squadmate" | "support" | "incident"; ownerId: string | number }>
+    friendlyCombatants: ReadonlyArray<{ ownerKind: "squadmate" | "support" | "incident" | "camp-garrison"; ownerId: string | number }>
   ): boolean {
     return (
       (support.playerEscort && friendlyCombatants.some((combatant) => combatant.ownerKind === "squadmate")) ||
@@ -9195,7 +10007,7 @@ export class RaidScene extends Phaser.Scene {
 
   private isIncidentRepresentedByFriendlyCombatant(
     incident: FrontlineIncidentState,
-    friendlyCombatants: ReadonlyArray<{ ownerKind: "squadmate" | "support" | "incident"; ownerId: string | number }>
+    friendlyCombatants: ReadonlyArray<{ ownerKind: "squadmate" | "support" | "incident" | "camp-garrison"; ownerId: string | number }>
   ): boolean {
     return (
       incident.kind === "firefight" &&
@@ -9215,6 +10027,1149 @@ export class RaidScene extends Phaser.Scene {
     return grenades.filter((grenade) => this.isPointNearCamera(grenade.position, 200) || this.isPointNearCamera(grenade.target, 220));
   }
 
+  private drawTownWarCampArt(): void {
+    const snapshot = townWarController.getSnapshot();
+    const pulse = (Math.sin(this.time.now / 420) + 1) * 0.5;
+    let campLabelCount = 0;
+
+    this.drawTownWarFieldworks(snapshot, pulse);
+
+    for (const camp of snapshot.camps) {
+      if (!camp.destroyed && this.isPointNearCamera(camp.spawn.position, 430)) {
+        campLabelCount = this.drawTownWarCampStatusRing(camp, snapshot.soldiers, snapshot.casualties, pulse, campLabelCount);
+      }
+    }
+    this.hideUnusedObjectiveLabels(this.townWarCampLabels, campLabelCount);
+  }
+
+  private drawTownWarFieldworks(snapshot: ReturnType<typeof townWarController.getSnapshot>, pulse: number): void {
+    const graphics = this.townWarCampGraphics;
+    const preview = townWarController.getBuildPlacementPreview();
+    let fieldworkLabelCount = 0;
+    const getTrenchGroupId = (sourceId: string | null): string | null => {
+      if (!sourceId) {
+        return null;
+      }
+      return sourceId.split(":slot-")[0] ?? sourceId;
+    };
+    const trenchGroups = new Map<
+      string,
+      {
+        x: number;
+        y: number;
+        count: number;
+        occupied: number;
+        occupiedIds: string[];
+        faction: "camp-a" | "camp-b" | null;
+        angle: number;
+        protection: number;
+        slots: (typeof snapshot.aiTactics.coverSlots)[number][];
+      }
+    >();
+    for (const slot of snapshot.aiTactics.coverSlots) {
+      if (slot.sourceKind !== "trench") {
+        continue;
+      }
+      const groupId = getTrenchGroupId(slot.sourceId) ?? slot.id;
+      const group =
+        trenchGroups.get(groupId) ??
+        {
+          x: 0,
+          y: 0,
+          count: 0,
+          occupied: 0,
+          occupiedIds: [],
+          faction: slot.faction,
+          angle: Number.isFinite(slot.facingAngleRadians) ? slot.facingAngleRadians : slot.facing === "camp-a" ? Math.PI : 0,
+          protection: slot.protection,
+          slots: []
+        };
+      group.x += slot.position.x;
+      group.y += slot.position.y;
+      group.count += 1;
+      group.protection = Math.max(group.protection, slot.protection);
+      group.slots.push(slot);
+      if (slot.occupiedBySoldierId !== null) {
+        group.occupied += 1;
+        group.occupiedIds.push(slot.occupiedBySoldierId);
+      }
+      trenchGroups.set(groupId, group);
+    }
+    const labeledTrenchGroups = new Set<string>();
+    const completedImpactLabels = new Set<string>();
+    const combatProofLabels = new Set<string>();
+    const drawTrenchFootprint = (
+      x: number,
+      y: number,
+      angle: number,
+      color: number,
+      accent: number,
+      alpha: number,
+      state: "ghost" | "rough" | "complete" | "occupied" | "damaged",
+      occupiedCount = 0
+    ): void => {
+      const dx = Math.cos(angle);
+      const dy = Math.sin(angle);
+      const nx = -dy;
+      const ny = dx;
+      const halfLength = 56;
+      const isGhost = state === "ghost";
+      const isRough = state === "rough";
+      const isOccupied = state === "occupied";
+      const trenchAlpha = isGhost ? alpha * 0.62 : alpha;
+      const rimColor = isRough ? 0x6b4a24 : 0x5b3a1b;
+      const darkMud = state === "damaged" ? 0x09090b : 0x111827;
+      const wetMud = state === "damaged" ? 0x2b1d15 : 0x3f2a16;
+      const lipWidth = isRough ? 14 : 19;
+      const cutWidth = isRough ? 7 : 11;
+
+      graphics.fillStyle(0x020617, trenchAlpha * 0.24);
+      graphics.fillEllipse(x, y + 10, 150, 54);
+      graphics.lineStyle(lipWidth + 10, 0x1f1308, trenchAlpha * 0.22);
+      graphics.lineBetween(x - dx * (halfLength + 8), y - dy * (halfLength + 8), x + dx * (halfLength + 8), y + dy * (halfLength + 8));
+      graphics.lineStyle(lipWidth, rimColor, trenchAlpha * (isGhost ? 0.52 : 0.92));
+      graphics.lineBetween(x - dx * halfLength, y - dy * halfLength, x + dx * halfLength, y + dy * halfLength);
+      graphics.lineStyle(lipWidth - 5, wetMud, trenchAlpha * 0.9);
+      graphics.lineBetween(x - dx * 54, y - dy * 54, x + dx * 54, y + dy * 54);
+      graphics.lineStyle(cutWidth, darkMud, Math.min(0.98, trenchAlpha + 0.14));
+      graphics.lineBetween(x - dx * 51, y - dy * 51, x + dx * 51, y + dy * 51);
+      graphics.lineStyle(3, color, isOccupied ? 0.94 : Math.max(0.3, trenchAlpha * 0.54));
+      graphics.lineBetween(x - dx * 56 + nx * -10, y - dy * 56 + ny * -10, x + dx * 56 + nx * -10, y + dy * 56 + ny * -10);
+      graphics.lineBetween(x - dx * 56 + nx * 10, y - dy * 56 + ny * 10, x + dx * 56 + nx * 10, y + dy * 56 + ny * 10);
+
+      graphics.lineStyle(2, 0x8b5e34, trenchAlpha * 0.62);
+      for (let offset = -45; offset <= 45; offset += 15) {
+        const wobble = Math.sin(offset * 1.7) * 2;
+        graphics.lineBetween(
+          x + dx * offset + nx * (-17 + wobble),
+          y + dy * offset + ny * (-17 + wobble),
+          x + dx * (offset + 8) + nx * (-13 + wobble),
+          y + dy * (offset + 8) + ny * (-13 + wobble)
+        );
+        graphics.lineBetween(
+          x + dx * offset + nx * (17 - wobble),
+          y + dy * offset + ny * (17 - wobble),
+          x + dx * (offset + 8) + nx * (13 - wobble),
+          y + dy * (offset + 8) + ny * (13 - wobble)
+        );
+      }
+
+      graphics.lineStyle(2, accent, Math.max(0.26, trenchAlpha * 0.5 + pulse * 0.1));
+      for (let offset = -36; offset <= 36; offset += 18) {
+        const cx = x + dx * offset;
+        const cy = y + dy * offset;
+        graphics.lineBetween(cx - nx * 12, cy - ny * 12, cx + nx * 12, cy + ny * 12);
+      }
+
+      graphics.lineStyle(2, accent, Math.max(0.34, trenchAlpha * 0.56));
+      graphics.lineBetween(x + dx * 66 - nx * 11, y + dy * 66 - ny * 11, x + dx * 66 + nx * 11, y + dy * 66 + ny * 11);
+
+      graphics.fillStyle(accent, isGhost ? 0.28 : 0.7);
+      graphics.fillTriangle(x + nx * 30, y + ny * 30, x + nx * 20 - dx * 7, y + ny * 20 - dy * 7, x + nx * 20 + dx * 7, y + ny * 20 + dy * 7);
+      if (occupiedCount > 0) {
+        graphics.fillStyle(0x0f172a, 0.78);
+        graphics.fillRoundedRect(x - 16, y - 13, 32, 16, 5);
+        graphics.lineStyle(2, accent, 0.84);
+        graphics.strokeRoundedRect(x - 16, y - 13, 32, 16, 5);
+      }
+    };
+    const drawDugoutFootprint = (
+      x: number,
+      y: number,
+      angle: number,
+      color: number,
+      alpha: number,
+      status: "ghost" | "building" | "active" | "contested" | "damaged" | "destroyed"
+    ): void => {
+      const dx = Math.cos(angle);
+      const dy = Math.sin(angle);
+      const nx = -dy;
+      const ny = dx;
+      const fill = status === "contested" ? 0x7f1d1d : status === "damaged" || status === "destroyed" ? 0x292524 : 0x3f2a16;
+      const rim = status === "contested" ? 0xfb7185 : status === "damaged" || status === "destroyed" ? 0xf97316 : color;
+      graphics.fillStyle(0x020617, alpha * 0.28);
+      graphics.fillEllipse(x, y + 14, 106, 52);
+      graphics.fillStyle(fill, alpha * 0.82);
+      graphics.fillRoundedRect(x - 36, y - 24, 72, 48, 7);
+      graphics.lineStyle(4, 0x111827, alpha * 0.72);
+      graphics.strokeRoundedRect(x - 38, y - 26, 76, 52, 7);
+      graphics.lineStyle(2, rim, status === "ghost" ? alpha * 0.64 : alpha);
+      graphics.strokeRoundedRect(x - 34, y - 22, 68, 44, 6);
+      graphics.lineStyle(3, rim, alpha * 0.72);
+      graphics.lineBetween(x + dx * 8 - nx * 24, y + dy * 8 - ny * 24, x + dx * 8 + nx * 24, y + dy * 8 + ny * 24);
+      graphics.fillStyle(rim, alpha * 0.86);
+      graphics.fillTriangle(x + dx * 46, y + dy * 46, x + dx * 28 + nx * 8, y + dy * 28 + ny * 8, x + dx * 28 - nx * 8, y + dy * 28 - ny * 8);
+    };
+    const getTrenchSlotUsers = (
+      slot: (typeof snapshot.aiTactics.coverSlots)[number]
+    ): {
+      occupant: (typeof snapshot.soldiers)[number] | null;
+      mover: (typeof snapshot.soldiers)[number] | null;
+      reserver: (typeof snapshot.soldiers)[number] | null;
+    } => {
+      const occupant =
+        slot.occupiedBySoldierId
+          ? snapshot.soldiers.find(
+              (soldier) =>
+                soldier.id === slot.occupiedBySoldierId &&
+                soldier.health.current > 0 &&
+                soldier.faction === slot.faction &&
+                soldier.coverIntent.coverSlotId === slot.id &&
+                soldier.coverIntent.state === "occupying" &&
+                Phaser.Math.Distance.Between(soldier.position.x, soldier.position.y, slot.position.x, slot.position.y) <= 48
+            ) ?? null
+          : null;
+      const mover =
+        snapshot.soldiers.find(
+          (soldier) =>
+            soldier.id !== occupant?.id &&
+            soldier.health.current > 0 &&
+            soldier.faction === slot.faction &&
+            soldier.task.kind === "move" &&
+            soldier.task.targetEntityId === slot.id
+        ) ?? null;
+      const reserver =
+        snapshot.soldiers.find(
+          (soldier) =>
+            soldier.id !== occupant?.id &&
+            soldier.id !== mover?.id &&
+            soldier.health.current > 0 &&
+            soldier.faction === slot.faction &&
+            soldier.coverIntent.coverSlotId === slot.id
+        ) ?? null;
+      return { occupant, mover, reserver };
+    };
+    const getNearestEnemyDistanceToSlot = (slot: (typeof snapshot.aiTactics.coverSlots)[number]): number => {
+      return snapshot.combatants.reduce((nearest, combatant) => {
+        if (combatant.faction === slot.faction || combatant.health.current <= 0) {
+          return nearest;
+        }
+        return Math.min(nearest, Phaser.Math.Distance.Between(slot.position.x, slot.position.y, combatant.position.x, combatant.position.y));
+      }, Number.POSITIVE_INFINITY);
+    };
+    const getNearestEnemyToSlot = (slot: (typeof snapshot.aiTactics.coverSlots)[number]): (typeof snapshot.combatants)[number] | null => {
+      return snapshot.combatants.reduce<(typeof snapshot.combatants)[number] | null>((best, combatant) => {
+        if (combatant.faction === slot.faction || combatant.health.current <= 0) {
+          return best;
+        }
+        if (!best) {
+          return combatant;
+        }
+        return Phaser.Math.Distance.Between(slot.position.x, slot.position.y, combatant.position.x, combatant.position.y) <
+          Phaser.Math.Distance.Between(slot.position.x, slot.position.y, best.position.x, best.position.y)
+          ? combatant
+          : best;
+      }, null);
+    };
+    const drawTrenchSlotStateMarker = (
+      slot: (typeof snapshot.aiTactics.coverSlots)[number],
+      angle: number,
+      state: "reserved" | "occupied" | "contested" | "abandoned",
+      accent: number,
+      user: (typeof snapshot.soldiers)[number] | null
+    ): void => {
+      const dx = Math.cos(angle);
+      const dy = Math.sin(angle);
+      const nx = -dy;
+      const ny = dx;
+      const x = slot.position.x;
+      const y = slot.position.y;
+      const color = state === "occupied" ? accent : state === "reserved" ? 0x38bdf8 : state === "contested" ? 0xfb7185 : 0x94a3b8;
+      const alpha = state === "abandoned" ? 0.34 : 0.74 + pulse * 0.16;
+
+      graphics.lineStyle(state === "reserved" ? 2 : 3, color, alpha);
+      graphics.strokeCircle(x + nx * 15, y + ny * 15, state === "abandoned" ? 7 : 9 + pulse * 1.2);
+      if (state === "reserved") {
+        graphics.lineStyle(2, color, 0.54);
+        graphics.lineBetween(x - dx * 12 + nx * 15, y - dy * 12 + ny * 15, x + dx * 12 + nx * 15, y + dy * 12 + ny * 15);
+        if (user) {
+          graphics.lineStyle(2, color, 0.28 + pulse * 0.18);
+          graphics.lineBetween(user.position.x, user.position.y, x, y);
+          graphics.fillStyle(color, 0.72);
+          graphics.fillTriangle(x - dx * 8, y - dy * 8, x - dx * 18 + nx * 5, y - dy * 18 + ny * 5, x - dx * 18 - nx * 5, y - dy * 18 - ny * 5);
+        }
+      }
+      if (state === "contested") {
+        graphics.lineStyle(2, color, 0.64 + pulse * 0.18);
+        graphics.lineBetween(x - nx * 22 - dx * 8, y - ny * 22 - dy * 8, x - nx * 22 + dx * 8, y - ny * 22 + dy * 8);
+        graphics.lineBetween(x - nx * 22 + dx * 8, y - ny * 22 - dy * 8, x - nx * 22 - dx * 8, y - ny * 22 + dy * 8);
+      }
+      if (state === "abandoned") {
+        graphics.lineStyle(2, color, alpha);
+        graphics.lineBetween(x + nx * 8 - dx * 8, y + ny * 8 - dy * 8, x + nx * 22 + dx * 8, y + ny * 22 + dy * 8);
+      }
+    };
+    const getTrenchDirectionRead = (slot: (typeof snapshot.aiTactics.coverSlots)[number], angle: number): { text: string; color: string } => {
+      const nearestEnemy = snapshot.combatants.reduce<(typeof snapshot.combatants)[number] | null>((best, combatant) => {
+        if (combatant.faction === slot.faction) {
+          return best;
+        }
+        if (!best) {
+          return combatant;
+        }
+        return Phaser.Math.Distance.Between(slot.position.x, slot.position.y, combatant.position.x, combatant.position.y) <
+          Phaser.Math.Distance.Between(slot.position.x, slot.position.y, best.position.x, best.position.y)
+          ? combatant
+          : best;
+      }, null);
+
+      if (!nearestEnemy) {
+        return {
+          text: `TRENCH HOLD\n-${Math.round(slot.protection * 72)}% PRESSURE`,
+          color: getTownWarEnemyTextColor(slot.faction)
+        };
+      }
+
+      const fullTurn = Math.PI * 2;
+      const incomingAngle = Math.atan2(nearestEnemy.position.y - slot.position.y, nearestEnemy.position.x - slot.position.x);
+      const rawDelta = Math.abs(((incomingAngle - angle) % fullTurn + fullTurn) % fullTurn);
+      const delta = rawDelta > Math.PI ? fullTurn - rawDelta : rawDelta;
+      const fit = Phaser.Math.Clamp(Math.abs(Math.sin(delta)), 0, 1);
+      const pressureReduction = Math.round(Phaser.Math.Clamp(slot.protection * (0.22 + fit * 0.94), 0, 1) * 72);
+      if (fit >= 0.72) {
+        return { text: `FRONT TRENCH\n-${pressureReduction}% PRESSURE`, color: getTownWarEnemyTextColor(slot.faction) };
+      }
+      if (fit >= 0.38) {
+        return { text: `ANGLED TRENCH\n-${pressureReduction}% PRESSURE`, color: "#fed7aa" };
+      }
+      return { text: "ENFILADED\nCOVER WEAK", color: "#fca5a5" };
+    };
+    const getTrenchSlotCallout = (
+      slot: (typeof snapshot.aiTactics.coverSlots)[number],
+      angle: number
+    ): { text: string; color: string; state: "reserved" | "occupied" | "contested" | "abandoned"; user: (typeof snapshot.soldiers)[number] | null } => {
+      const users = getTrenchSlotUsers(slot);
+      const enemyDistance = getNearestEnemyDistanceToSlot(slot);
+      const directionRead = getTrenchDirectionRead(slot, angle);
+      const occupantPressure = users.occupant ? users.occupant.morale.pressure / Math.max(1, users.occupant.morale.maxPressure) : 0;
+      if (users.occupant) {
+        if (enemyDistance <= 150) {
+          return { text: "CONTESTED\nCLOSE CONTACT", color: "#fca5a5", state: "contested", user: users.occupant };
+        }
+        if (directionRead.text.startsWith("ENFILADED")) {
+          return { text: "LEAVING\nEXPOSED FLANK", color: "#fca5a5", state: "occupied", user: users.occupant };
+        }
+        if (occupantPressure >= 0.48) {
+          return { text: "PINNED\nIN TRENCH", color: "#fde68a", state: "occupied", user: users.occupant };
+        }
+        return { text: "HOLDING\nFIRING SLIT", color: getTownWarEnemyTextColor(slot.faction), state: "occupied", user: users.occupant };
+      }
+      if (users.mover || users.reserver) {
+        const user = users.mover ?? users.reserver;
+        return {
+          text: users.mover ? "TAKING\nTRENCH" : "RESERVED\nFIRING BAY",
+          color: "#bae6fd",
+          state: "reserved",
+          user
+        };
+      }
+      if (enemyDistance <= 150) {
+        return { text: "CONTESTED\nNO HOLDER", color: "#fca5a5", state: "contested", user: null };
+      }
+      return { text: "EMPTY\nNO DEFENDER", color: "#cbd5e1", state: "abandoned", user: null };
+    };
+    const getTrenchCombatProof = (
+      slot: (typeof snapshot.aiTactics.coverSlots)[number],
+      angle: number
+    ): { text: string; color: string; tone: "good" | "warn" | "bad"; occupant: (typeof snapshot.soldiers)[number] | null } | null => {
+      const users = getTrenchSlotUsers(slot);
+      const occupant = users.occupant;
+      if (!occupant) {
+        return null;
+      }
+
+      const directionRead = getTrenchDirectionRead(slot, angle);
+      const nearestEnemy = getNearestEnemyToSlot(slot);
+      const pressureRatio = occupant.morale.pressure / Math.max(1, occupant.morale.maxPressure);
+      const pressureSaved = Math.round(slot.protection * (directionRead.text.startsWith("FRONT") ? 68 : directionRead.text.startsWith("ANGLED") ? 42 : 14));
+      if (directionRead.text.startsWith("ENFILADED")) {
+        return { text: "FLANKED\nCOVER WEAK", color: "#fca5a5", tone: "bad", occupant };
+      }
+      if (nearestEnemy && Phaser.Math.Distance.Between(slot.position.x, slot.position.y, nearestEnemy.position.x, nearestEnemy.position.y) <= 360) {
+        return {
+          text: directionRead.text.startsWith("FRONT")
+            ? `PRESSURE REDUCED\nBY TRENCH -${pressureSaved}%`
+            : `ANGLED COVER\n-${pressureSaved}% PRESSURE`,
+          color: directionRead.text.startsWith("FRONT") ? "#bbf7d0" : "#fed7aa",
+          tone: directionRead.text.startsWith("FRONT") ? "good" : "warn",
+          occupant
+        };
+      }
+      if (pressureRatio >= 0.18) {
+        return {
+          text: directionRead.text.startsWith("FRONT") ? `FRONT PROTECTED\n-${pressureSaved}% PRESSURE` : `PARTIAL COVER\n-${pressureSaved}% PRESSURE`,
+          color: directionRead.text.startsWith("FRONT") ? "#bbf7d0" : "#fed7aa",
+          tone: directionRead.text.startsWith("FRONT") ? "good" : "warn",
+          occupant
+        };
+      }
+      return null;
+    };
+    const drawTrenchCombatProof = (
+      slot: (typeof snapshot.aiTactics.coverSlots)[number],
+      angle: number,
+      groupId: string,
+      proof: NonNullable<ReturnType<typeof getTrenchCombatProof>>
+    ): void => {
+      const color = proof.tone === "good" ? 0x22c55e : proof.tone === "warn" ? 0xfacc15 : 0xfb7185;
+      const dx = Math.cos(angle);
+      const dy = Math.sin(angle);
+      const nearestEnemy = getNearestEnemyToSlot(slot);
+      graphics.lineStyle(3, color, 0.5 + pulse * 0.22);
+      graphics.strokeCircle(slot.position.x, slot.position.y, proof.tone === "bad" ? 34 + pulse * 6 : 28 + pulse * 4);
+      graphics.lineStyle(2, color, 0.36 + pulse * 0.16);
+      graphics.lineBetween(slot.position.x - dx * 34, slot.position.y - dy * 34, slot.position.x + dx * 34, slot.position.y + dy * 34);
+      if (nearestEnemy) {
+        graphics.lineStyle(2, color, proof.tone === "bad" ? 0.34 : 0.22);
+        graphics.lineBetween(nearestEnemy.position.x, nearestEnemy.position.y, slot.position.x, slot.position.y);
+      }
+      if (combatProofLabels.has(groupId)) {
+        return;
+      }
+      combatProofLabels.add(groupId);
+      this.syncObjectiveLabel(this.townWarFieldworkLabels, fieldworkLabelCount, {
+        x: slot.position.x,
+        y: slot.position.y + 58,
+        text: proof.text,
+        color: proof.color,
+        fontSize: "10px",
+        scrollFixed: false,
+        originX: 0.5,
+        originY: 0
+      });
+      fieldworkLabelCount += 1;
+    };
+    const getAmmoSuppressionProof = (
+      crate: (typeof snapshot.ammoCrates)[number]
+    ): { text: string; color: string; suppressorCount: number } | null => {
+      if (crate.maxAmmo <= 0 || crate.ammo <= 0) {
+        return null;
+      }
+      const suppressors = snapshot.soldiers.filter(
+        (soldier) =>
+          soldier.faction === crate.faction &&
+          soldier.health.current > 0 &&
+          soldier.task.kind === "suppress" &&
+          soldier.ammo.inMag + soldier.ammo.reserve > 0 &&
+          Phaser.Math.Distance.Between(soldier.position.x, soldier.position.y, crate.position.x, crate.position.y) <= 360
+      );
+      if (suppressors.length <= 0) {
+        return null;
+      }
+      const ammoRatio = crate.ammo / Math.max(1, crate.maxAmmo);
+      return {
+        text: ammoRatio >= 0.25 ? `AMMO KEPT\nSUPPRESSION ALIVE x${suppressors.length}` : `AMMO LOW\nSUPPRESSION FADING x${suppressors.length}`,
+        color: ammoRatio >= 0.25 ? "#bbf7d0" : "#fde68a",
+        suppressorCount: suppressors.length
+      };
+    };
+    const drawBuildTravelRead = (
+      order: (typeof snapshot.orders)[number],
+      builder: (typeof snapshot.soldiers)[number] | null,
+      color: number,
+      progressRatio: number,
+      status: string
+    ): void => {
+      const site = order.position;
+      if (!builder) {
+        graphics.lineStyle(2, 0xfb7185, 0.58 + pulse * 0.18);
+        graphics.strokeCircle(site.x, site.y, 48 + pulse * 5);
+        graphics.lineStyle(2, 0xfb7185, 0.44);
+        graphics.lineBetween(site.x - 14, site.y - 14, site.x + 14, site.y + 14);
+        graphics.lineBetween(site.x + 14, site.y - 14, site.x - 14, site.y + 14);
+        return;
+      }
+
+      const distance = Phaser.Math.Distance.Between(builder.position.x, builder.position.y, site.x, site.y);
+      const enRoute = distance > 14;
+      const lineColor = order.build.stalled ? 0xfb7185 : order.build.coverFireSupport >= 0.45 ? 0x22c55e : color;
+      graphics.lineStyle(enRoute ? 3 : 2, lineColor, enRoute ? 0.42 + pulse * 0.18 : 0.2);
+      graphics.lineBetween(builder.position.x, builder.position.y, site.x, site.y);
+      const steps = enRoute ? 4 : 2;
+      for (let index = 1; index <= steps; index += 1) {
+        const t = index / (steps + 1);
+        const dotX = Phaser.Math.Linear(builder.position.x, site.x, t);
+        const dotY = Phaser.Math.Linear(builder.position.y, site.y, t);
+        graphics.fillStyle(lineColor, 0.46 + pulse * 0.2);
+        graphics.fillCircle(dotX, dotY, enRoute ? 3.5 : 2.5);
+      }
+      graphics.lineStyle(2, lineColor, 0.56 + pulse * 0.16);
+      graphics.strokeCircle(builder.position.x, builder.position.y, enRoute ? 13 + pulse * 2 : 9 + pulse * 1.4);
+      graphics.fillStyle(lineColor, 0.72);
+      graphics.fillCircle(builder.position.x, builder.position.y, 4 + pulse);
+      graphics.lineStyle(2, lineColor, 0.72);
+      graphics.strokeCircle(site.x, site.y, 26 + progressRatio * 18 + pulse * 3);
+      if (status === "DIGGING" || status === "COVERED DIG") {
+        graphics.lineStyle(2, lineColor, 0.68 + pulse * 0.18);
+        graphics.lineBetween(site.x - 12, site.y - 34, site.x + 12, site.y - 18);
+        graphics.lineBetween(site.x + 12, site.y - 34, site.x - 12, site.y - 18);
+      }
+    };
+    const drawBuildCompletionPulse = (
+      impact: (typeof snapshot.aiTactics.completedConstructionImpact)[number],
+      slot: (typeof snapshot.aiTactics.coverSlots)[number],
+      order: (typeof snapshot.orders)[number] | null
+    ): void => {
+      const age = snapshot.clock.seconds - impact.createdAtSeconds;
+      if (age < 0 || age > 8 || !this.isPointNearCamera(slot.position, 260)) {
+        return;
+      }
+      const t = Phaser.Math.Clamp(age / 8, 0, 1);
+      const color = getTownWarFactionAccent(impact.faction);
+      const alpha = (1 - t) * 0.74;
+      graphics.lineStyle(3, color, alpha);
+      graphics.strokeCircle(slot.position.x, slot.position.y, 32 + t * 42);
+      graphics.lineStyle(2, 0xe5e7eb, alpha * 0.62);
+      graphics.strokeCircle(slot.position.x, slot.position.y, 18 + t * 20);
+      if (age <= 3.4 && !completedImpactLabels.has(impact.orderId)) {
+        completedImpactLabels.add(impact.orderId);
+        const label = order?.build.outcomeCause ? order.build.outcomeCause.split("-").join(" ").toUpperCase() : "BUILD COMPLETE";
+        this.syncObjectiveLabel(this.townWarFieldworkLabels, fieldworkLabelCount, {
+          x: slot.position.x,
+          y: slot.position.y - 58,
+          text: `COMPLETE\n${label}`,
+          color: getTownWarFactionTextColor(impact.faction),
+          fontSize: "10px",
+          scrollFixed: false,
+          originX: 0.5,
+          originY: 1
+        });
+        fieldworkLabelCount += 1;
+      }
+    };
+
+    if (preview.position && this.isPointNearCamera(preview.position, 260)) {
+      const color = getTownWarFactionAccent(preview.faction);
+      const x = preview.position.x;
+      const y = preview.position.y;
+      if (preview.kind === "trench") {
+        drawTrenchFootprint(
+          x,
+          y,
+          preview.facingAngleRadians,
+          color,
+          getTownWarFactionAccent(preview.faction),
+          0.38 + pulse * 0.12,
+          "ghost"
+        );
+        graphics.lineStyle(2, color, preview.valid ? 0.78 : 0.34);
+        graphics.strokeCircle(x, y, 34 + pulse * 3);
+        graphics.fillStyle(color, 0.76);
+        graphics.fillCircle(x, y - 24, 4 + pulse * 1.5);
+      } else if (preview.kind === "ammo-crate") {
+        graphics.fillStyle(0x020617, 0.22);
+        graphics.fillEllipse(x, y + 12, 82, 40);
+        graphics.lineStyle(2, color, preview.valid ? 0.82 : 0.36);
+        graphics.strokeRoundedRect(x - 28, y - 22, 56, 40, 6);
+        graphics.fillStyle(0x92400e, 0.28 + pulse * 0.08);
+        graphics.fillRoundedRect(x - 25, y - 19, 50, 34, 5);
+        graphics.lineStyle(2, color, 0.52);
+        graphics.lineBetween(x - 20, y - 5, x + 20, y - 5);
+        graphics.fillStyle(color, 0.78);
+        graphics.fillCircle(x, y - 28, 4 + pulse * 1.5);
+      } else if (preview.kind === "dugout") {
+        drawDugoutFootprint(x, y, preview.facingAngleRadians, color, 0.38 + pulse * 0.12, "ghost");
+        graphics.lineStyle(2, color, preview.valid ? 0.78 : 0.34);
+        graphics.strokeCircle(x, y, 42 + pulse * 3);
+      }
+    }
+
+    for (const order of snapshot.orders) {
+      if (order.status !== "assigned" || !this.isPointNearCamera(order.position, 240)) {
+        continue;
+      }
+
+      const progressRatio =
+        order.build.requiredProgress > 0 ? Phaser.Math.Clamp(order.build.progress / order.build.requiredProgress, 0, 1) : 0;
+      const color = getTownWarFactionAccent(order.faction);
+      const progressPercent = Math.round(progressRatio * 100);
+      const builder = order.assignedSoldierId
+        ? snapshot.soldiers.find((soldier) => soldier.id === order.assignedSoldierId) ?? null
+        : null;
+      const builderDistance = builder ? Phaser.Math.Distance.Between(builder.position.x, builder.position.y, order.position.x, order.position.y) : Number.POSITIVE_INFINITY;
+      const buildStatus = !builder
+        ? "NO BUILDER"
+        : order.build.stalled
+          ? "STALLED"
+          : order.build.buildRate > 0
+            ? order.build.coverFireSupport >= 0.45
+              ? "COVERED DIG"
+              : "DIGGING"
+            : builderDistance > 14
+              ? "BUILDER EN ROUTE"
+              : "SETTING TOOLS";
+      const buildStatusColor = order.build.stalled ? "#fca5a5" : order.build.buildRate > 0 ? "#bbf7d0" : "#fde68a";
+      const supportRead =
+        order.build.supportAmmoState === "dry"
+          ? "AMMO SUPPORT DRY"
+          : order.build.supportAmmoState === "low"
+            ? "AMMO SUPPORT LOW"
+            : order.build.coverFireSupport >= 0.45
+              ? "SUPPRESSED COVER"
+              : order.build.coverFireSupport > 0
+                ? "LIGHT COVER FIRE"
+                : "NO COVER FIRE";
+      const failureRead = !builder
+        ? "NO BUILDER"
+        : order.build.stalled
+          ? order.build.stallReason?.toUpperCase() ?? "STALLED"
+          : order.build.supportAmmoState === "dry"
+            ? "NO AMMO COVER"
+            : order.build.exposure >= 0.7 && order.build.coverFireSupport < 0.25
+              ? "EXPOSED WORK"
+              : supportRead;
+      drawBuildTravelRead(order, builder, color, progressRatio, buildStatus);
+      if (order.kind === "trench") {
+        const angle = Number.isFinite(order.facingAngleRadians) ? order.facingAngleRadians : order.faction === "camp-a" ? Math.PI : 0;
+        const dx = Math.cos(angle);
+        const dy = Math.sin(angle);
+        drawTrenchFootprint(order.position.x, order.position.y, angle, color, 0xe5e7eb, 0.3 + progressRatio * 0.38, "rough");
+        graphics.lineStyle(2, color, 0.42 + pulse * 0.18);
+        graphics.fillStyle(color, 0.56);
+        graphics.fillCircle(order.position.x - dx * 48 + dx * 96 * progressRatio, order.position.y - dy * 48 + dy * 96 * progressRatio, 4 + pulse * 1.5);
+        graphics.lineStyle(3, color, 0.32);
+        graphics.lineBetween(order.position.x - dx * 48, order.position.y - dy * 48 + 24, order.position.x - dx * 48 + dx * 96 * progressRatio, order.position.y - dy * 48 + dy * 96 * progressRatio + 24);
+        graphics.fillStyle(0x0f172a, 0.78);
+        graphics.fillRoundedRect(order.position.x - 56, order.position.y + 42, 112, 12, 4);
+        graphics.fillStyle(order.build.stalled ? 0xef4444 : order.build.coverFireSupport >= 0.45 ? 0x22c55e : color, 0.82);
+        graphics.fillRoundedRect(order.position.x - 53, order.position.y + 45, Math.max(6, 106 * progressRatio), 6, 3);
+        graphics.lineStyle(2, order.build.stalled ? 0xfb7185 : 0xfacc15, 0.42 + progressRatio * 0.42);
+        graphics.lineBetween(order.position.x - dx * 50, order.position.y - dy * 50 - 18, order.position.x - dx * 50 + dx * 100 * progressRatio, order.position.y - dy * 50 + dy * 100 * progressRatio - 18);
+        if (progressRatio >= 0.25) {
+          graphics.lineStyle(2, 0x111827, 0.7);
+          graphics.lineBetween(order.position.x - dx * 35, order.position.y - dy * 35, order.position.x - dx * 35 + dx * 70 * progressRatio, order.position.y - dy * 35 + dy * 70 * progressRatio);
+        }
+        this.syncObjectiveLabel(this.townWarFieldworkLabels, fieldworkLabelCount, {
+          x: order.position.x,
+          y: order.position.y - 78,
+          text: `${buildStatus}\n${progressPercent}% ${failureRead}\n${order.build.buildRate}/s`,
+          color: buildStatusColor,
+          fontSize: "10px",
+          scrollFixed: false,
+          originX: 0.5,
+          originY: 1
+        });
+        fieldworkLabelCount += 1;
+      } else if (order.kind === "dugout") {
+        const angle = Number.isFinite(order.facingAngleRadians) ? order.facingAngleRadians : order.faction === "camp-a" ? Math.PI : 0;
+        drawDugoutFootprint(order.position.x, order.position.y, angle, color, 0.32 + progressRatio * 0.42, "building");
+        graphics.fillStyle(color, 0.62);
+        graphics.fillRoundedRect(order.position.x - 26, order.position.y + 31, 52 * progressRatio, 5, 2);
+        this.syncObjectiveLabel(this.townWarFieldworkLabels, fieldworkLabelCount, {
+          x: order.position.x,
+          y: order.position.y - 54,
+          text: `${buildStatus}\n${progressPercent}% ${failureRead}\n${order.build.buildRate}/s`,
+          color: buildStatusColor,
+          fontSize: "10px",
+          scrollFixed: false,
+          originX: 0.5,
+          originY: 1
+        });
+        fieldworkLabelCount += 1;
+      } else if (order.kind === "ammo-crate") {
+        graphics.fillStyle(0x020617, 0.28);
+        graphics.fillEllipse(order.position.x, order.position.y + 10, 62, 32);
+        graphics.lineStyle(2, color, 0.48 + pulse * 0.16);
+        graphics.strokeRoundedRect(order.position.x - 22, order.position.y - 18, 44, 32, 5);
+        graphics.fillStyle(0x92400e, 0.36);
+        graphics.fillRoundedRect(order.position.x - 19, order.position.y - 15, 38, 26, 4);
+        graphics.fillStyle(color, 0.6);
+        graphics.fillRoundedRect(order.position.x - 20, order.position.y + 18, 40 * progressRatio, 4, 2);
+        this.syncObjectiveLabel(this.townWarFieldworkLabels, fieldworkLabelCount, {
+          x: order.position.x,
+          y: order.position.y - 42,
+          text: `${buildStatus}\n${progressPercent}% ${failureRead}\n${order.build.buildRate}/s`,
+          color: buildStatusColor,
+          fontSize: "10px",
+          scrollFixed: false,
+          originX: 0.5,
+          originY: 1
+        });
+        fieldworkLabelCount += 1;
+      }
+    }
+
+    for (const dugout of snapshot.dugouts) {
+      if (!this.isPointNearCamera(dugout.position, 260)) {
+        continue;
+      }
+      const color = getTownWarFactionAccent(dugout.faction);
+      const status = dugout.status === "destroyed" ? "destroyed" : dugout.status === "contested" ? "contested" : dugout.status === "damaged" ? "damaged" : "active";
+      drawDugoutFootprint(dugout.position.x, dugout.position.y, dugout.facingAngleRadians, color, 0.84, status);
+      const healthRatio = dugout.maxHealth > 0 ? Phaser.Math.Clamp(dugout.health / dugout.maxHealth, 0, 1) : 0;
+      graphics.fillStyle(0x0f172a, 0.78);
+      graphics.fillRoundedRect(dugout.position.x - 32, dugout.position.y + 34, 64, 7, 3);
+      graphics.fillStyle(status === "contested" || status === "damaged" ? 0xf97316 : 0x22c55e, 0.82);
+      graphics.fillRoundedRect(dugout.position.x - 30, dugout.position.y + 36, 60 * healthRatio, 3, 2);
+      graphics.lineStyle(2, status === "contested" ? 0xfb7185 : color, 0.48 + pulse * 0.18);
+      graphics.strokeCircle(dugout.position.x, dugout.position.y, dugout.rallyRadius * 0.12 + pulse * 3);
+      const read =
+        dugout.status === "contested"
+          ? "DUGOUT CONTESTED"
+          : dugout.status === "damaged" || dugout.status === "destroyed"
+            ? "POSITION COLLAPSING"
+            : dugout.shelteringSoldierIds.length > 0
+              ? "WOUNDED SHELTERING"
+              : dugout.connectedTrenchSlotIds.length > 0
+                ? "LINE SUPPLIED"
+                : "RALLY ACTIVE";
+      this.syncObjectiveLabel(this.townWarFieldworkLabels, fieldworkLabelCount, {
+        x: dugout.position.x,
+        y: dugout.position.y - 64,
+        text: `${read}\nTRENCH LINKS ${dugout.connectedTrenchSlotIds.length} | SHELTER ${dugout.shelteringSoldierIds.length}`,
+        color: dugout.status === "contested" || dugout.status === "damaged" || dugout.status === "destroyed" ? "#fca5a5" : "#bbf7d0",
+        fontSize: "10px",
+        scrollFixed: false,
+        originX: 0.5,
+        originY: 1
+      });
+      fieldworkLabelCount += 1;
+    }
+
+    for (const crate of snapshot.ammoCrates) {
+      if (crate.destroyedAtSeconds !== null || !this.isPointNearCamera(crate.position, 240)) {
+        continue;
+      }
+
+      const color = getTownWarFactionColor(crate.faction);
+      const accent = getTownWarFactionAccent(crate.faction);
+      const ammoRatio = crate.maxAmmo > 0 ? Phaser.Math.Clamp(crate.ammo / crate.maxAmmo, 0, 1) : 0;
+      const x = crate.position.x;
+      const y = crate.position.y;
+      graphics.fillStyle(0x020617, 0.34);
+      graphics.fillEllipse(x, y + 12, 72, 34);
+      graphics.fillStyle(0x78350f, 0.82);
+      graphics.fillRoundedRect(x - 24, y - 18, 48, 34, 5);
+      graphics.lineStyle(3, color, 0.74);
+      graphics.strokeRoundedRect(x - 24, y - 18, 48, 34, 5);
+      graphics.lineStyle(2, accent, 0.62 + pulse * 0.18);
+      graphics.lineBetween(x - 18, y - 5, x + 18, y - 5);
+      graphics.fillStyle(accent, 0.78);
+      graphics.fillRoundedRect(x - 22, y + 21, 44 * ammoRatio, 5, 2);
+      const ammoProof = getAmmoSuppressionProof(crate);
+      if (ammoProof) {
+        graphics.lineStyle(2, ammoRatio >= 0.25 ? 0x22c55e : 0xfacc15, 0.52 + pulse * 0.18);
+        graphics.strokeCircle(x, y, 35 + pulse * 5);
+        this.syncObjectiveLabel(this.townWarFieldworkLabels, fieldworkLabelCount, {
+          x,
+          y: y + 42,
+          text: ammoProof.text,
+          color: ammoProof.color,
+          fontSize: "10px",
+          scrollFixed: false,
+          originX: 0.5,
+          originY: 0
+        });
+        fieldworkLabelCount += 1;
+      }
+    }
+
+    for (const impact of snapshot.aiTactics.completedConstructionImpact) {
+      const slot = snapshot.aiTactics.coverSlots.find((candidate) => candidate.id === impact.coverSlotId) ?? null;
+      if (!slot) {
+        continue;
+      }
+      const order = snapshot.orders.find((candidate) => candidate.id === impact.orderId) ?? null;
+      drawBuildCompletionPulse(impact, slot, order);
+    }
+
+    for (const [groupId, group] of trenchGroups) {
+      if (group.count <= 0) {
+        continue;
+      }
+      const x = group.x / group.count;
+      const y = group.y / group.count;
+      if (!this.isPointNearCamera({ x, y }, 280)) {
+        continue;
+      }
+      const color = getTownWarFactionColor(group.faction);
+      const accent = getTownWarFactionAccent(group.faction);
+      const groupCallouts = group.slots.map((slot) => getTrenchSlotCallout(slot, group.angle));
+      const occupiedCount = groupCallouts.filter((callout) => callout.state === "occupied").length;
+      const reservedCount = groupCallouts.filter((callout) => callout.state === "reserved").length;
+      const contestedCount = groupCallouts.filter((callout) => callout.state === "contested").length;
+      const proofSlot =
+        group.slots
+          .map((slot) => ({ slot, proof: getTrenchCombatProof(slot, group.angle) }))
+          .find((entry) => entry.proof?.tone === "bad") ??
+        group.slots
+          .map((slot) => ({ slot, proof: getTrenchCombatProof(slot, group.angle) }))
+          .find((entry) => entry.proof !== null);
+      const groupState = contestedCount > 0 ? "damaged" : group.occupied > 0 ? "occupied" : "complete";
+      drawTrenchFootprint(x, y, group.angle, color, accent, 0.86, groupState, group.occupied);
+      if (proofSlot?.proof) {
+        drawTrenchCombatProof(proofSlot.slot, group.angle, groupId, proofSlot.proof);
+      }
+      if (labeledTrenchGroups.has(groupId)) {
+        continue;
+      }
+      const anchorSlot =
+        group.slots.find((slot) => getTrenchSlotCallout(slot, group.angle).state === "contested") ??
+        group.slots.find((slot) => slot.occupiedBySoldierId !== null) ??
+        group.slots.find((slot) => getTrenchSlotCallout(slot, group.angle).state === "reserved") ??
+        group.slots[0];
+      if (!anchorSlot) {
+        continue;
+      }
+      const callout = getTrenchSlotCallout(anchorSlot, group.angle);
+      const directionRead = getTrenchDirectionRead(anchorSlot, group.angle);
+      const groupStatus =
+        occupiedCount > 0
+          ? `OCCUPIED ${group.occupied}/${group.count}`
+          : reservedCount > 0
+            ? `RESERVED ${reservedCount}/${group.count}`
+            : contestedCount > 0
+              ? "CONTESTED EMPTY"
+              : "EMPTY: NO NEARBY DEFENDER";
+      labeledTrenchGroups.add(groupId);
+      this.syncObjectiveLabel(this.townWarFieldworkLabels, fieldworkLabelCount, {
+        x,
+        y: y - 88,
+        text: `${callout.text}\n${groupStatus}${occupiedCount > 0 ? `\n${directionRead.text}` : ""}`,
+        color: callout.state === "abandoned" ? callout.color : directionRead.text.startsWith("ENFILADED") ? "#fca5a5" : callout.color,
+        fontSize: "10px",
+        scrollFixed: false,
+        originX: 0.5,
+        originY: 1
+      });
+      fieldworkLabelCount += 1;
+    }
+
+    for (const slot of snapshot.aiTactics.coverSlots) {
+      if (slot.sourceKind !== "trench" || !this.isPointNearCamera(slot.position, 260)) {
+        continue;
+      }
+
+      const accent = getTownWarFactionAccent(slot.faction);
+      const occupied = slot.occupiedBySoldierId !== null;
+      const x = slot.position.x;
+      const y = slot.position.y;
+      const angle = Number.isFinite(slot.facingAngleRadians) ? slot.facingAngleRadians : slot.facing === "camp-a" ? Math.PI : 0;
+      const callout = getTrenchSlotCallout(slot, angle);
+      drawTrenchSlotStateMarker(slot, angle, callout.state, accent, callout.user);
+      if (occupied) {
+        this.townWarCampGraphics.lineStyle(1.7, accent, 0.74);
+        this.townWarCampGraphics.strokeCircle(x, y, 12);
+      }
+    }
+
+    for (const story of snapshot.frontlineStories.slice(0, 5)) {
+      if (!story.position || !this.isPointNearCamera(story.position, 360)) {
+        continue;
+      }
+      const color =
+        story.kind === "medic"
+          ? "#bbf7d0"
+          : story.kind === "resupply"
+            ? "#bfdbfe"
+            : story.kind === "cover"
+              ? "#fde68a"
+              : story.kind === "occupy"
+                ? "#fef3c7"
+                : "#e0f2fe";
+      const actionRead =
+        story.kind === "build"
+          ? "finished the trench"
+          : story.kind === "cover"
+            ? "covered the dig"
+            : story.kind === "resupply"
+              ? "ran ammo"
+              : story.kind === "medic"
+                ? "stabilized wounded"
+                : story.kind === "occupy"
+                  ? "holding trench"
+                  : "carries consequence";
+      this.syncObjectiveLabel(this.townWarFieldworkLabels, fieldworkLabelCount, {
+        x: story.position.x,
+        y: story.position.y + (story.kind === "occupy" ? 82 : 104),
+        text: `${story.soldierName}\n${actionRead}`,
+        color,
+        fontSize: "10px",
+        scrollFixed: false,
+        originX: 0.5,
+        originY: 0
+      });
+      fieldworkLabelCount += 1;
+    }
+
+    this.hideUnusedObjectiveLabels(this.townWarFieldworkLabels, fieldworkLabelCount);
+  }
+
+  private drawTownWarCampStatusRing(
+    camp: TownWarCampState,
+    soldiers: readonly TownWarSoldierState[],
+    casualties: ReturnType<typeof townWarController.getSnapshot>["casualties"],
+    pulse: number,
+    labelIndex: number
+  ): number {
+    const graphics = this.townWarCampGraphics;
+    const { x, y } = camp.spawn.position;
+    const healthRatio = camp.health.max > 0 ? Phaser.Math.Clamp(camp.health.current / camp.health.max, 0, 1) : 0;
+    const ringColor = getTownWarFactionColor(camp.id);
+    const accentColor = getTownWarFactionAccent(camp.id);
+    const sustainment = camp.sustainment;
+    const campSoldiers = soldiers.filter((soldier) => soldier.faction === camp.id && soldier.health.current > 0);
+    const workCounts = campSoldiers.reduce(
+      (counts, soldier) => {
+        if (soldier.task.kind === "hold" && soldier.task.label?.toLowerCase().includes("rest")) {
+          counts.rest += 1;
+        } else if (counts[soldier.task.kind] !== undefined) {
+          counts[soldier.task.kind] += 1;
+        }
+        return counts;
+      },
+      { build: 0, resupply: 0, heal: 0, suppress: 0, defend: 0, rest: 0 } as Record<string, number>
+    );
+    const activeCasualties = casualties.filter(
+      (casualty) => casualty.faction === camp.id && (casualty.status === "wounded" || casualty.status === "downed")
+    ).length;
+    const readinessRatio = Phaser.Math.Clamp(sustainment.readiness, 0, 1);
+    const ammoFlowRatio = Phaser.Math.Clamp(sustainment.ammoFlow, 0, 1);
+    const needWarning =
+      sustainment.warnings[0] ??
+      (sustainment.fatigueAverage >= 0.58
+        ? "Tired camp: slower work"
+        : sustainment.hungerAverage >= 0.52
+          ? "Hungry camp: brittle morale"
+          : activeCasualties > 0
+            ? "Medical load: recovery needed"
+            : workCounts.resupply > 0
+              ? "Ammo runner supplying line"
+              : workCounts.build > 0
+                ? "Builders shaping the line"
+                : "Camp work supporting line");
+
+    graphics.setDepth(y * 0.001 + 0.26);
+    graphics.lineStyle(3, ringColor, 0.32 + pulse * 0.18);
+    graphics.strokeEllipse(x, y + 8, 418, 288);
+    graphics.lineStyle(2, accentColor, 0.16 + healthRatio * 0.24);
+    graphics.strokeEllipse(x, y + 8, 382, 250);
+    graphics.lineStyle(2, ringColor, 0.44);
+    graphics.strokeCircle(x, y, 14 + pulse * 5);
+    graphics.fillStyle(ringColor, 0.72);
+    graphics.fillCircle(x, y, 6 + pulse * 2);
+    graphics.fillStyle(0x020617, 0.72);
+    graphics.fillRoundedRect(x - 58, y + 156, 116, 10, 5);
+    graphics.fillStyle(ringColor, 0.82);
+    graphics.fillRoundedRect(x - 56, y + 158, 112 * healthRatio, 6, 3);
+    graphics.fillStyle(0x020617, 0.58);
+    graphics.fillRoundedRect(x - 86, y + 170, 172, 16, 6);
+    graphics.fillStyle(0x22c55e, 0.7);
+    graphics.fillRoundedRect(x - 82, y + 174, 78 * readinessRatio, 4, 2);
+    graphics.fillStyle(0xfacc15, 0.68);
+    graphics.fillRoundedRect(x + 4, y + 174, 78 * ammoFlowRatio, 4, 2);
+
+    this.syncObjectiveLabel(this.townWarCampLabels, labelIndex, {
+      x,
+      y: y - 188,
+      text:
+        `${isTownWarPlayerFaction(camp.id) ? "RUSSIAN PLAYER CAMP" : "UKRAINIAN ENEMY CAMP"} COLONY\n` +
+        `READY ${Math.round(readinessRatio * 100)}%  AMMO ${Math.round(ammoFlowRatio * 100)}%\n` +
+        `${needWarning.toUpperCase()}`,
+      color: isTownWarPlayerFaction(camp.id) ? "#fde68a" : "#bfdbfe",
+      fontSize: "10px",
+      scrollFixed: false,
+      originX: 0.5,
+      originY: 1
+    });
+    labelIndex += 1;
+
+    const activeWorkRead = `B${workCounts.build} R${workCounts.resupply} M${workCounts.heal} C${workCounts.suppress}`;
+    this.syncObjectiveLabel(this.townWarCampLabels, labelIndex, {
+      x,
+      y: y + 193,
+      text: `WORKERS ${activeWorkRead}  WOUNDED ${activeCasualties}`,
+      color: isTownWarPlayerFaction(camp.id) ? "#bbf7d0" : "#bfdbfe",
+      fontSize: "9px",
+      scrollFixed: false,
+      originX: 0.5,
+      originY: 0
+    });
+    return labelIndex + 1;
+  }
+
+  private syncTownWarSoldierSprites(snapshot: ReturnType<typeof townWarController.getSnapshot>): void {
+    const liveSoldierIds = new Set(snapshot.soldiers.map((soldier) => soldier.id));
+    let selectedLabelCount = 0;
+    let lookLabelCount = 0;
+    let nearestLookSoldier:
+      | {
+          soldier: TownWarSoldierState;
+          position: Vec2;
+          distance: number;
+        }
+      | null = null;
+    for (const [id, sprite] of this.townWarSoldierSprites) {
+      if (liveSoldierIds.has(id)) {
+        continue;
+      }
+
+      sprite.destroy();
+      this.townWarSoldierSprites.delete(id);
+    }
+
+    for (const soldier of snapshot.soldiers) {
+      let sprite = this.townWarSoldierSprites.get(soldier.id);
+      if (!sprite) {
+        sprite = this.add.sprite(soldier.position.x, soldier.position.y, getTownWarSoldierSpriteKey(soldier));
+        this.townWarSoldierSprites.set(soldier.id, sprite);
+      }
+
+      const visible = this.isPointNearCamera(soldier.position, 150);
+      sprite.setVisible(visible);
+      if (!visible) {
+        continue;
+      }
+
+      const healthRatio = soldier.health.current / Math.max(1, soldier.health.max);
+      const baseScale = soldier.role === "suppressor" ? 1.02 : soldier.role === "builder" || soldier.role === "medic" ? 0.92 : 0.98;
+      const occupantSlot =
+        soldier.coverIntent.state === "occupying" && soldier.coverIntent.coverSlotId
+          ? snapshot.aiTactics.coverSlots.find((slot) => slot.id === soldier.coverIntent.coverSlotId) ?? null
+          : null;
+      const facing = getTownWarSoldierFacing(soldier, snapshot.aiTactics.coverSlots, snapshot.combatants);
+      const pose = getFriendlyCombatantRenderPose(
+        {
+          id: getTownWarSoldierRenderId(soldier.id),
+          facing,
+          pressureType: getTownWarSoldierPressureType(soldier),
+          awareness: getTownWarSoldierAwareness(soldier)
+        },
+        this.time.now
+      );
+      const trenchOccupant = occupantSlot?.sourceKind === "trench" && occupantSlot.occupiedBySoldierId === soldier.id;
+      const nearestEnemy = trenchOccupant ? getNearestTownWarEnemy(occupantSlot.position, soldier.faction, snapshot.combatants) : null;
+      const enemyDistance = nearestEnemy && occupantSlot ? Phaser.Math.Distance.Between(occupantSlot.position.x, occupantSlot.position.y, nearestEnemy.position.x, nearestEnemy.position.y) : Number.POSITIVE_INFINITY;
+      const firingFromTrench =
+        trenchOccupant &&
+        nearestEnemy !== null &&
+        enemyDistance <= 470 &&
+        soldier.health.current > 0 &&
+        soldier.ammo.inMag + soldier.ammo.reserve > 0 &&
+        (soldier.task.kind === "defend" ||
+          soldier.task.kind === "suppress" ||
+          soldier.task.kind === "attack" ||
+          soldier.tacticalIntent.state === "hold-cover" ||
+          soldier.tacticalIntent.state === "suppress-area" ||
+          soldier.tacticalIntent.state === "reload-behind-cover");
+      const trenchLipOffset = trenchOccupant ? 9 : 0;
+      const position = trenchOccupant
+        ? {
+            x: occupantSlot.position.x + facing.x * trenchLipOffset,
+            y: occupantSlot.position.y + facing.y * trenchLipOffset
+          }
+        : soldier.position;
+      if (this.townWarLookWorld && isTownWarPlayerFaction(soldier.faction) && soldier.health.current > 0) {
+        const lookDistance = Phaser.Math.Distance.Between(
+          this.townWarLookWorld.x,
+          this.townWarLookWorld.y,
+          position.x,
+          position.y
+        );
+        if (lookDistance <= 62 && (!nearestLookSoldier || lookDistance < nearestLookSoldier.distance)) {
+          nearestLookSoldier = { soldier, position, distance: lookDistance };
+        }
+      }
+
+      sprite.setPosition(position.x + pose.offsetX, position.y + pose.offsetY);
+      sprite.setTexture(getTownWarSoldierSpriteKey(soldier));
+      sprite.setRotation(Math.atan2(facing.y, facing.x) + pose.rotationOffset);
+      sprite.setScale((trenchOccupant ? baseScale * 1.08 : baseScale) * pose.scaleX, (trenchOccupant ? baseScale * 1.08 : baseScale) * pose.scaleY);
+      sprite.setTint(getTownWarSoldierTint(soldier));
+      sprite.setAlpha((healthRatio <= 0 ? 0.34 : healthRatio < 0.45 ? 0.62 : trenchOccupant ? 1 : 0.94) * pose.alphaMultiplier);
+      sprite.setDepth(position.y * 0.001 + (trenchOccupant ? 0.116 : 0.086));
+
+      if (trenchOccupant) {
+        const lateral = { x: -facing.y, y: facing.x };
+        const accent = isTownWarPlayerFaction(soldier.faction) ? 0xfacc15 : 0x93c5fd;
+        const fireSeed = Math.sin(this.time.now / (soldier.role === "suppressor" ? 76 : 118) + getTownWarSoldierRenderId(soldier.id) * 0.37);
+        const weaponId = getTownWarSoldierWeaponId(soldier);
+        this.frontlineSupportGraphics.lineStyle(3.2, 0x020617, 0.62);
+        this.frontlineSupportGraphics.lineBetween(
+          position.x - lateral.x * 13 - facing.x * 2,
+          position.y - lateral.y * 13 - facing.y * 2,
+          position.x + lateral.x * 13 - facing.x * 2,
+          position.y + lateral.y * 13 - facing.y * 2
+        );
+        this.frontlineSupportGraphics.lineStyle(1.8, accent, 0.7);
+        this.frontlineSupportGraphics.lineBetween(
+          position.x - lateral.x * 11,
+          position.y - lateral.y * 11,
+          position.x + lateral.x * 11,
+          position.y + lateral.y * 11
+        );
+        this.frontlineSupportGraphics.lineStyle(1.4, accent, 0.34);
+        this.frontlineSupportGraphics.lineBetween(position.x - facing.x * 18, position.y - facing.y * 18, position.x + facing.x * 28, position.y + facing.y * 28);
+        if (firingFromTrench && fireSeed > (soldier.role === "suppressor" ? -0.55 : -0.12)) {
+          drawFrontlineTracerBurst(
+            this.frontlineSupportGraphics,
+            position,
+            facing,
+            accent,
+            0.48 + Math.max(0, fireSeed) * 0.34,
+            getFrontlineTracerDrawLength(weaponId, soldier.role === "suppressor" ? 18 : 8),
+            weaponId,
+            pose
+          );
+        }
+      }
+
+      if (this.isPointNearCamera(position, 96)) {
+        drawFactionMarker(
+          this.factionMarkerGraphics,
+          position,
+          facing,
+          isTownWarPlayerFaction(soldier.faction) ? 0xef4444 : 0x60a5fa,
+          soldier.coverIntent.state === "occupying" ? 0.94 : 0.68,
+          soldier.coverIntent.state === "occupying" ? 1.04 : 0.86
+        );
+      }
+
+      if (soldier.id === this.selectedTownWarSoldierId && isTownWarPlayerFaction(soldier.faction)) {
+        const accent = getTownWarFactionAccent(soldier.faction);
+        const selectedPulse = (Math.sin(this.time.now / 260) + 1) * 0.5;
+        this.factionMarkerGraphics.lineStyle(2, 0x020617, 0.7);
+        this.factionMarkerGraphics.strokeCircle(position.x, position.y - 2, 26 + selectedPulse * 4);
+        this.factionMarkerGraphics.lineStyle(2, accent, 0.78);
+        this.factionMarkerGraphics.strokeCircle(position.x, position.y - 2, 22 + selectedPulse * 4);
+        this.factionMarkerGraphics.lineStyle(1, accent, 0.4);
+        this.factionMarkerGraphics.strokeCircle(position.x, position.y - 2, 34 + selectedPulse * 6);
+        this.syncObjectiveLabel(this.townWarSelectedSoldierLabels, selectedLabelCount, {
+          x: position.x,
+          y: position.y - 40,
+          text: `${soldier.displayName.toUpperCase()}\n${(soldier.task.label ?? soldier.taskDecision.selectedWork ?? soldier.task.kind).toUpperCase()}`,
+          color: "#fde68a",
+          fontSize: "9px",
+          scrollFixed: false,
+          originX: 0.5,
+          originY: 1
+        });
+        selectedLabelCount += 1;
+      }
+    }
+    if (nearestLookSoldier && nearestLookSoldier.soldier.id !== this.selectedTownWarSoldierId) {
+      const { soldier, position, distance } = nearestLookSoldier;
+      const alphaPulse = Phaser.Math.Clamp(1 - distance / 62, 0.34, 0.92);
+      this.factionMarkerGraphics.lineStyle(1, 0x020617, 0.5 * alphaPulse);
+      this.factionMarkerGraphics.strokeCircle(position.x, position.y - 2, 20);
+      this.factionMarkerGraphics.lineStyle(1, 0xfde68a, 0.42 * alphaPulse);
+      this.factionMarkerGraphics.strokeCircle(position.x, position.y - 2, 18);
+      this.syncObjectiveLabel(this.townWarLookSoldierLabels, lookLabelCount, {
+        x: position.x,
+        y: position.y - 34,
+        text: `${soldier.displayName}\n${soldier.task.label ?? soldier.taskDecision.selectedWork ?? soldier.task.kind}`,
+        color: "#fef3c7",
+        fontSize: "8px",
+        scrollFixed: false,
+        originX: 0.5,
+        originY: 1
+      });
+      lookLabelCount += 1;
+    }
+    this.hideUnusedObjectiveLabels(this.townWarSelectedSoldierLabels, selectedLabelCount);
+    this.hideUnusedObjectiveLabels(this.townWarLookSoldierLabels, lookLabelCount);
+  }
+
   private syncSprites(): void {
     const { player, enemies, friendlyCombatants, fallenSquadBodies, fallenEnemyBodies, bullets, grenades, frontlineTracers, frontlineImpacts, loot, intelSites, supplyCaches, extractZone, extractionReady, extractionContested, extractionHoldDuration, extractionHoldTimer, phase, activeSearch, activeIntelCapture, activeLootPickup, activeObstacleBreach, recentNoisePosition, recentNoisePulse, soundPressure, frontlineSupports, frontlineIncidents, activeFrontlineHoldZoneId, activeSquadBodyRecovery } =
       raidController.state;
@@ -9228,6 +11183,7 @@ export class RaidScene extends Phaser.Scene {
     this.frontlineSupportGraphics.clear();
     this.frontlineIncidentGraphics.clear();
     this.frontlineImpactGraphics.clear();
+    this.townWarCampGraphics.clear();
     this.grenadeGraphics.clear();
     this.objectiveGraphics.clear();
     this.roomStackGraphics.clear();
@@ -9239,6 +11195,8 @@ export class RaidScene extends Phaser.Scene {
     this.hideObjectiveLabels();
     this.hideUnusedObjectiveLabels(this.roomStackLabels, 0);
     this.hideUnusedObjectiveLabels(this.squadEscortLabels, 0);
+    this.hideUnusedObjectiveLabels(this.townWarSelectedSoldierLabels, 0);
+    this.hideUnusedObjectiveLabels(this.townWarLookSoldierLabels, 0);
     const renderedSupports = frontlineSupports.filter(
       (support) => !this.isSupportRepresentedByFriendlyCombatant(support, friendlyCombatants)
     );
@@ -9250,6 +11208,7 @@ export class RaidScene extends Phaser.Scene {
     const renderableGrenades = this.getRenderableGrenades(grenades);
     const renderableTracers = this.getRenderableTracers(frontlineTracers);
     const renderableImpacts = this.getRenderableImpacts(frontlineImpacts);
+    this.drawTownWarCampArt();
     const selectedMate = raidController.state.squadMates.find((mate) => mate.id === raidController.state.selectedSquadMateId) ?? null;
     const selectedDefendAnchor =
       selectedMate?.command.orderId === "defend" && selectedMate.command.anchor ? selectedMate.command.anchor : null;
@@ -9327,6 +11286,7 @@ export class RaidScene extends Phaser.Scene {
     this.syncSpriteCollection(this.friendlyCombatantSprites, friendlyCombatants, (combatant) =>
       this.add.sprite(combatant.position.x, combatant.position.y, getFriendlyCombatantKey(combatant.archetypeId))
     );
+    this.syncTownWarSoldierSprites(townWarController.getSnapshot());
     this.syncSpriteCollection(
       this.fallenSquadBodySprites,
       fallenSquadBodies.filter((body) => !body.recovered),
@@ -9717,7 +11677,11 @@ export class RaidScene extends Phaser.Scene {
       sprite.setPosition(cache.position.x, cache.position.y);
       sprite.setTexture(getSupplyCacheTexture(cache.kind));
       sprite.setTint(
-        cache.frontlineDrop
+        cache.resupplyCrate
+          ? (cache.resupplyThreatTimer ?? 0) > 0.1
+            ? 0xfb7185
+            : 0x60a5fa
+          : cache.frontlineDrop
           ? cache.kind === "medical"
             ? 0x86efac
             : cache.kind === "ammo"
@@ -11235,6 +13199,8 @@ export class RaidScene extends Phaser.Scene {
 
   private hideObjectiveLabels(): void {
     this.hideUnusedObjectiveLabels(this.worldObjectiveLabels, 0);
+    this.hideUnusedObjectiveLabels(this.townWarFieldworkLabels, 0);
+    this.hideUnusedObjectiveLabels(this.townWarCampLabels, 0);
     this.hideUnusedObjectiveLabels(this.edgeObjectiveLabels, 0);
   }
 

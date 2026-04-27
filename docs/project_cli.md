@@ -43,6 +43,131 @@ Global options:
 - `--command-tab <tab-id>` planning/command tab
 - `--output <path>` screenshot output for commands that support capture
 
+## Town war / officer orders
+
+These commands drive the first-town officer-war slice. They stage `town-war` automatically, mutate town war state, and return JSON with an `ok` flag plus a short `summary` string intended for quick agent feedback (supply impact, assigned soldier, lane assignments, or applied ticks).
+
+The town-war snapshot also exposes the first emergent war drama inspect surface:
+
+- `war.dialogue.lastDramaEvent`
+- `war.dialogue.recentDramaEvents`
+- `war.dialogue.activeOfficerWarTags`
+- `war.dialogue.activeScarTags`
+- `war.dramaMemories`
+- `war.aiThreats.playerThreatShare`
+- `war.aiThreats.frontlineFocus`
+- `war.townWar.soldiers[*].targetIntent`
+- `war.aiTactics.coverSlots`
+- `war.aiTactics.suppressionFields`
+- `war.townWar.soldiers[*].tacticalIntent`
+- `war.townWar.soldiers[*].coverIntent`
+- `war.aiTactics.tacticalPairs`
+- `war.aiTactics.completedConstructionImpact`
+- `war.locationScars`
+- `war.focusedLocationScar`
+- `war.dramaBeat.current`
+- `war.dramaBeat.chain`
+- `war.dramaBeat.lastPayoff`
+- `war.debriefEchoes`
+- `war.storyPackAudit`
+- `war.soldiers[*].dramaMemoryTags`
+- `war.soldiers[*].witnessedEventCount`
+- `war.soldiers[*].dramaArc`
+- `war.soldiers[*].trustInOfficer`
+- `war.soldiers[*].relationshipPressure`
+
+Build orders, risky builder movement, construction completion, ammo crate depletion/destruction, casualty pressure, and camp damage can update these fields.
+Cause/witness/responsibility memory is also inspectable: repeated risky orders can now produce a later line with `referencedMemoryTag` pointing at the earlier officer-caused event.
+Long-haul character arc pressure is inspectable too: repeated officer-cost or officer-helped memories can shift trust, resentment, guilt, confidence, and relationship pressure, then bias later dialogue toward arc-specific callbacks.
+Location-scar memory is inspectable as a battlefield ledger: repeat orders or fights near the same lane can activate scar tags like `builder-hit-here`, `trench-saved-line`, `ammo-ran-dry`, or `camp-shelled` and bias the next line toward scarred-town callbacks.
+The cinematic beat director is inspectable through `war.dramaBeat` and `war.debriefEchoes`: setup, complication, cost, payoff, aftermath, reversal, and echo beats are derived from real drama events and can tune dialogue pacing without scripting the outcome.
+Story-pack authoring health is inspectable through `war.storyPackAudit`, including duplicate-id errors, missing-speaker warnings, memory-tag validation, line-length warnings, and content totals grouped by story family.
+
+### `war-quickstart`
+
+Seeds a demo town-war and prints camp health.
+
+```bash
+npm run game:cli -- war-quickstart
+npm run game:cli -- war-quickstart --side camp-b
+```
+
+### `war-deploy-officer`
+
+Deploy the officer to a camp spawn point (useful for verifying side selection and camp-based entry).
+
+```bash
+npm run game:cli -- war-deploy-officer --id camp-a
+```
+
+### `war-reinforce`
+
+Spawn reinforcements for a camp at its spawn point. Use `--damage-before` to prove that camp destruction blocks spawning.
+
+```bash
+npm run game:cli -- war-reinforce --id camp-a --role rifleman --count 2
+npm run game:cli -- war-reinforce --id camp-a --role rifleman --count 1 --damage-before 2000
+```
+
+### `war-order-trench`
+
+Place a trench build order for a camp. Optionally pass `--x/--y` world coordinates.
+
+```bash
+npm run game:cli -- war-order-trench --id camp-a
+npm run game:cli -- war-order-trench --id camp-b --x 520 --y 340
+```
+
+### `war-order-ammo-crate`
+
+Place an ammo crate build order for a camp. Optionally pass `--x/--y` world coordinates.
+
+```bash
+npm run game:cli -- war-order-ammo-crate --id camp-a
+npm run game:cli -- war-order-ammo-crate --id camp-b --x 610 --y 312
+```
+
+### `war-order-dugout`
+
+Place a dugout rally/shelter build order for a camp. Dugouts connect nearby trench slots, pull defenders toward the line, give wounded or pinned soldiers a fallback shelter, and can be damaged.
+
+```bash
+npm run game:cli -- war-order-dugout --id camp-a
+npm run game:cli -- war-order-dugout --id camp-a --x 6027 --y 3213 --facing 3.14159 --advance-seconds 60
+npm run game:cli -- war-dugout-report
+npm run game:cli -- war-damage-dugout --id town-war-dugout-1 --amount 55
+```
+
+### `war-focus-lane`
+
+Order a camp to focus a lane (`north|mid|south`).
+
+```bash
+npm run game:cli -- war-focus-lane --id camp-a --lane mid
+```
+
+### `war-advance`
+
+Advance the town war simulation for a short window so soldiers can react.
+
+```bash
+npm run game:cli -- war-advance --seconds 12
+npm run game:cli -- war-advance --seconds 8 --tick-seconds 0.2
+```
+
+### `war-operation`
+
+Prepare and inspect the first persistent operation cycle for the Russian player camp. These commands expose the protected stockpile, committed camp supplies, carried soldier records, and debrief recommendations.
+
+```bash
+npm run game:cli -- war-operation prepare --ammo 220 --build 220 --food 180 --med 90
+npm run game:cli -- war-operation start
+npm run game:cli -- war-operation end
+npm run game:cli -- war-operation report
+```
+
+The snapshot exposes `war.operation` and `war.townWar.operation`. A debrief carries named Russian soldier fatigue, wounds, memory tags, and camp supply shortages into the next operation. Build supply now also contributes to construction speed, so low stockpile operations build worse even when the order itself is accepted.
+
 ### `status`
 
 Read a live snapshot of current game state (phase, stash, route, player health, ammo, frontline, and options).
@@ -96,6 +221,13 @@ Supported verification drills:
 npm run game:cli -- verify --id doorway-regression
 npm run game:cli -- verify --id room-clear-drill --path automation-artifacts/room-clear-verify.png
 npm run game:cli -- verify --id room-clear-chain --path automation-artifacts/room-clear-chain-verify.png
+npm run game:cli -- verify --id war-drama-responsibility
+npm run game:cli -- verify --id war-drama-relationships
+npm run game:cli -- verify --id war-drama-location-scars
+npm run game:cli -- verify --id war-drama-beat-chain
+npm run game:cli -- verify --id emergent-war-drama
+npm run game:cli -- verify --id frontline-ai-player-decenter
+npm run game:cli -- verify --id frontline-ai-cover-suppression
 ```
 
 Returned keys:

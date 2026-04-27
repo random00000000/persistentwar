@@ -11,6 +11,17 @@ import blueEnemyVariantIdleSource from "../assets/character-variants/survivor-ri
 import chatgptEnemyGridSource from "../assets/character-variants/chatgpt/enemy-chatgpt-grid-transparent.png";
 import chatgptPlayerGridSource from "../assets/character-variants/chatgpt/chatgptimage-player-grid-transparent.png";
 import { RaidScene } from "./game/scene/RaidScene";
+import { TOWN_WAR_ENEMY_FACTION, TOWN_WAR_PLAYER_FACTION, townWarController } from "./game/townWar";
+import type {
+  TownWarCampWorkPriorityId,
+  TownWarFactionId,
+  TownWarFlankLaneId,
+  TownWarFlankPressureLevel,
+  TownWarSoldierState,
+  TownWarState
+} from "./game/townWar";
+import type { TownWarWorkPriorityId } from "./game/townWar/types";
+import { validateDialogueStoryPacks } from "./game/dialogue/storyPacks";
 import { RAID_ROUTES, RAID_TIME_SECONDS, type ArenaDoorway, type RaidExtractDefinition, type RaidRouteId } from "./game/arena";
 import { BRIEFING_CONTROL_STRIPS, RAID_CONTROL_GROUPS, type RaidControlGroup } from "./game/controls";
 import {
@@ -187,10 +198,37 @@ type StoryFinaleChoiceId = "sell-route" | "burn-route";
 type CommandTabId = "forecast" | "operations" | "debrief" | "ledger";
 type TopTabId = "gear" | "operator" | "health" | "skills" | "map" | "tasks";
 type GearWorkbenchTabId = "loadout" | "storage" | "planning";
+type OfficerToolsPaneId = "build" | "priorities" | "camp" | "debrief";
+type OfficerWorkLensId = "all" | "build" | "fight" | "medical" | "supply";
 type PaperdollSlotId = "route" | "contract" | "support" | "weapon" | "medkits" | "ammo";
 type StorageSurfaceId = "tactical-rig" | "pockets" | "backpack" | "pouch";
 type StashFilterId = "all" | "weapons" | "medical" | "gear" | "intel" | "utility";
+type OfficerPriorityPresetId = "builder" | "fighter" | "medic" | "scout" | "sustainment";
 const QUICK_SLOT_IDS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"] as const;
+const OFFICER_TOOLS_TABS: Array<{ id: OfficerToolsPaneId; label: string }> = [
+  { id: "build", label: "Build" },
+  { id: "priorities", label: "Priorities" },
+  { id: "camp", label: "Camp" },
+  { id: "debrief", label: "Debrief" }
+];
+const OFFICER_PRIORITY_PRESETS: Array<{ id: OfficerPriorityPresetId; label: string }> = [
+  { id: "builder", label: "Build" },
+  { id: "fighter", label: "Fight" },
+  { id: "medic", label: "Medic" },
+  { id: "scout", label: "Scout" },
+  { id: "sustainment", label: "Supply" }
+];
+const OFFICER_PRIORITY_QUICK_WORKS: TownWarWorkPriorityId[] = ["Build", "Defend", "Suppress", "Resupply", "Medic", "Scout"];
+const OFFICER_PRIORITY_INSPECTOR_WORKS: TownWarWorkPriorityId[] = ["Build", "Defend", "Suppress", "Resupply", "Medic", "Rescue", "Haul", "Rest"];
+const OFFICER_CAMP_WORKS: TownWarCampWorkPriorityId[] = ["Resupply", "Cook", "Rest"];
+const OFFICER_FLANK_LANES: TownWarFlankLaneId[] = ["north", "mid", "south"];
+const OFFICER_WORK_LENSES: Array<{ id: OfficerWorkLensId; label: string; works: TownWarWorkPriorityId[] }> = [
+  { id: "all", label: "All", works: [] },
+  { id: "build", label: "Build", works: ["Build", "Repair", "Haul"] },
+  { id: "fight", label: "Fight", works: ["Defend", "Suppress", "Assault", "Scout"] },
+  { id: "medical", label: "Medical", works: ["Medic", "Rescue", "Rest"] },
+  { id: "supply", label: "Supply", works: ["Resupply", "Cook", "Haul"] }
+];
 const STASH_EQUIPMENT_SLOT_ORDER: EquipmentSlotId[] = [
   "on-sling",
   "on-back",
@@ -208,6 +246,30 @@ const STASH_EQUIPMENT_SLOT_ORDER: EquipmentSlotId[] = [
   "melee"
 ];
 type QuickSlotId = (typeof QUICK_SLOT_IDS)[number];
+
+const officerToolsState: {
+  open: boolean;
+  buildModeOpen: boolean;
+  pane: OfficerToolsPaneId;
+  placementMode: "trench" | "ammo-crate" | "dugout" | null;
+  previewWorld: { x: number; y: number } | null;
+  placementAngleRadians: number;
+  selectedSoldierId: string | null;
+  workLens: OfficerWorkLensId;
+  playerCampArtVisible: boolean;
+  lastAction: string;
+} = {
+  open: false,
+  buildModeOpen: false,
+  pane: "build",
+  placementMode: null,
+  previewWorld: null,
+  placementAngleRadians: 0,
+  selectedSoldierId: null,
+  workLens: "all",
+  playerCampArtVisible: true,
+  lastAction: "Orders panel ready."
+};
 
 interface BriefingBeat {
   speaker: BriefingSpeakerId;
@@ -9673,6 +9735,41 @@ app.innerHTML = `
             </div>
             <button class="hud-toggle" data-hud-toggle type="button" aria-expanded="false">Open Tactical Read</button>
           </section>
+          <section class="build-mode-dock" data-build-mode-dock aria-label="Construction mode">
+            <button class="camp-art-toggle" data-camp-art-toggle type="button" aria-pressed="false">
+              <span>Camp art</span>
+              <strong data-camp-art-status>On</strong>
+            </button>
+            <button class="build-mode-toggle" data-build-mode-toggle type="button" aria-expanded="false">
+              <span>Build</span>
+              <strong data-build-mode-status>Ready</strong>
+            </button>
+            <section class="build-mode-strip hidden" data-build-mode-strip aria-label="Quick construction controls">
+              <div data-build-mode-body></div>
+            </section>
+          </section>
+          <section class="officer-tools-dock" aria-label="Officer tools">
+            <button class="officer-tools-toggle" data-officer-tools-toggle type="button" aria-expanded="false">
+              <span>Orders</span>
+              <strong data-officer-tools-camp>Camp</strong>
+            </button>
+            <section class="officer-tools-panel hidden" data-officer-tools-panel aria-label="Officer tools panel">
+              <div class="officer-tools-head">
+                <div>
+                  <p class="eyebrow">Officer Tools</p>
+                  <strong data-officer-tools-title>Build orders</strong>
+                </div>
+                <button class="officer-tools-icon-button" data-officer-tools-close type="button" aria-label="Close officer tools">X</button>
+              </div>
+              <div class="officer-tools-tabs" role="tablist" aria-label="Officer tool panes">
+                <button class="officer-tools-tab active" data-officer-tools-tab="build" type="button">Build</button>
+                <button class="officer-tools-tab" data-officer-tools-tab="priorities" type="button">Priorities</button>
+                <button class="officer-tools-tab" data-officer-tools-tab="camp" type="button">Camp</button>
+                <button class="officer-tools-tab" data-officer-tools-tab="debrief" type="button">Debrief</button>
+              </div>
+              <div class="officer-tools-body" data-officer-tools-body></div>
+            </section>
+          </section>
           <section class="objective-card objective-card-compact frontline-aftermath-card-main frontline-aftermath-card-main-held hidden hud-secondary-card" data-frontline-aftermath-card aria-label="Frontline scar memory">
             <div class="objective-card-head">
               <div>
@@ -9975,35 +10072,35 @@ app.innerHTML = `
         <section class="main-menu-panel" aria-label="Main menu">
           <div class="main-menu-page" data-main-menu-page="board">
             <div class="main-menu-copy">
-              <p class="eyebrow">Escape from Kharkiv</p>
-              <h1 data-main-menu-title>Enter The Stash</h1>
+              <p class="eyebrow">Frontline Officer</p>
+              <h1 data-main-menu-title>Frontline Officer</h1>
               <p class="main-menu-summary" data-main-menu-summary>
-                Stage the next raid, read the route, and only carry what can make it home.
+                Shape a slow, cinematic NPC war. Bank supplies in the protected stash, stage one order, and deploy into the first-town frontline.
               </p>
             </div>
             <div class="main-menu-actions">
               <button class="main-menu-button main-menu-button-primary" data-main-menu-enter type="button">
-                Enter Stash
+                Enter Operations Stash
               </button>
-              <button class="main-menu-button" data-main-menu-art-study-a type="button">
+              <button class="main-menu-button hidden" data-main-menu-art-study-a type="button">
                 Ground Study A
               </button>
-              <button class="main-menu-button" data-main-menu-art-study-b type="button">
+              <button class="main-menu-button hidden" data-main-menu-art-study-b type="button">
                 Ground Study B
               </button>
-              <button class="main-menu-button" data-main-menu-art-study-c type="button">
+              <button class="main-menu-button hidden" data-main-menu-art-study-c type="button">
                 Ground Study C
               </button>
-              <button class="main-menu-button" data-main-menu-art-study-d type="button">
+              <button class="main-menu-button hidden" data-main-menu-art-study-d type="button">
                 Ground Study D
               </button>
-              <button class="main-menu-button" data-main-menu-survivor-test type="button">
+              <button class="main-menu-button hidden" data-main-menu-survivor-test type="button">
                 Survivor Walk Test
               </button>
-              <button class="main-menu-button" data-main-menu-gulag-duel type="button">
+              <button class="main-menu-button hidden" data-main-menu-gulag-duel type="button">
                 Gulag Duel
               </button>
-              <button class="main-menu-button" data-main-menu-sprite-paint-lab type="button">
+              <button class="main-menu-button hidden" data-main-menu-sprite-paint-lab type="button">
                 Sprite Paint Lab
               </button>
               <button class="main-menu-button" data-main-menu-settings type="button">
@@ -10019,7 +10116,7 @@ app.innerHTML = `
               <p class="eyebrow">Settings</p>
               <h1>Key Bindings</h1>
               <p class="main-menu-summary">
-                The live compact controls stack used in the briefing and raid.
+                The live compact controls stack used in the briefing and frontline operation.
               </p>
             </div>
             <div class="main-menu-detail main-menu-detail-settings">
@@ -10036,7 +10133,7 @@ app.innerHTML = `
               <p class="eyebrow">Operator</p>
               <h1>Current Kit</h1>
               <p class="main-menu-summary">
-                Read the current fighter, loadout, and raid posture before stepping onto the operating board.
+                Read the current officer kit, loadout, and deployment posture before stepping onto the operating board.
               </p>
             </div>
             <div class="main-menu-detail main-menu-detail-settings">
@@ -10087,7 +10184,7 @@ app.innerHTML = `
               <div class="main-menu-credit-list">
                 <div class="main-menu-credit-line">
                   <span>Game Build</span>
-                  <strong>Escape from Kharkiv</strong>
+                  <strong>Frontline Officer</strong>
                 </div>
                 <div class="main-menu-credit-line">
                   <span>Workspace</span>
@@ -12534,6 +12631,230 @@ const stashTabTasksSupportMetaValue = requireElement<HTMLElement>("[data-stash-t
 const commandTabButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-command-tab]"));
 const commandTabPanes = Array.from(document.querySelectorAll<HTMLElement>("[data-command-pane]"));
 const selectionDrawers = Array.from(document.querySelectorAll<HTMLDetailsElement>("[data-selection-drawer]"));
+const buildModeToggleButton = requireElement<HTMLButtonElement>("[data-build-mode-toggle]");
+const campArtToggleButton = requireElement<HTMLButtonElement>("[data-camp-art-toggle]");
+const campArtStatusValue = requireElement<HTMLElement>("[data-camp-art-status]");
+const buildModeStrip = requireElement<HTMLElement>("[data-build-mode-strip]");
+const buildModeStatusValue = requireElement<HTMLElement>("[data-build-mode-status]");
+const buildModeBodyValue = requireElement<HTMLElement>("[data-build-mode-body]");
+const officerToolsToggleButton = requireElement<HTMLButtonElement>("[data-officer-tools-toggle]");
+const officerToolsPanel = requireElement<HTMLElement>("[data-officer-tools-panel]");
+const officerToolsCampValue = requireElement<HTMLElement>("[data-officer-tools-camp]");
+const officerToolsTitleValue = requireElement<HTMLElement>("[data-officer-tools-title]");
+const officerToolsBodyValue = requireElement<HTMLElement>("[data-officer-tools-body]");
+const officerToolsTabButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-officer-tools-tab]"));
+
+app.addEventListener("click", (event) => {
+  const target = event.target instanceof HTMLElement ? event.target : null;
+
+  if (target?.closest("[data-officer-tools-toggle]")) {
+    officerToolsState.open = !officerToolsState.open;
+    renderOfficerTools();
+    return;
+  }
+
+  if (target?.closest("[data-build-mode-toggle]")) {
+    officerToolsState.buildModeOpen = !officerToolsState.buildModeOpen;
+    officerToolsState.pane = "build";
+    if (!officerToolsState.buildModeOpen && officerToolsState.placementMode !== null) {
+      cancelOfficerPlacement("Placement cancelled.");
+    } else {
+      officerToolsState.lastAction = officerToolsState.buildModeOpen
+        ? "Build mode ready. Pick trench or ammo, then click the battlefield ghost."
+        : "Build mode collapsed.";
+      renderOfficerTools();
+    }
+    return;
+  }
+
+  if (target?.closest("[data-camp-art-toggle]")) {
+    officerToolsState.playerCampArtVisible = !officerToolsState.playerCampArtVisible;
+    getActiveRaidScene()?.setTownWarPlayerCampArtVisible(officerToolsState.playerCampArtVisible);
+    officerToolsState.lastAction = officerToolsState.playerCampArtVisible
+      ? "Russian camp art visible."
+      : "Russian camp art hidden for trench debugging.";
+    renderOfficerTools();
+    return;
+  }
+
+  if (target?.closest("[data-officer-tools-close]")) {
+    officerToolsState.open = false;
+    renderOfficerTools();
+    return;
+  }
+
+  const tabButton = target?.closest<HTMLButtonElement>("[data-officer-tools-tab]");
+  const tabId = tabButton?.dataset.officerToolsTab as OfficerToolsPaneId | undefined;
+  if (tabId && OFFICER_TOOLS_TABS.some((tab) => tab.id === tabId)) {
+    officerToolsState.pane = tabId;
+    officerToolsState.open = true;
+    renderOfficerTools();
+    return;
+  }
+
+  const workLensButton = target?.closest<HTMLButtonElement>("[data-officer-work-lens]");
+  const workLensId = workLensButton?.dataset.officerWorkLens as OfficerWorkLensId | undefined;
+  if (workLensId && OFFICER_WORK_LENSES.some((lens) => lens.id === workLensId)) {
+    officerToolsState.workLens = workLensId;
+    officerToolsState.open = true;
+    officerToolsState.pane = "priorities";
+    officerToolsState.lastAction =
+      workLensId === "all" ? "Showing every Russian soldier on the priority board." : `Filtering priority board to ${workLensId} work.`;
+    renderOfficerTools();
+    return;
+  }
+
+  const selectSoldierButton = target?.closest<HTMLButtonElement>("[data-officer-select-soldier]");
+  const selectSoldierId = selectSoldierButton?.dataset.officerSelectSoldier;
+  if (selectSoldierId) {
+    const townWar = townWarController.getSnapshot();
+    const soldier = townWar.soldiers.find((entry) => entry.id === selectSoldierId);
+    officerToolsState.selectedSoldierId = selectSoldierId;
+    officerToolsState.open = true;
+    officerToolsState.pane = "priorities";
+    officerToolsState.lastAction = soldier
+      ? `Inspecting ${soldier.displayName}: ${getTownWarTaskLabel(soldier)}.`
+      : "Selected soldier is no longer on the board.";
+    renderOfficerTools();
+    return;
+  }
+
+  const placeButton = target?.closest<HTMLButtonElement>("[data-officer-place]");
+  const placeKind = placeButton?.dataset.officerPlace;
+  if (placeKind === "trench" || placeKind === "ammo-crate" || placeKind === "dugout") {
+    const nextMode = placeKind;
+    const fromBuildModeStrip = placeButton !== null && placeButton !== undefined && placeButton.closest("[data-build-mode-strip]") !== null;
+    officerToolsState.placementMode = officerToolsState.placementMode === nextMode ? null : nextMode;
+    officerToolsState.buildModeOpen = true;
+    officerToolsState.open = fromBuildModeStrip ? false : true;
+    officerToolsState.pane = "build";
+    officerToolsState.lastAction =
+      officerToolsState.placementMode === nextMode
+        ? `${nextMode === "trench" ? "Trench placement armed. Scroll to rotate, then click the ghost." : nextMode === "dugout" ? "Dugout placement armed. Scroll to rotate the protected face, then click the ghost." : "Ammo crate placement armed. Move the mouse over the battlefield and click the ghost."}`
+        : `${nextMode === "trench" ? "Trench" : nextMode === "dugout" ? "Dugout" : "Ammo crate"} placement cancelled.`;
+    syncOfficerBuildPlacementPreview();
+    renderOfficerTools();
+    return;
+  }
+
+  const buildButton = target?.closest<HTMLButtonElement>("[data-officer-build]");
+  const buildKind = buildButton?.dataset.officerBuild;
+  if (buildKind) {
+    townWarController.ensureDemoSeeded();
+    officerToolsState.buildModeOpen = true;
+    const campId = getOfficerCamp(townWarController.getSnapshot());
+    const result =
+      buildKind === "trench"
+        ? townWarController.placeDebugTrench(campId, raidController.state.player.position, officerToolsState.placementAngleRadians)
+        : buildKind === "ammo-crate"
+          ? townWarController.orderAmmoCrate(campId, null)
+          : buildKind === "dugout"
+            ? townWarController.orderDugout(campId, raidController.state.player.position, 1, officerToolsState.placementAngleRadians)
+          : null;
+    officerToolsState.lastAction = result?.ok
+      ? buildKind === "trench"
+        ? "Fast trench completed at your current position."
+        : buildKind === "dugout"
+          ? "Dugout queued at your current position."
+        : `Ammo crate queued for ${getOfficerCampLabel(townWarController.getSnapshot())}.`
+      : `Order failed: ${result?.reason ?? "unknown"}.`;
+    updateUi();
+    return;
+  }
+
+  const presetButton = target?.closest<HTMLButtonElement>("[data-officer-priority-preset]");
+  const soldierPreset = presetButton?.dataset.officerPriorityPreset;
+  const presetSoldierId = presetButton?.dataset.officerSoldier;
+  if (soldierPreset && presetSoldierId) {
+    const result = townWarController.applySoldierPriorityPreset(presetSoldierId, soldierPreset);
+    officerToolsState.selectedSoldierId = presetSoldierId;
+    officerToolsState.lastAction = result.ok
+      ? `${result.soldier?.displayName ?? "Soldier"} shifted to ${soldierPreset}.`
+      : `Priority failed: ${result.reason ?? "unknown"}.`;
+    updateUi();
+    return;
+  }
+
+  const priorityButton = target?.closest<HTMLButtonElement>("[data-officer-priority-work]");
+  const priorityWork = priorityButton?.dataset.officerPriorityWork as TownWarWorkPriorityId | undefined;
+  const prioritySoldierId = priorityButton?.dataset.officerSoldier;
+  const priorityValue = Number(priorityButton?.dataset.officerPriorityValue ?? "5");
+  if (priorityWork && prioritySoldierId && Number.isFinite(priorityValue)) {
+    const result = townWarController.setSoldierPriority(prioritySoldierId, priorityWork, priorityValue);
+    officerToolsState.selectedSoldierId = prioritySoldierId;
+    officerToolsState.lastAction = result.ok
+      ? `${result.soldier?.displayName ?? "Soldier"} now favors ${priorityWork}.`
+      : `Priority failed: ${result.reason ?? "unknown"}.`;
+    updateUi();
+    return;
+  }
+
+  const priorityAdjustButton = target?.closest<HTMLButtonElement>("[data-officer-priority-adjust]");
+  const adjustWork = priorityAdjustButton?.dataset.officerPriorityAdjust as TownWarWorkPriorityId | undefined;
+  const adjustSoldierId = priorityAdjustButton?.dataset.officerSoldier;
+  const adjustDelta = Number(priorityAdjustButton?.dataset.officerPriorityDelta ?? "0");
+  if (adjustWork && adjustSoldierId && Number.isFinite(adjustDelta)) {
+    const townWar = townWarController.getSnapshot();
+    const soldier = townWar.soldiers.find((entry) => entry.id === adjustSoldierId);
+    const currentPriority = soldier?.workPriorities[adjustWork] ?? 0;
+    const nextPriority = Math.round(clampValue(currentPriority + adjustDelta, 0, 5));
+    const result = townWarController.setSoldierPriority(adjustSoldierId, adjustWork, nextPriority);
+    officerToolsState.selectedSoldierId = adjustSoldierId;
+    officerToolsState.lastAction = result.ok
+      ? `${result.soldier?.displayName ?? "Soldier"} ${adjustWork} priority ${result.priority}.`
+      : `Priority failed: ${result.reason ?? "unknown"}.`;
+    updateUi();
+    return;
+  }
+
+  const campWorkButton = target?.closest<HTMLButtonElement>("[data-officer-camp-work]");
+  const campWork = campWorkButton?.dataset.officerCampWork as TownWarCampWorkPriorityId | undefined;
+  const campPriority = Number(campWorkButton?.dataset.officerCampPriority ?? "5");
+  if (campWork && Number.isFinite(campPriority)) {
+    const campId = getOfficerCamp(townWarController.getSnapshot());
+    const result = townWarController.setCampWorkPriority(campId, campWork, campPriority);
+    officerToolsState.lastAction = result.ok
+      ? `${campWork} camp priority set to ${result.priority}.`
+      : `Camp work failed: ${result.reason ?? "unknown"}.`;
+    updateUi();
+    return;
+  }
+
+  const operationButton = target?.closest<HTMLButtonElement>("[data-officer-operation]");
+  const operationAction = operationButton?.dataset.officerOperation;
+  if (operationAction) {
+    const profile = operationButton?.dataset.officerOperationProfile ?? "balanced";
+    const result =
+      operationAction === "prepare"
+        ? townWarController.prepareOperationStockpile(
+            profile === "build"
+              ? { ammo: 180, build: 260, food: 140, med: 70 }
+              : profile === "medical"
+                ? { ammo: 160, build: 140, food: 180, med: 120 }
+                : { ammo: 220, build: 220, food: 180, med: 90 }
+          )
+        : operationAction === "start"
+          ? townWarController.startNextOperation()
+          : townWarController.endOperation();
+    officerToolsState.lastAction = result.readable;
+    updateUi();
+    return;
+  }
+
+  const flankButton = target?.closest<HTMLButtonElement>("[data-officer-flank-lane]");
+  const flankLane = flankButton?.dataset.officerFlankLane as TownWarFlankLaneId | undefined;
+  const flankPressure = flankButton?.dataset.officerFlankPressure as TownWarFlankPressureLevel | undefined;
+  if (flankLane && flankPressure) {
+    const campId = getOfficerCamp(townWarController.getSnapshot());
+    const result = townWarController.stageFlankPressure(flankLane, flankPressure, campId);
+    officerToolsState.lastAction = result.ok
+      ? `${flankLane} flank staged: ${result.outcome?.outcome ?? "active"}.`
+      : `Flank failed: ${result.reason ?? "unknown"}.`;
+    updateUi();
+    return;
+  }
+
+});
 
 stashOverlay.addEventListener("dragstart", (event) => {
   const source = event.target instanceof HTMLElement ? (event.target.closest("[data-drag-kind]") as HTMLElement | null) : null;
@@ -17898,6 +18219,39 @@ function getRaidWorldPointFromClient(clientX: number, clientY: number): { x: num
   return { x: worldPoint.x, y: worldPoint.y };
 }
 
+function normalizePlacementAngleRadians(angle: number): number {
+  const fullTurn = Math.PI * 2;
+  return ((angle % fullTurn) + fullTurn) % fullTurn;
+}
+
+function formatPlacementAngle(angle: number): string {
+  return `${Math.round((normalizePlacementAngleRadians(angle) * 180) / Math.PI)} deg`;
+}
+
+function syncOfficerBuildPlacementPreview(position: { x: number; y: number } | null = officerToolsState.previewWorld): void {
+  if (officerToolsState.placementMode === null) {
+    officerToolsState.previewWorld = null;
+    townWarController.clearBuildPlacementPreview();
+    return;
+  }
+
+  officerToolsState.previewWorld = position;
+  townWarController.setBuildPlacementPreview({
+    kind: officerToolsState.placementMode,
+    faction: getOfficerCamp(townWarController.getSnapshot()),
+    position,
+    facingAngleRadians: officerToolsState.placementMode === "trench" || officerToolsState.placementMode === "dugout" ? officerToolsState.placementAngleRadians : 0,
+    valid: position !== null
+  });
+}
+
+function cancelOfficerPlacement(message = "Placement cancelled."): void {
+  officerToolsState.placementMode = null;
+  officerToolsState.lastAction = message;
+  syncOfficerBuildPlacementPreview(null);
+  renderOfficerTools();
+}
+
 function isEditableEventTarget(target: EventTarget | null): boolean {
   return (
     target instanceof HTMLInputElement ||
@@ -17914,6 +18268,13 @@ window.addEventListener(
   "keydown",
   (event) => {
     if (isEditableEventTarget(event.target)) {
+      return;
+    }
+
+    if (event.key === "Escape" && officerToolsState.placementMode !== null) {
+      cancelOfficerPlacement("Placement cancelled.");
+      event.preventDefault();
+      event.stopPropagation();
       return;
     }
 
@@ -18148,6 +18509,46 @@ window.addEventListener(
 );
 
 window.addEventListener(
+  "pointermove",
+  (event) => {
+    if (officerToolsState.placementMode === null) {
+      return;
+    }
+
+    const pointerWorld =
+      raidController.state.phase === "raid" && event.target === game.canvas
+        ? getRaidWorldPointFromClient(event.clientX, event.clientY)
+        : null;
+    syncOfficerBuildPlacementPreview(pointerWorld);
+  },
+  true
+);
+
+window.addEventListener(
+  "wheel",
+  (event) => {
+    if (raidController.state.phase !== "raid" || (officerToolsState.placementMode !== "trench" && officerToolsState.placementMode !== "dugout") || event.defaultPrevented) {
+      return;
+    }
+
+    if (event.target !== game.canvas) {
+      return;
+    }
+
+    const step = event.shiftKey ? Math.PI / 24 : Math.PI / 12;
+    officerToolsState.placementAngleRadians = normalizePlacementAngleRadians(
+      officerToolsState.placementAngleRadians + (event.deltaY > 0 ? step : -step)
+    );
+    syncOfficerBuildPlacementPreview(getRaidWorldPointFromClient(event.clientX, event.clientY));
+    officerToolsState.lastAction = `${officerToolsState.placementMode === "dugout" ? "Dugout" : "Trench"} rotated to ${formatPlacementAngle(officerToolsState.placementAngleRadians)}.`;
+    renderOfficerTools();
+    event.preventDefault();
+    event.stopPropagation();
+  },
+  { passive: false, capture: true }
+);
+
+window.addEventListener(
   "pointerdown",
   (event) => {
     if (raidController.state.phase !== "raid" || event.defaultPrevented) {
@@ -18158,8 +18559,59 @@ window.addEventListener(
       return;
     }
 
+    if (event.button === 2 && officerToolsState.placementMode !== null) {
+      cancelOfficerPlacement("Placement cancelled with right-click.");
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
     const pointerWorld = getRaidWorldPointFromClient(event.clientX, event.clientY);
     if (!pointerWorld) {
+      return;
+    }
+
+    if (event.button === 0 && officerToolsState.placementMode !== null) {
+      const campId = getOfficerCamp(townWarController.getSnapshot());
+      const mode = officerToolsState.placementMode;
+      let placementRead: string;
+      if (mode === "trench") {
+        const result = townWarController.orderTrench(campId, pointerWorld, 25, officerToolsState.placementAngleRadians);
+        const orderId = typeof result.orderId === "string" ? result.orderId : "trench order";
+        const builder = typeof result.assignedSoldierId === "string" ? result.assignedSoldierId : "builder";
+        const eta =
+          typeof result.etaSeconds === "number" && Number.isFinite(result.etaSeconds)
+            ? `${Math.round(result.etaSeconds)}s`
+            : "unknown ETA";
+        placementRead = result.ok
+          ? `Trench order ${orderId} queued at ${Math.round(pointerWorld.x)},${Math.round(pointerWorld.y)}; ${builder} moving to dig (${eta}).`
+          : `Trench placement failed: ${result.reason ?? "unknown"}.`;
+      } else if (mode === "dugout") {
+        const result = townWarController.orderDugout(campId, pointerWorld, 45, officerToolsState.placementAngleRadians);
+        const orderId = typeof result.orderId === "string" ? result.orderId : "dugout order";
+        const builder = typeof result.assignedSoldierId === "string" ? result.assignedSoldierId : "builder";
+        const eta =
+          typeof result.etaSeconds === "number" && Number.isFinite(result.etaSeconds)
+            ? `${Math.round(result.etaSeconds)}s`
+            : "unknown ETA";
+        placementRead = result.ok
+          ? `Dugout order ${orderId} queued at ${Math.round(pointerWorld.x)},${Math.round(pointerWorld.y)}; ${builder} moving to build shelter (${eta}).`
+          : `Dugout placement failed: ${result.reason ?? "unknown"}.`;
+      } else {
+        const result = townWarController.orderAmmoCrate(campId, pointerWorld);
+        placementRead = result.ok
+          ? `Ammo crate queued at ${Math.round(pointerWorld.x)},${Math.round(pointerWorld.y)} for ${campId}.`
+          : `Ammo crate placement failed: ${result.reason ?? "unknown"}.`;
+      }
+      officerToolsState.placementMode = null;
+      officerToolsState.buildModeOpen = true;
+      officerToolsState.open = false;
+      officerToolsState.pane = "build";
+      officerToolsState.lastAction = placementRead;
+      syncOfficerBuildPlacementPreview(null);
+      updateUi();
+      event.preventDefault();
+      event.stopPropagation();
       return;
     }
 
@@ -18195,6 +18647,11 @@ window.addEventListener(
   "contextmenu",
   (event) => {
     if (raidController.state.phase !== "raid" || event.target !== game.canvas) {
+      return;
+    }
+
+    if (officerToolsState.placementMode !== null) {
+      event.preventDefault();
       return;
     }
 
@@ -20203,6 +20660,907 @@ function setStyleWidthIfChanged(node: HTMLElement, value: string): void {
   }
 }
 
+function getOfficerCamp(townWar: TownWarState): TownWarFactionId {
+  return townWar.officer.faction;
+}
+
+function getTownWarCampPlayerFacingLabel(campId: TownWarFactionId, fallback?: string): string {
+  if (campId === TOWN_WAR_PLAYER_FACTION) {
+    return "Russian Camp";
+  }
+  if (campId === TOWN_WAR_ENEMY_FACTION) {
+    return "Ukrainian Enemy Camp";
+  }
+  return fallback ?? campId;
+}
+
+function getOfficerCampLabel(townWar: TownWarState): string {
+  const campId = getOfficerCamp(townWar);
+  return getTownWarCampPlayerFacingLabel(campId, townWar.camps.find((camp) => camp.id === campId)?.label);
+}
+
+function getSoldierTopSkills(soldier: TownWarSoldierState): string {
+  return Object.entries(soldier.skills)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([skill, value]) => `${skill} ${value}`)
+    .join(" | ");
+}
+
+function getSoldierTopSkillEntries(soldier: TownWarSoldierState): Array<[string, number]> {
+  return Object.entries(soldier.skills)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4);
+}
+
+function getTownWarTaskLabel(soldier: TownWarSoldierState): string {
+  return soldier.task.label ?? soldier.taskDecision.selectedWork ?? soldier.task.kind;
+}
+
+function getSoldierTopPriority(soldier: TownWarSoldierState): string {
+  const [work, priority] =
+    Object.entries(soldier.workPriorities)
+      .sort((left, right) => right[1] - left[1])[0] ?? ["Defend", 0];
+  return `${work} ${priority}`;
+}
+
+function getSoldierPriorityEntries(soldier: TownWarSoldierState): Array<[string, number]> {
+  return Object.entries(soldier.workPriorities)
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 4);
+}
+
+function getSoldierSelectedWork(soldier: TownWarSoldierState): TownWarWorkPriorityId | null {
+  return soldier.taskDecision.selectedWork ?? (Object.entries(soldier.workPriorities).sort((left, right) => right[1] - left[1])[0]?.[0] as TownWarWorkPriorityId | undefined) ?? null;
+}
+
+function soldierMatchesWorkLens(soldier: TownWarSoldierState, lensId: OfficerWorkLensId): boolean {
+  if (lensId === "all") {
+    return true;
+  }
+  const lens = OFFICER_WORK_LENSES.find((entry) => entry.id === lensId);
+  if (!lens) {
+    return true;
+  }
+  const selectedWork = getSoldierSelectedWork(soldier);
+  return lens.works.some((work) => work === selectedWork || soldier.workPriorities[work] >= 5);
+}
+
+function getOfficerWorkLensCount(soldiers: TownWarSoldierState[], lensId: OfficerWorkLensId): number {
+  return soldiers.filter((soldier) => soldierMatchesWorkLens(soldier, lensId)).length;
+}
+
+function renderOfficerPrioritySummary(soldiers: TownWarSoldierState[]): string {
+  const builderCount = getOfficerWorkLensCount(soldiers, "build");
+  const fighterCount = getOfficerWorkLensCount(soldiers, "fight");
+  const medicalCount = getOfficerWorkLensCount(soldiers, "medical");
+  const supplyCount = getOfficerWorkLensCount(soldiers, "supply");
+  const tiredCount = soldiers.filter((soldier) => soldier.currentNeed === "tired" || soldier.needs.fatigue >= 0.58).length;
+  const hungryCount = soldiers.filter((soldier) => soldier.currentNeed === "hungry" || soldier.needs.hunger >= 0.5).length;
+  const woundedCount = soldiers.filter((soldier) => soldier.currentNeed === "wounded" || soldier.health.current < soldier.health.max * 0.7).length;
+  const lensMarkup = OFFICER_WORK_LENSES.map((lens) => {
+    const active = officerToolsState.workLens === lens.id;
+    const count = lens.id === "all" ? soldiers.length : getOfficerWorkLensCount(soldiers, lens.id);
+    return `<button type="button" class="${active ? "active" : ""}" data-officer-work-lens="${lens.id}">${lens.label} ${count}</button>`;
+  }).join("");
+
+  return `
+    <article class="officer-priority-bridge">
+      <div class="officer-priority-bridge-head">
+        <span>Work lens</span>
+        <strong>${soldiers.length} Russian soldiers</strong>
+      </div>
+      <div class="officer-tools-actions officer-tools-actions-tight">${lensMarkup}</div>
+      <div class="officer-priority-labor-grid">
+        <span>Build <strong>${builderCount}</strong></span>
+        <span>Fight <strong>${fighterCount}</strong></span>
+        <span>Medic <strong>${medicalCount}</strong></span>
+        <span>Supply <strong>${supplyCount}</strong></span>
+      </div>
+      <div class="officer-priority-need-row">
+        <span>Tired ${tiredCount}</span>
+        <span>Hungry ${hungryCount}</span>
+        <span>Wounded ${woundedCount}</span>
+      </div>
+    </article>
+  `;
+}
+
+function getSoldierConditionRead(soldier: TownWarSoldierState): string {
+  const healthRatio = soldier.health.max > 0 ? soldier.health.current / soldier.health.max : 0;
+  const pressureRatio = soldier.morale.maxPressure > 0 ? soldier.morale.pressure / soldier.morale.maxPressure : 0;
+  return `health ${Math.round(clampValue(healthRatio, 0, 1) * 100)}% | mag ${soldier.ammo.inMag}/${soldier.ammo.maxMag} | ${
+    soldier.ammo.reserve
+  } reserve | pressure ${Math.round(clampValue(pressureRatio, 0, 1) * 100)}%`;
+}
+
+function renderSoldierMeter(value: number, label: string): string {
+  const percent = Math.round(clampValue(value, 0, 1) * 100);
+  return `<span><i style="width:${percent}%"></i><em>${escapeHtml(label)} ${percent}%</em></span>`;
+}
+
+function renderOfficerSelectedSoldierCard(townWar: TownWarState, soldiers: TownWarSoldierState[]): string {
+  const selected =
+    soldiers.find((soldier) => soldier.id === officerToolsState.selectedSoldierId) ??
+    soldiers[0] ??
+    townWar.soldiers.find((soldier) => soldier.id === officerToolsState.selectedSoldierId);
+  if (!selected) {
+    officerToolsState.selectedSoldierId = null;
+    return `
+      <article class="officer-soldier-inspector muted">
+        <div>
+          <span>Selected soldier</span>
+          <strong>None</strong>
+        </div>
+        <p>Select a Russian soldier in the priority board to see their real job, skills, condition, and decision reason.</p>
+      </article>
+    `;
+  }
+
+  officerToolsState.selectedSoldierId = selected.id;
+  const decision = selected.taskDecision;
+  const candidate = decision.candidates.find((entry) => entry.work === decision.selectedWork) ?? decision.candidates[0] ?? null;
+  const reason = decision.selectedReason ?? candidate?.reason ?? selected.tacticalIntent.reason ?? selected.identitySummary.risk;
+  const blocked = decision.blockedReason ?? candidate?.blockedReason ?? null;
+  const skillMarkup = getSoldierTopSkillEntries(selected)
+    .map(([skill, value]) => `<span>${escapeHtml(skill)} <strong>${value}</strong></span>`)
+    .join("");
+  const priorityMarkup = getSoldierPriorityEntries(selected)
+    .map(([work, value]) => `<span>${escapeHtml(work)} <strong>${value}</strong></span>`)
+    .join("");
+  const priorityNudgeMarkup = OFFICER_PRIORITY_INSPECTOR_WORKS.map((work) => {
+    const value = selected.workPriorities[work] ?? 0;
+    return `
+      <div class="officer-priority-nudge-row">
+        <span>${escapeHtml(work)}</span>
+        <button type="button" data-officer-priority-adjust="${work}" data-officer-priority-delta="-1" data-officer-soldier="${escapeHtml(selected.id)}" aria-label="Lower ${escapeHtml(work)} priority">-</button>
+        <strong>${value}</strong>
+        <button type="button" data-officer-priority-adjust="${work}" data-officer-priority-delta="1" data-officer-soldier="${escapeHtml(selected.id)}" aria-label="Raise ${escapeHtml(work)} priority">+</button>
+      </div>
+    `;
+  }).join("");
+  const decisionMarkup =
+    decision.candidates.length > 0
+      ? decision.candidates
+          .slice(0, 3)
+          .map((entry) => {
+            const active = entry.work === decision.selectedWork;
+            const score = Math.round(entry.score);
+            const scoreWidth = Math.round(clampValue(entry.score / 100, 0, 1) * 100);
+            return `
+              <div class="officer-decision-row ${active ? "active" : ""}">
+                <div>
+                  <strong>${escapeHtml(entry.work)}</strong>
+                  <span>${escapeHtml(entry.blockedReason ?? entry.reason)}</span>
+                </div>
+                <em>${score}</em>
+                <i style="width:${scoreWidth}%"></i>
+              </div>
+            `;
+          })
+          .join("")
+      : `<p>No alternate work candidates yet.</p>`;
+  const presetButtons = OFFICER_PRIORITY_PRESETS.map(
+    (preset) =>
+      `<button type="button" data-officer-priority-preset="${preset.id}" data-officer-soldier="${escapeHtml(selected.id)}">${preset.label}</button>`
+  ).join("");
+
+  return `
+    <article class="officer-soldier-inspector">
+      <div class="officer-soldier-inspector-head">
+        <div>
+          <span>Selected Russian soldier</span>
+          <strong>${escapeHtml(selected.displayName)}</strong>
+        </div>
+        <em>${escapeHtml(`${selected.role} | ${selected.archetype}`)}</em>
+      </div>
+      <div class="officer-soldier-inspector-grid">
+        <span>Job <strong>${escapeHtml(getTownWarTaskLabel(selected))}</strong></span>
+        <span>Need <strong>${escapeHtml(selected.currentNeed)}</strong></span>
+        <span>Cover <strong>${escapeHtml(selected.coverIntent.state)}</strong></span>
+        <span>Tactic <strong>${escapeHtml(selected.tacticalIntent.state)}</strong></span>
+        <span>Map <strong>Tracked</strong></span>
+      </div>
+      <p>${escapeHtml(getSoldierConditionRead(selected))}</p>
+      <div class="officer-soldier-meter-grid">
+        ${renderSoldierMeter(selected.needs.fatigue, "fatigue")}
+        ${renderSoldierMeter(selected.needs.hunger, "hunger")}
+        ${renderSoldierMeter(selected.needs.morale, "stress")}
+      </div>
+      <div class="officer-soldier-chip-grid">${skillMarkup}</div>
+      <div class="officer-soldier-chip-grid priority">${priorityMarkup}</div>
+      <div class="officer-priority-nudge-grid">${priorityNudgeMarkup}</div>
+      <div class="officer-decision-stack">
+        <div class="officer-decision-stack-head">
+          <span>Decision stack</span>
+          <strong>${escapeHtml(decision.selectedWork ?? "None")}</strong>
+        </div>
+        ${decisionMarkup}
+      </div>
+      <p>${escapeHtml(blocked ? `${reason} Blocked: ${blocked}.` : reason)}</p>
+      <div class="officer-tools-actions officer-tools-actions-tight">${presetButtons}</div>
+    </article>
+  `;
+}
+
+function getSoldierRecentStory(townWar: TownWarState, soldier: TownWarSoldierState): string {
+  const story = townWar.frontlineStories.find((entry) => entry.soldierId === soldier.id);
+  if (story) {
+    return story.summary;
+  }
+  if (soldier.dramaMemoryTags.length > 0) {
+    return soldier.dramaMemoryTags[0].split("-").join(" ");
+  }
+  return soldier.identitySummary.risk || "No field memory yet";
+}
+
+function formatOfficerProgress(current: number, max: number): string {
+  if (max <= 0) {
+    return "0%";
+  }
+  return `${Math.round(clampValue(current / max, 0, 1) * 100)}%`;
+}
+
+function formatOfficerPercent(value: number | null | undefined): string {
+  return `${Math.round(clampValue(value ?? 0, 0, 1) * 100)}%`;
+}
+
+function getOfficerPressureLabel(value: number | null | undefined, lowLabel: string, highLabel: string): string {
+  const percent = Math.round(clampValue(value ?? 0, 0, 1) * 100);
+  return percent >= 55 ? `${percent}% ${highLabel}` : `${percent}% ${lowLabel}`;
+}
+
+function getOfficerCampWorkCounts(townWar: TownWarState, campId: TownWarFactionId): Record<string, number> {
+  const counts: Record<string, number> = {
+    build: 0,
+    resupply: 0,
+    heal: 0,
+    suppress: 0,
+    defend: 0,
+    rest: 0
+  };
+  for (const soldier of townWar.soldiers) {
+    if (soldier.faction !== campId || soldier.health.current <= 0) {
+      continue;
+    }
+    if (soldier.task.kind === "hold" && soldier.task.label?.toLowerCase().includes("rest")) {
+      counts.rest += 1;
+    } else if (counts[soldier.task.kind] !== undefined) {
+      counts[soldier.task.kind] += 1;
+    }
+  }
+  return counts;
+}
+
+function getOfficerCampBottleneckRead(camp: TownWarState["camps"][number] | undefined): string {
+  if (!camp) {
+    return "No camp telemetry.";
+  }
+  const warnings = camp.sustainment.warnings;
+  if (warnings.length > 0) {
+    return warnings[0];
+  }
+  if (camp.supply.build < 40) {
+    return "Build stock low: trench orders will run dry.";
+  }
+  if (camp.supply.med < 20) {
+    return "Med stock low: wounded recovery is brittle.";
+  }
+  if (camp.supply.food < 45) {
+    return "Food stock low: hunger will drag readiness down.";
+  }
+  return camp.sustainment.bottleneckReason ?? "Camp work is supporting the line.";
+}
+
+function renderBuildModeStrip(townWar: TownWarState): string {
+  const campId = getOfficerCamp(townWar);
+  const camp = townWar.camps.find((entry) => entry.id === campId) ?? townWar.camps[0];
+  const pendingOrders = townWar.orders.filter((order) => order.faction === campId && order.status !== "completed").length;
+  const selectedTool =
+    officerToolsState.placementMode === "trench" ? "Trench" : officerToolsState.placementMode === "dugout" ? "Dugout" : officerToolsState.placementMode === "ammo-crate" ? "Ammo" : "None";
+  const trenchButtonLabel = officerToolsState.placementMode === "trench" ? "Cancel trench" : "Trench";
+  const dugoutButtonLabel = officerToolsState.placementMode === "dugout" ? "Cancel dugout" : "Dugout";
+  const ammoButtonLabel = officerToolsState.placementMode === "ammo-crate" ? "Cancel ammo" : "Ammo";
+  const placementHint =
+    officerToolsState.placementMode === "trench"
+      ? "Move the ghost, scroll to rotate, left-click to place."
+      : officerToolsState.placementMode === "dugout"
+        ? "Move the ghost, scroll to face the protected side, left-click to place."
+        : officerToolsState.placementMode === "ammo-crate"
+          ? "Move the ghost and left-click to queue ammo."
+        : "Pick a tool, then place it on the battlefield.";
+
+  return `
+    <div class="build-mode-read">
+      <article>
+        <span>Tool</span>
+        <strong>${escapeHtml(selectedTool)}</strong>
+      </article>
+      <article>
+        <span>Stock</span>
+        <strong>${camp?.supply.build ?? 0} build</strong>
+      </article>
+      <article>
+        <span>Angle</span>
+        <strong>${formatPlacementAngle(officerToolsState.placementAngleRadians)}</strong>
+      </article>
+      <article>
+        <span>Pending</span>
+        <strong>${pendingOrders}</strong>
+      </article>
+    </div>
+    <div class="build-mode-actions">
+      <button type="button" class="${officerToolsState.placementMode === "trench" ? "active" : ""}" data-officer-place="trench">${trenchButtonLabel}</button>
+      <button type="button" class="${officerToolsState.placementMode === "dugout" ? "active" : ""}" data-officer-place="dugout">${dugoutButtonLabel}</button>
+      <button type="button" class="${officerToolsState.placementMode === "ammo-crate" ? "active" : ""}" data-officer-place="ammo-crate">${ammoButtonLabel}</button>
+      <button type="button" data-officer-build="trench">Fast trench</button>
+      <button type="button" data-officer-build="dugout">Fast dugout</button>
+      <button type="button" data-officer-build="ammo-crate">Queue ammo</button>
+    </div>
+    <p class="build-mode-hint">${escapeHtml(placementHint)} Esc/right-click cancels.</p>
+  `;
+}
+
+function renderOfficerBuildPane(townWar: TownWarState): string {
+  const campId = getOfficerCamp(townWar);
+  const camp = townWar.camps.find((entry) => entry.id === campId) ?? townWar.camps[0];
+  const openOrders = townWar.orders
+    .filter((order) => order.faction === campId)
+    .slice(-5)
+    .reverse();
+  const completedCover = townWar.aiTactics.completedConstructionImpact.filter((entry) => entry.faction === campId);
+  const completedTrenches = townWar.aiTactics.coverSlots.filter((slot) => slot.faction === campId && slot.sourceKind === "trench").length;
+  const liveAmmoCrates = townWar.ammoCrates.filter((crate) => crate.faction === campId && crate.destroyedAtSeconds === null).length;
+  const liveDugouts = townWar.dugouts.filter((dugout) => dugout.faction === campId && dugout.destroyedAtSeconds === null).length;
+  const activePlacementLabel =
+    officerToolsState.placementMode === "trench" ? "trench" : officerToolsState.placementMode === "dugout" ? "dugout" : officerToolsState.placementMode === "ammo-crate" ? "ammo crate" : "building";
+  const placementRead =
+    officerToolsState.placementMode !== null
+      ? officerToolsState.previewWorld
+        ? `Ghost ${activePlacementLabel} ready at ${Math.round(officerToolsState.previewWorld.x)}, ${Math.round(officerToolsState.previewWorld.y)}${
+            officerToolsState.placementMode === "trench" || officerToolsState.placementMode === "dugout" ? ` | angle ${formatPlacementAngle(officerToolsState.placementAngleRadians)} | scroll rotates` : ""
+          }.`
+        : `Move over the battlefield to preview the ${activePlacementLabel} footprint.`
+      : "Pick a build tool, then click the ground where the ghost footprint appears.";
+  const orderMarkup =
+    openOrders.length > 0
+      ? openOrders
+          .map((order) => {
+            const assigned = townWar.soldiers.find((soldier) => soldier.id === order.assignedSoldierId);
+            const progress = formatOfficerProgress(order.build.progress, order.build.requiredProgress);
+            return `
+              <article class="officer-tools-row">
+                <div>
+                  <strong>${escapeHtml(order.kind === "trench" ? "Trench line" : order.kind === "dugout" ? "Dugout" : "Ammo crate")}</strong>
+                  <span>${escapeHtml(`${order.status} | ${assigned?.displayName ?? "unassigned"} | ${progress}`)}</span>
+                </div>
+                <em>${escapeHtml(order.build.stalled ? order.build.stallReason ?? "stalled" : order.build.supportAmmoState)}</em>
+              </article>
+            `;
+          })
+          .join("")
+      : `<p class="officer-tools-empty">No active build orders for this camp.</p>`;
+
+  return `
+    <div class="officer-tools-grid">
+      <article class="officer-tools-stat">
+        <span>Build stock</span>
+        <strong>${camp?.supply.build ?? 0}</strong>
+      </article>
+      <article class="officer-tools-stat">
+        <span>Ammo stock</span>
+        <strong>${camp?.supply.ammo ?? 0}</strong>
+      </article>
+      <article class="officer-tools-stat">
+        <span>Finished cover</span>
+        <strong>${completedCover.length}</strong>
+      </article>
+    </div>
+    <article class="officer-tools-note officer-tools-placement-note ${officerToolsState.placementMode !== null ? "active" : ""}">
+      <strong>${officerToolsState.placementMode !== null ? `Placing ${activePlacementLabel}` : "Build mode"}</strong>
+      <span>${escapeHtml(placementRead)}</span>
+    </article>
+    <div class="officer-tools-actions">
+      <button type="button" class="${officerToolsState.placementMode === "trench" ? "active" : ""}" data-officer-place="trench">${officerToolsState.placementMode === "trench" ? "Cancel trench" : "Place trench"}</button>
+      <button type="button" class="${officerToolsState.placementMode === "dugout" ? "active" : ""}" data-officer-place="dugout">${officerToolsState.placementMode === "dugout" ? "Cancel dugout" : "Place dugout"}</button>
+      <button type="button" class="${officerToolsState.placementMode === "ammo-crate" ? "active" : ""}" data-officer-place="ammo-crate">${officerToolsState.placementMode === "ammo-crate" ? "Cancel ammo" : "Place ammo"}</button>
+      <button type="button" data-officer-build="trench">Fast trench here</button>
+      <button type="button" data-officer-build="dugout">Fast dugout here</button>
+      <button type="button" data-officer-build="ammo-crate">Queue ammo</button>
+    </div>
+    <div class="officer-tools-build-cards">
+      <article>
+        <strong>Trench</strong>
+        <span>Visible fighting slit. Mouse wheel rotates before placement; soldiers prefer it under fire.</span>
+        <em>${completedTrenches} built</em>
+      </article>
+      <article>
+        <strong>Dugout</strong>
+        <span>Rally shelter. Connects nearby trenches, pulls defenders, and gives pinned soldiers somewhere safer than open retreat.</span>
+        <em>${liveDugouts} active</em>
+      </article>
+      <article>
+        <strong>Ammo crate</strong>
+        <span>Forward resupply node. Builders place it, defenders reload from it, enemies can destroy it.</span>
+        <em>${liveAmmoCrates} live</em>
+      </article>
+    </div>
+    <div class="officer-tools-section">
+      <div class="officer-tools-section-head">
+        <span>Build queue</span>
+        <strong>${openOrders.length}</strong>
+      </div>
+      ${orderMarkup}
+    </div>
+    <p class="officer-tools-action-read">${escapeHtml(officerToolsState.lastAction)}</p>
+  `;
+}
+
+function renderOfficerPrioritiesPane(townWar: TownWarState): string {
+  const campId = getOfficerCamp(townWar);
+  const liveSoldiers = townWar.soldiers
+    .filter((soldier) => soldier.faction === campId && soldier.health.current > 0)
+    .sort((a, b) => b.taskDecision.selectedScore - a.taskDecision.selectedScore);
+  const soldiers = liveSoldiers
+    .filter((soldier) => soldierMatchesWorkLens(soldier, officerToolsState.workLens))
+    .slice(0, 8);
+  if (soldiers.length > 0 && !soldiers.some((soldier) => soldier.id === officerToolsState.selectedSoldierId)) {
+    officerToolsState.selectedSoldierId = soldiers[0].id;
+  }
+
+  const soldierMarkup =
+    soldiers.length > 0
+      ? soldiers
+          .map((soldier) => {
+            const selected = soldier.id === officerToolsState.selectedSoldierId;
+            const presetButtons = OFFICER_PRIORITY_PRESETS.map(
+              (preset) =>
+                `<button type="button" data-officer-priority-preset="${preset.id}" data-officer-soldier="${escapeHtml(soldier.id)}">${preset.label}</button>`
+            ).join("");
+            const quickWorkButtons = OFFICER_PRIORITY_QUICK_WORKS.map((work) => {
+              const active = soldier.workPriorities[work] >= 5;
+              return `<button type="button" class="${active ? "active" : ""}" data-officer-priority-work="${work}" data-officer-priority-value="5" data-officer-soldier="${escapeHtml(soldier.id)}">${work}</button>`;
+            }).join("");
+            return `
+              <article class="officer-soldier-row ${selected ? "selected" : ""}">
+                <div class="officer-soldier-main">
+                  <div>
+                    <strong>${escapeHtml(soldier.displayName)}</strong>
+                    <span>${escapeHtml(`${soldier.role} ${soldier.archetype} | ${soldier.currentNeed} | ${getTownWarTaskLabel(soldier)}`)}</span>
+                    <span>${escapeHtml(`top priority ${getSoldierTopPriority(soldier)} | ${getSoldierRecentStory(townWar, soldier)}`)}</span>
+                  </div>
+                  <em>${escapeHtml(getSoldierTopSkills(soldier))}</em>
+                </div>
+                <div class="officer-tools-actions officer-tools-actions-tight">
+                  <button type="button" class="${selected ? "active" : ""}" data-officer-select-soldier="${escapeHtml(soldier.id)}">${
+                    selected ? "Selected" : "Inspect"
+                  }</button>
+                </div>
+                <div class="officer-tools-actions officer-tools-actions-tight">${presetButtons}</div>
+                <div class="officer-tools-actions officer-tools-actions-tight">${quickWorkButtons}</div>
+              </article>
+            `;
+          })
+          .join("")
+      : `<p class="officer-tools-empty">No living soldiers are currently tied to this camp.</p>`;
+
+  return `
+    <div class="officer-tools-section">
+      <div class="officer-tools-section-head">
+        <span>Priority board</span>
+        <strong>${soldiers.length}/${liveSoldiers.length} shown</strong>
+      </div>
+      ${renderOfficerPrioritySummary(liveSoldiers)}
+      ${renderOfficerSelectedSoldierCard(townWar, soldiers)}
+      ${soldierMarkup}
+    </div>
+    <p class="officer-tools-action-read">${escapeHtml(officerToolsState.lastAction)}</p>
+  `;
+}
+
+function renderOfficerCampPane(townWar: TownWarState): string {
+  const campId = getOfficerCamp(townWar);
+  const camp = townWar.camps.find((entry) => entry.id === campId) ?? townWar.camps[0];
+  const campLabel = getTownWarCampPlayerFacingLabel(campId, camp?.label);
+  const sustainment = camp?.sustainment;
+  const workCounts = getOfficerCampWorkCounts(townWar, campId);
+  const casualties = townWar.casualties.filter(
+    (casualty) => casualty.faction === campId && (casualty.status === "wounded" || casualty.status === "downed")
+  );
+  const liveSoldiers = townWar.soldiers.filter((soldier) => soldier.faction === campId && soldier.health.current > 0);
+  const tiredCount = liveSoldiers.filter((soldier) => soldier.currentNeed === "tired" || soldier.needs.fatigue >= 0.58).length;
+  const hungryCount = liveSoldiers.filter((soldier) => soldier.currentNeed === "hungry" || soldier.needs.hunger >= 0.5).length;
+  const ammoNeedCount = liveSoldiers.filter((soldier) => soldier.currentNeed === "low-ammo" || soldier.ammo.inMag + soldier.ammo.reserve < soldier.ammo.maxMag * 1.5).length;
+  const bottleneckRead = getOfficerCampBottleneckRead(camp);
+  const operation = townWar.operation;
+  const operationRecommendations = operation.recommendations.slice(0, 3);
+  const operationRecommendationMarkup =
+    operationRecommendations.length > 0
+      ? operationRecommendations.map((entry) => `<span>${escapeHtml(entry)}</span>`).join("")
+      : `<span>Prepare a stockpile, launch the operation, then debrief the carried consequences.</span>`;
+  const campWorkMarkup = OFFICER_CAMP_WORKS.map((work) => {
+    const priority = sustainment?.workPriorities[work] ?? 0;
+    return `
+      <article class="officer-tools-row">
+        <div>
+          <strong>${work}</strong>
+          <span>${escapeHtml(`priority ${priority} | camp-wide work bias`)}</span>
+        </div>
+        <button type="button" data-officer-camp-work="${work}" data-officer-camp-priority="${priority >= 5 ? 3 : 5}">
+          ${priority >= 5 ? "Ease" : "Push"}
+        </button>
+      </article>
+    `;
+  }).join("");
+  const activeWorkMarkup = [
+    { label: "Builders", value: workCounts.build, read: "digging or moving to build" },
+    { label: "Ammo runners", value: workCounts.resupply, read: "hauling to a crate or lane" },
+    { label: "Medics", value: workCounts.heal, read: "recovering wounded" },
+    { label: "Cover fire", value: workCounts.suppress, read: "protecting workers or lane" }
+  ]
+    .map(
+      (entry) => `
+        <article class="officer-tools-row officer-tools-row-compact">
+          <div>
+            <strong>${entry.label}</strong>
+            <span>${entry.read}</span>
+          </div>
+          <em>${entry.value}</em>
+        </article>
+      `
+    )
+    .join("");
+  const flankMarkup = OFFICER_FLANK_LANES.map(
+    (lane) => `<button type="button" data-officer-flank-lane="${lane}" data-officer-flank-pressure="medium">${lane}</button>`
+  ).join("");
+
+  return `
+    <div class="officer-tools-grid">
+      <article class="officer-tools-stat">
+        <span>Readiness</span>
+        <strong>${formatOfficerPercent(sustainment?.readiness)}</strong>
+      </article>
+      <article class="officer-tools-stat">
+        <span>Ammo flow</span>
+        <strong>${formatOfficerPercent(sustainment?.ammoFlow)}</strong>
+      </article>
+      <article class="officer-tools-stat">
+        <span>Morale</span>
+        <strong>${formatOfficerPercent(camp?.control.morale)}</strong>
+      </article>
+    </div>
+    <article class="officer-tools-note officer-colony-status-card">
+      <strong>${escapeHtml(campLabel)} work colony</strong>
+      <span>${escapeHtml(bottleneckRead)}</span>
+      <div class="officer-colony-meter-grid">
+        <span>Food ${camp?.supply.food ?? 0}</span>
+        <span>Build ${camp?.supply.build ?? 0}</span>
+        <span>Med ${camp?.supply.med ?? 0}</span>
+        <span>Ammo ${camp?.supply.ammo ?? 0}</span>
+        <span>${escapeHtml(getOfficerPressureLabel(sustainment?.fatigueAverage, "rested", "tired"))}</span>
+        <span>${escapeHtml(getOfficerPressureLabel(sustainment?.hungerAverage, "fed", "hungry"))}</span>
+      </div>
+    </article>
+    <article class="officer-tools-note officer-colony-status-card">
+      <strong>${escapeHtml(`Operation ${operation.activeId} | ${operation.phase}`)}</strong>
+      <span>${escapeHtml(`Committed stockpile: ammo ${operation.stockpile.lastCommitted.ammo}, build ${operation.stockpile.lastCommitted.build}, food ${operation.stockpile.lastCommitted.food}, med ${operation.stockpile.lastCommitted.med}`)}</span>
+      <div class="officer-colony-meter-grid">
+        <span>Protected ammo ${operation.stockpile.protected.ammo}</span>
+        <span>Protected build ${operation.stockpile.protected.build}</span>
+        <span>Protected food ${operation.stockpile.protected.food}</span>
+        <span>Protected med ${operation.stockpile.protected.med}</span>
+      </div>
+      <div class="officer-tools-actions">
+        <button type="button" data-officer-operation="prepare" data-officer-operation-profile="balanced">Balanced prep</button>
+        <button type="button" data-officer-operation="prepare" data-officer-operation-profile="build">Build push</button>
+        <button type="button" data-officer-operation="prepare" data-officer-operation-profile="medical">Medical prep</button>
+        <button type="button" data-officer-operation="start">Next op</button>
+        <button type="button" data-officer-operation="end">Debrief op</button>
+      </div>
+      <div class="officer-tools-mini-list">${operationRecommendationMarkup}</div>
+    </article>
+    <div class="officer-tools-grid">
+      <article class="officer-tools-stat">
+        <span>Medical load</span>
+        <strong>${casualties.length}</strong>
+      </article>
+      <article class="officer-tools-stat">
+        <span>Tired/hungry</span>
+        <strong>${tiredCount}/${hungryCount}</strong>
+      </article>
+      <article class="officer-tools-stat">
+        <span>Ammo need</span>
+        <strong>${ammoNeedCount}</strong>
+      </article>
+    </div>
+    <div class="officer-tools-section">
+      <div class="officer-tools-section-head">
+        <span>Camp work</span>
+        <strong>${escapeHtml(campLabel)}</strong>
+      </div>
+      ${campWorkMarkup}
+    </div>
+    <div class="officer-tools-section">
+      <div class="officer-tools-section-head">
+        <span>Active colony jobs</span>
+        <strong>${workCounts.build + workCounts.resupply + workCounts.heal + workCounts.suppress}</strong>
+      </div>
+      ${activeWorkMarkup}
+    </div>
+    <div class="officer-tools-section">
+      <div class="officer-tools-section-head">
+        <span>Probe lane</span>
+        <strong>${townWar.officer.focusedLane}</strong>
+      </div>
+      <div class="officer-tools-actions">${flankMarkup}</div>
+    </div>
+    <p class="officer-tools-action-read">${escapeHtml(officerToolsState.lastAction)}</p>
+  `;
+}
+
+function getTownWarDistance(left: { x: number; y: number }, right: { x: number; y: number }): number {
+  return Math.hypot(left.x - right.x, left.y - right.y);
+}
+
+function getTownWarTrenchFit(slot: TownWarState["aiTactics"]["coverSlots"][number], sourcePosition: { x: number; y: number }): number {
+  if (slot.sourceKind !== "trench") {
+    return 1;
+  }
+  const sourceAngle = Math.atan2(sourcePosition.y - slot.position.y, sourcePosition.x - slot.position.x);
+  const fullTurn = Math.PI * 2;
+  const rawDelta = Math.abs(((sourceAngle - slot.facingAngleRadians) % fullTurn + fullTurn) % fullTurn);
+  const delta = rawDelta > Math.PI ? fullTurn - rawDelta : rawDelta;
+  return clampValue(Math.abs(Math.sin(delta)), 0, 1);
+}
+
+function renderOfficerBuildOutcomeCard(townWar: TownWarState): string {
+  const campId = getOfficerCamp(townWar);
+  const latestImpact = [...townWar.aiTactics.completedConstructionImpact]
+    .filter((impact) => impact.faction === campId)
+    .sort((left, right) => right.createdAtSeconds - left.createdAtSeconds)[0];
+
+  if (!latestImpact) {
+    return `
+      <article class="officer-tools-note officer-tools-outcome-card">
+        <strong>No build payoff recorded</strong>
+        <span>Complete a trench or ammo crate and this card will name what it changed in the fight.</span>
+      </article>
+    `;
+  }
+
+  const order = townWar.orders.find((candidate) => candidate.id === latestImpact.orderId) ?? null;
+  const impactSlots = townWar.aiTactics.coverSlots.filter((slot) => slot.sourceId?.startsWith(`${latestImpact.orderId}:`) || slot.id === latestImpact.coverSlotId);
+  const occupiedSlots = impactSlots.filter((slot) => slot.occupiedBySoldierId !== null);
+  const anchorSlot = occupiedSlots[0] ?? impactSlots[0] ?? townWar.aiTactics.coverSlots.find((slot) => slot.id === latestImpact.coverSlotId) ?? null;
+  const nearestEnemy =
+    anchorSlot === null
+      ? null
+      : townWar.combatants
+          .filter((combatant) => combatant.faction !== anchorSlot.faction && combatant.health.current > 0)
+          .sort((left, right) => getTownWarDistance(left.position, anchorSlot.position) - getTownWarDistance(right.position, anchorSlot.position))[0] ?? null;
+  const fit = anchorSlot && nearestEnemy ? getTownWarTrenchFit(anchorSlot, nearestEnemy.position) : null;
+  const pressureSaved = anchorSlot ? Math.round(anchorSlot.protection * (fit === null ? 56 : fit >= 0.72 ? 68 : fit >= 0.38 ? 42 : 14)) : 0;
+  const nearbySuppressors =
+    anchorSlot === null
+      ? 0
+      : townWar.soldiers.filter(
+          (soldier) =>
+            soldier.faction === campId &&
+            soldier.health.current > 0 &&
+            soldier.task.kind === "suppress" &&
+            soldier.ammo.inMag + soldier.ammo.reserve > 0 &&
+            getTownWarDistance(soldier.position, anchorSlot.position) <= 420
+        ).length;
+  const liveAmmoNearby =
+    anchorSlot === null
+      ? 0
+      : townWar.ammoCrates.filter(
+          (crate) =>
+            crate.faction === campId &&
+            crate.destroyedAtSeconds === null &&
+            crate.ammo > 0 &&
+            getTownWarDistance(crate.position, anchorSlot.position) <= 360
+        ).length;
+
+  const headline =
+    latestImpact.kind === "ammo-crate"
+      ? liveAmmoNearby > 0 && nearbySuppressors > 0
+        ? "Ammo kept suppression alive"
+        : "Ammo position completed"
+      : fit !== null && fit < 0.38
+        ? "Trench is flanked"
+        : occupiedSlots.length > 0
+          ? "Trench reduced pressure"
+          : "Trench ready, waiting for holders";
+  const detail =
+    latestImpact.kind === "ammo-crate"
+      ? `${nearbySuppressors} suppressor${nearbySuppressors === 1 ? "" : "s"} can fight around this crate while it has ammo.`
+      : fit !== null && fit < 0.38
+        ? `Facing is weak against the nearest enemy angle. Cover only saves about ${pressureSaved}% pressure.`
+        : `${occupiedSlots.length}/${Math.max(impactSlots.length, 1)} slots occupied. Current facing saves about ${pressureSaved}% pressure.`;
+  const meta =
+    latestImpact.kind === "ammo-crate"
+      ? `${order?.build.outcomeCause ?? "completed"} | ${liveAmmoNearby} live ammo node${liveAmmoNearby === 1 ? "" : "s"} nearby`
+      : `${order?.build.outcomeCause ?? "completed"} | ${fit === null ? "no enemy angle" : fit >= 0.72 ? "front protected" : fit >= 0.38 ? "angled cover" : "enfiladed"}`;
+
+  return `
+    <article class="officer-tools-note officer-tools-outcome-card ${fit !== null && fit < 0.38 ? "danger" : "success"}">
+      <strong>${escapeHtml(headline)}</strong>
+      <span>${escapeHtml(detail)}</span>
+      <em>${escapeHtml(meta)}</em>
+    </article>
+  `;
+}
+
+function renderOfficerDebriefPane(townWar: TownWarState): string {
+  const debrief = townWar.skillDebrief;
+  const campId = getOfficerCamp(townWar);
+  const operationDebrief = townWar.operation.lastDebrief;
+  const operationRecommendations = (operationDebrief?.recommendations ?? townWar.operation.recommendations).slice(0, 4);
+  const operationRecommendationMarkup =
+    operationRecommendations.length > 0
+      ? operationRecommendations
+          .map(
+            (recommendation) => `
+              <article class="officer-tools-row">
+                <div>
+                  <strong>Next operation</strong>
+                  <span>${escapeHtml(recommendation)}</span>
+                </div>
+              </article>
+            `
+          )
+          .join("")
+      : `<p class="officer-tools-empty">No operation recommendations yet.</p>`;
+  const namedStories = townWar.frontlineStories.filter((story) => story.faction === campId).slice(0, 6);
+  const namedStoryMarkup =
+    namedStories.length > 0
+      ? namedStories
+          .map(
+            (story) => `
+              <article class="officer-tools-row officer-story-row">
+                <div>
+                  <strong>${escapeHtml(`${story.soldierName} | ${story.kind}`)}</strong>
+                  <span>${escapeHtml(story.summary)}</span>
+                  <span>${escapeHtml(story.consequence)}</span>
+                </div>
+              </article>
+            `
+          )
+          .join("")
+      : `<p class="officer-tools-empty">No named soldier contributions recorded yet.</p>`;
+  const outcomeMarkup =
+    debrief.outcomes.length > 0
+      ? debrief.outcomes
+          .slice(-4)
+          .reverse()
+          .map(
+            (outcome) => `
+              <article class="officer-tools-row">
+                <div>
+                  <strong>${escapeHtml(outcome.outcome)}</strong>
+                  <span>${escapeHtml(`${outcome.lane} | ${outcome.pressure} | readiness ${Math.round(outcome.readiness * 100)}%`)}</span>
+                </div>
+              </article>
+            `
+          )
+          .join("")
+      : `<p class="officer-tools-empty">No flank or skill outcomes yet.</p>`;
+  const dramaMarkup =
+    townWar.dialogue.recentDramaEvents.length > 0
+      ? townWar.dialogue.recentDramaEvents
+          .slice(-3)
+          .reverse()
+          .map(
+            (event) => `
+              <article class="officer-tools-row">
+                <div>
+                  <strong>${escapeHtml(event.locationLabel)}</strong>
+                  <span>${escapeHtml(event.summary)}</span>
+                </div>
+              </article>
+            `
+          )
+          .join("")
+      : `<p class="officer-tools-empty">No fresh drama beats yet.</p>`;
+
+  return `
+    ${renderOfficerBuildOutcomeCard(townWar)}
+    <article class="officer-tools-note">
+      <strong>${escapeHtml(operationDebrief?.summary ?? `Operation ${townWar.operation.activeId} ${townWar.operation.phase}`)}</strong>
+      <span>${escapeHtml(`Carried soldiers: ${townWar.operation.carriedSoldiers.length} | protected stockpile build ${townWar.operation.stockpile.protected.build}, ammo ${townWar.operation.stockpile.protected.ammo}`)}</span>
+      <div class="officer-tools-actions">
+        <button type="button" data-officer-operation="end">Debrief op</button>
+        <button type="button" data-officer-operation="start">Start next op</button>
+      </div>
+    </article>
+    <div class="officer-tools-section">
+      <div class="officer-tools-section-head">
+        <span>Operation recommendations</span>
+        <strong>${operationRecommendations.length}</strong>
+      </div>
+      ${operationRecommendationMarkup}
+    </div>
+    <div class="officer-tools-section">
+      <div class="officer-tools-section-head">
+        <span>Named frontline stories</span>
+        <strong>${namedStories.length}</strong>
+      </div>
+      ${namedStoryMarkup}
+    </div>
+    <article class="officer-tools-note">
+      <strong>${escapeHtml(debrief.summary)}</strong>
+      <span>${escapeHtml(debrief.recommendedNextPlan)}</span>
+    </article>
+    <div class="officer-tools-section">
+      <div class="officer-tools-section-head">
+        <span>Skill outcomes</span>
+        <strong>${debrief.outcomes.length}</strong>
+      </div>
+      ${outcomeMarkup}
+    </div>
+    <div class="officer-tools-section">
+      <div class="officer-tools-section-head">
+        <span>War stories</span>
+        <strong>${townWar.dialogue.recentDramaEvents.length}</strong>
+      </div>
+      ${dramaMarkup}
+    </div>
+  `;
+}
+
+function renderOfficerTools(): void {
+  townWarController.ensureDemoSeeded();
+  syncOfficerBuildPlacementPreview();
+  const townWar = townWarController.getSnapshot();
+  const campLabel = getOfficerCampLabel(townWar);
+  const buildModeActive = officerToolsState.buildModeOpen || officerToolsState.placementMode !== null;
+  document.body.classList.toggle("town-war-build-mode", raidController.state.phase === "raid" && buildModeActive);
+  buildModeToggleButton.setAttribute("aria-expanded", buildModeActive ? "true" : "false");
+  buildModeToggleButton.classList.toggle("active", buildModeActive);
+  buildModeToggleButton.classList.toggle("placing", officerToolsState.placementMode !== null);
+  campArtToggleButton.setAttribute("aria-pressed", officerToolsState.playerCampArtVisible ? "false" : "true");
+  campArtToggleButton.classList.toggle("hidden-art", !officerToolsState.playerCampArtVisible);
+  setTextIfChanged(campArtStatusValue, officerToolsState.playerCampArtVisible ? "On" : "Off");
+  getActiveRaidScene()?.setTownWarPlayerCampArtVisible(officerToolsState.playerCampArtVisible);
+  buildModeStrip.classList.toggle("hidden", !buildModeActive);
+  setTextIfChanged(
+    buildModeStatusValue,
+    officerToolsState.placementMode === "trench"
+      ? "Trench"
+      : officerToolsState.placementMode === "dugout"
+        ? "Dugout"
+      : officerToolsState.placementMode === "ammo-crate"
+        ? "Ammo"
+        : buildModeActive
+          ? "Open"
+          : "Ready"
+  );
+  setHtmlIfChanged(buildModeBodyValue, renderBuildModeStrip(townWar));
+  setTextIfChanged(officerToolsCampValue, campLabel);
+  officerToolsToggleButton.setAttribute("aria-expanded", officerToolsState.open ? "true" : "false");
+  officerToolsToggleButton.classList.toggle("placing", officerToolsState.placementMode !== null);
+  officerToolsPanel.classList.toggle("hidden", !officerToolsState.open);
+  const activeTab = OFFICER_TOOLS_TABS.find((tab) => tab.id === officerToolsState.pane) ?? OFFICER_TOOLS_TABS[0];
+  setTextIfChanged(officerToolsTitleValue, `${activeTab.label} tools`);
+  for (const button of officerToolsTabButtons) {
+    const active = button.dataset.officerToolsTab === officerToolsState.pane;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  }
+
+  const body =
+    officerToolsState.pane === "build"
+      ? renderOfficerBuildPane(townWar)
+      : officerToolsState.pane === "priorities"
+        ? renderOfficerPrioritiesPane(townWar)
+        : officerToolsState.pane === "camp"
+          ? renderOfficerCampPane(townWar)
+          : renderOfficerDebriefPane(townWar);
+  setHtmlIfChanged(officerToolsBodyValue, body);
+  getActiveRaidScene()?.setTownWarSelectedSoldierId(officerToolsState.selectedSoldierId);
+}
+
 function getSurvivorActorFrameRing(activeKnifeEvent: SurvivorTestKnifeEvent | null): string[] {
   if (survivorWalkState.weaponId === "knife") {
     if (activeKnifeEvent !== null && survivorMeleeAttackKnifeFrames.length > 0) {
@@ -21636,6 +22994,7 @@ function updateUi(): void {
   const weapon = WEAPONS[selectedWeapon];
   const tacticalService = raidController.getSelectedTacticalService();
   const activeDemand = raidController.getActiveDemand();
+  renderOfficerTools();
   loadoutDrawerTitleValue.textContent = weapon.name;
   loadoutDrawerMetaValue.textContent = `Reference only | ${formatWeaponDrawerMeta(selectedWeapon)}`;
   routeDrawerTitleValue.textContent = route.name;
@@ -21748,8 +23107,8 @@ function updateUi(): void {
   );
   const mainMenuSummary =
     phase === "stash"
-      ? "A quiet front door before the operating board."
-      : "Get back to the stash, reset the board, and build the next push.";
+      ? "Officer prep: bank supplies in the protected stash, stage an order, then deploy into the first-town frontline."
+      : "Pause the frontline, return to the stash, and reset the operating board.";
   const operatorPageBody = `
     <div class="main-menu-credit-line">
       <span>Primary</span>
@@ -21790,7 +23149,7 @@ function updateUi(): void {
       <strong>${escapeHtml(formatWeaponReloadProfile(selectedWeapon))}</strong>
     </div>
   `;
-  setTextIfChanged(mainMenuTitleValue, phase === "stash" ? "Escape from Kharkiv" : "Return To The Board");
+  setTextIfChanged(mainMenuTitleValue, phase === "stash" ? "Frontline Officer" : "Return To Operations");
   setTextIfChanged(mainMenuSummaryValue, mainMenuSummary);
   setHtmlIfChanged(mainMenuOperatorBodyValue, operatorPageBody);
   setHtmlIfChanged(mainMenuRangeBodyValue, rangePageBody);
@@ -28092,7 +29451,8 @@ function stageDebugBlueCarriedFireShowcase(): void {
     timer: 0,
     movementPenaltyTimer: 0,
     destination: { ...activeExtract.position },
-    destinationLabel: activeExtract.label
+    destinationLabel: activeExtract.label,
+    storyBeat: "moving"
   };
   raidController.state.selectedSquadMateId = rescuerMate.id;
   raidController.state.soundPressure = Math.max(raidController.state.soundPressure, 0.94);
@@ -28233,7 +29593,8 @@ function stageDebugBlueCarriedExtractSuccessShowcase(): void {
     timer: 0,
     movementPenaltyTimer: 0,
     destination: { ...activeExtract.position },
-    destinationLabel: activeExtract.label
+    destinationLabel: activeExtract.label,
+    storyBeat: "extracting"
   };
   raidController.state.selectedSquadMateId = rescuerMate.id;
   raidController.state.soundPressure = Math.max(raidController.state.soundPressure, 0.74);
@@ -28366,7 +29727,8 @@ function stageDebugBlueBodyExtractShowcase(): void {
     timer: 0,
     movementPenaltyTimer: 0,
     destination: { ...activeExtract.position },
-    destinationLabel: activeExtract.label
+    destinationLabel: activeExtract.label,
+    storyBeat: "extracting"
   };
   raidController.state.activeExtractId = activeExtract.id;
   raidController.state.extractionReady = true;
@@ -33279,6 +34641,7 @@ type AgentStageStateId =
   | "front-door"
   | "stash"
   | "briefing"
+  | "town-war"
   | "raid"
   | "extract-ready"
   | "extract-hold-active"
@@ -33334,6 +34697,203 @@ interface TopDownExtractionAgentApi {
   getOptions: () => ReturnType<typeof getAgentOptions>;
   configureNextRaid: (config: AgentConfigureInput) => ReturnType<typeof getAgentSnapshot>;
   stageState: (stateId: AgentStageStateId) => ReturnType<typeof getAgentSnapshot>;
+  damageTownWarCamp: (payload: { campId: "camp-a" | "camp-b"; amount: number }) => ReturnType<typeof getAgentSnapshot>;
+  lootTownWarAmmoCrate: (payload: { crateId: string; looterFaction: "camp-a" | "camp-b" }) => {
+    ok: boolean;
+    summary: string;
+    crate: import("./game/townWar/state").TownWarAmmoCrateState | null;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  orderTownWarTrench: (payload: { campId: "camp-a" | "camp-b"; x?: number; y?: number; facingAngleRadians?: number }) => {
+    ok: boolean;
+    summary: string;
+    order: import("./game/townWar/controller").TownWarOfficerOrderResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  orderTownWarAmmoCrate: (payload: { campId: "camp-a" | "camp-b"; x?: number; y?: number }) => {
+    ok: boolean;
+    summary: string;
+    order: import("./game/townWar/controller").TownWarOfficerOrderResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  orderTownWarDugout: (payload: { campId: "camp-a" | "camp-b"; x?: number; y?: number; facingAngleRadians?: number }) => {
+    ok: boolean;
+    summary: string;
+    order: import("./game/townWar/controller").TownWarOfficerOrderResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  damageTownWarDugout: (payload: { dugoutId: string; amount: number }) => {
+    ok: boolean;
+    summary: string;
+    dugout: import("./game/townWar/state").TownWarDugoutState | null;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  getTownWarDugoutReport: () => {
+    ok: boolean;
+    summary: string;
+    report: ReturnType<typeof townWarController.getDugoutReport>;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  focusTownWarLane: (payload: { campId: "camp-a" | "camp-b"; lane: import("./game/townWar/controller").TownWarOfficerLaneId }) => {
+    ok: boolean;
+    summary: string;
+    focus: import("./game/townWar/controller").TownWarOfficerFocusResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  listTownWarPriorities: (payload?: { campId?: "camp-a" | "camp-b" }) => {
+    ok: boolean;
+    summary: string;
+    soldiers: import("./game/townWar/state").TownWarSoldierState[];
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  setTownWarPriority: (payload: { soldierId: string; work: string; priority: number }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarPriorityMutationResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  presetTownWarPriority: (payload: { soldierId: string; preset: string }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarPriorityMutationResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  getTownWarTaskCandidates: (payload: { soldierId: string }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarPriorityMutationResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  setTownWarSoldierNeeds: (payload: { soldierId: string; fatigue?: number; hunger?: number; morale?: number }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarPriorityMutationResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  setTownWarSoldierAmmo: (payload: { soldierId: string; inMag?: number; reserve?: number; maxMag?: number }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarPriorityMutationResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  orderTownWarBuildTest: (payload: { builderId: string; coveredById?: string; x?: number; y?: number }) => {
+    ok: boolean;
+    summary: string;
+    order: import("./game/townWar/controller").TownWarOfficerOrderResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  getTownWarBuildReport: (payload: { orderId: string }) => {
+    ok: boolean;
+    summary: string;
+    report: import("./game/townWar/controller").TownWarBuildReportResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  stageTownWarCasualty: (payload: { soldierId: string; x?: number; y?: number; severity?: import("./game/townWar/state").TownWarCasualtySeverity }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarCasualtyMutationResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  orderTownWarMedicRescue: (payload: { medicId: string; targetSoldierId: string; coveredById?: string }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarCasualtyMutationResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  getTownWarRescueReport: () => {
+    ok: boolean;
+    summary: string;
+    report: import("./game/townWar/controller").TownWarRescueReportResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  getTownWarSustainmentReport: () => {
+    ok: boolean;
+    summary: string;
+    report: import("./game/townWar/controller").TownWarSustainmentReportResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  setTownWarCampWork: (payload: { campId: "camp-a" | "camp-b"; work: string; priority: number }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarCampWorkMutationResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  stageTownWarAmmoPressure: (payload: { campId: "camp-a" | "camp-b" }) => {
+    ok: boolean;
+    summary: string;
+    report: import("./game/townWar/controller").TownWarSustainmentReportResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  stageTownWarFatigue: (payload: { campId: "camp-a" | "camp-b"; level: number }) => {
+    ok: boolean;
+    summary: string;
+    report: import("./game/townWar/controller").TownWarSustainmentReportResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  stageTownWarFlank: (payload: { campId?: "camp-a" | "camp-b"; lane: import("./game/townWar/state").TownWarFlankLaneId; pressure: import("./game/townWar/state").TownWarFlankPressureLevel }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarFlankPressureResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  runTownWarSkillEmergenceDemo: () => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarSkillEmergenceDemoResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  getTownWarSkillDebrief: () => {
+    ok: boolean;
+    summary: string;
+    debrief: import("./game/townWar/state").TownWarSkillDebriefState;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  prepareTownWarOperation: (payload: { ammo?: number; build?: number; food?: number; med?: number }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarOperationMutationResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  startNextTownWarOperation: () => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarOperationMutationResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  endTownWarOperation: () => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarOperationMutationResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  getTownWarOperationReport: () => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarOperationMutationResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  advanceTownWar: (payload: { seconds?: number; tickSeconds?: number }) => {
+    ok: boolean;
+    summary: string;
+    advance: import("./game/townWar/controller").TownWarOfficerAdvanceResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  deployTownWarOfficer: (payload: { campId: "camp-a" | "camp-b" }) => {
+    ok: boolean;
+    summary: string;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  focusTownWarCamera: (payload: { x?: number; y?: number }) => {
+    ok: boolean;
+    summary: string;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  reinforceTownWar: (payload: { campId: "camp-a" | "camp-b"; role?: import("./game/townWar/types").TownWarRoleId; count?: number }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarReinforceResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
   setTopTab: (tabId: TopTabId) => ReturnType<typeof getAgentSnapshot>;
   setCommandTab: (tabId: CommandTabId) => ReturnType<typeof getAgentSnapshot>;
   startRaid: () => ReturnType<typeof getAgentSnapshot>;
@@ -33353,6 +34913,15 @@ interface TopDownExtractionAgentApi {
     source?: "dom" | "alt-click" | "ctrl-click" | "alt-v" | "alt-g" | "cli" | "agent";
   }) => ReturnType<typeof getAgentSnapshot>;
   stageShowcase: (showcaseId: AgentShowcaseId) => ReturnType<typeof getAgentSnapshot>;
+  stageEnemyCornerUnstick: () => {
+    ok: boolean;
+    summary: string;
+    enemyId: number | null;
+    start: { x: number; y: number } | null;
+    goal: { x: number; y: number } | null;
+    obstacle: { id: number; label: string | null; x: number; y: number; width: number; height: number } | null;
+    snapshot: ReturnType<typeof getAgentSnapshot>;
+  };
 }
 
 const AGENT_TOP_TABS: TopTabId[] = ["gear", "operator", "health", "skills", "map", "tasks"];
@@ -33401,6 +34970,7 @@ const cliRuntimeMetrics = {
   fps: 0,
   frameTimeMs: 0,
   lastFrameAt: performance.now(),
+  townWarRealtimeEnabled: false,
   playerSampleAccumulatorMs: 0,
   heatmapSampleAccumulatorMs: 0,
   playerPathSamples: [] as Array<{ x: number; y: number; time: number }>,
@@ -34347,6 +35917,8 @@ function getDoorwayTelemetrySnapshot() {
 function getAgentSnapshot() {
   const route = raidController.getActiveRoute();
   const { state } = raidController;
+  townWarController.ensureDemoSeeded();
+  const townWar = townWarController.getSnapshot();
   const storyFinaleSummary = getStoryFinaleTriggerSummary(state.raidHistory);
   const pendingStoryFinale = state.phase === "stash" && storyFinaleSummary !== null && storyFinaleState.choice === null;
   const frontDoorOpen = state.phase === "stash" && frontDoorState.menuOpen && !briefingState.open && !pendingStoryFinale;
@@ -34354,15 +35926,19 @@ function getAgentSnapshot() {
   const activeSector = state.frontlineSectors.find((sector) => sector.routeId === route.id) ?? null;
   const ukraineIncidents = state.frontlineIncidents;
   const russianSupports = state.frontlineSupports;
-  const ukrainianHealthMetrics = getEnemyHealthMetrics(state.enemies);
+  const russianFactionHealthMetrics = getEnemyHealthMetrics([
+    { health: state.player.health, maxHealth: state.player.maxHealth },
+    ...state.friendlyCombatants
+  ]);
+  const ukrainianFactionHealthMetrics = getEnemyHealthMetrics(state.enemies);
   const combatDensityMetrics = getCombatDensityMetrics(
     state.player.position,
     state.enemies,
     state.frontlineSupports.map((support) => ({ position: support.position, health: 1, maxHealth: 1 })),
     ukraineIncidents
   );
-  const russianCombatStrength = russianSupports.reduce((total, support) => total + support.strength, 0);
-  const ukrainianCombatStrength = ukraineIncidents.reduce((total, incident) => total + incident.strength, 0);
+  const russianCombatStrength = state.friendlyCombatants.length + russianSupports.reduce((total, support) => total + support.strength, 0) + 1;
+  const ukrainianCombatStrength = state.enemies.length + ukraineIncidents.reduce((total, incident) => total + incident.strength, 0);
   const now = performance.now();
   const sampleUkrainians: Array<{
     id: string;
@@ -34390,13 +35966,45 @@ function getAgentSnapshot() {
     position: { x: number; y: number };
     side: "player" | "support";
     marker?: string;
+    squadRole?: string;
   }> = [
     {
       id: "player",
       position: state.player.position,
       side: "player" as const
     },
+    ...state.friendlyCombatants.map((combatant) => ({
+      id: `friendly-${combatant.id}`,
+      position: combatant.position,
+      side: "support" as const,
+      marker: combatant.ownerKind,
+      squadRole: combatant.weaponId
+    })),
     ...russianSupports.map((support) => ({ id: `support-${support.id}`, position: support.position, side: "support" as const, marker: support.kind }))
+  ];
+  const sampleUkrainianFaction = [
+    ...state.enemies.map((enemy) => ({
+      id: `enemy-${enemy.id}`,
+      position: enemy.position
+    })),
+    ...ukraineIncidents.map((incident) => ({
+      id: `incident-${incident.id}`,
+      position: incident.position
+    }))
+  ];
+  const sampleRussianFaction = [
+    {
+      id: "player",
+      position: state.player.position
+    },
+    ...state.friendlyCombatants.map((combatant) => ({
+      id: `${combatant.ownerKind}-${combatant.id}`,
+      position: combatant.position
+    })),
+    ...russianSupports.map((support) => ({
+      id: `support-${support.id}`,
+      position: support.position
+    }))
   ];
   const battlefieldSamples = [...sampleUkrainians, ...sampleRussians];
   const battlefieldSpan =
@@ -34823,6 +36431,117 @@ function getAgentSnapshot() {
   return {
     phase: state.phase,
     message: state.message,
+    war: {
+      fork: "frontline-officer",
+      intentDoc: "docs/PERSISTENT_WAR_OFFICER_FORK_INTENT.md",
+      town: {
+        id: "town-001",
+        routeId: route.id,
+        activeSector: activeSector
+          ? {
+              routeName: activeSector.routeName,
+              zoneLabel: activeSector.zoneLabel,
+              control: activeSector.control,
+              pressure: Number(activeSector.pressure.toFixed(3)),
+              fortification: Number(activeSector.fortification.toFixed(3))
+            }
+          : null
+      },
+      match: { ...townWar.match },
+      officer: {
+        faction: townWar.officer.faction,
+        position: { x: townWar.officer.position.x, y: townWar.officer.position.y },
+        focusedLane: townWar.officer.focusedLane,
+        lastCommandRead: townWar.officer.lastCommandRead,
+        lastCommandAtSeconds: townWar.officer.lastCommandAtSeconds
+      },
+      dialogue: {
+        lastDramaEvent: townWar.dialogue.lastDramaEvent,
+        recentDramaEvents: townWar.dialogue.recentDramaEvents,
+        activeOfficerWarTags: townWar.dialogue.activeOfficerWarTags,
+        activeScarTags: townWar.dialogue.activeScarTags
+      },
+      dramaMemories: townWar.dramaMemories,
+      locationScars: townWar.locationScars,
+      focusedLocationScar: townWar.focusedLocationScar,
+      dramaBeat: townWar.dramaBeat,
+      debriefEchoes: townWar.debriefEchoes,
+      flankPressures: townWar.flankPressures,
+      skillDebrief: townWar.skillDebrief,
+      storyPackAudit: validateDialogueStoryPacks(),
+      aiThreats: townWar.aiThreats,
+      aiTactics: townWar.aiTactics,
+      coverSlots: townWar.aiTactics.coverSlots,
+      suppressionFields: townWar.aiTactics.suppressionFields,
+      tacticalPairs: townWar.aiTactics.tacticalPairs,
+      completedConstructionImpact: townWar.aiTactics.completedConstructionImpact,
+      playerThreatShare: townWar.aiThreats.playerThreatShare,
+      frontlineFocus: townWar.aiThreats.frontlineFocus,
+      casualties: townWar.casualties,
+      soldiers: townWar.soldiers.map((soldier) => ({
+        id: soldier.id,
+        faction: soldier.faction,
+        role: soldier.role,
+        displayName: soldier.displayName,
+        archetype: soldier.archetype,
+        skills: soldier.skills,
+        traits: soldier.traits,
+        needs: soldier.needs,
+        workPriorities: soldier.workPriorities,
+        currentNeed: soldier.currentNeed,
+        experience: soldier.experience,
+        identitySummary: soldier.identitySummary,
+        task: soldier.task,
+        targetIntent: soldier.targetIntent,
+        tacticalIntent: soldier.tacticalIntent,
+        coverIntent: soldier.coverIntent,
+        dramaMemoryTags: soldier.dramaMemoryTags,
+        witnessedEventCount: soldier.witnessedEventCount,
+        dramaArc: soldier.dramaArc,
+        trustInOfficer: soldier.dramaArc.trustInOfficer,
+        relationshipPressure: soldier.dramaArc.relationshipPressure
+      })),
+      camps: townWar.camps.map((camp) => ({
+        id: camp.id,
+        side: camp.id === "camp-a" ? "a" : "b",
+        label: camp.label,
+        spawn: {
+          position: { ...camp.spawn.position },
+          radius: camp.spawn.radius,
+          totalSpawned: camp.spawn.totalSpawned,
+          lastReinforcementAtSeconds: camp.spawn.lastReinforcementAtSeconds
+        },
+        spawnedSoldiers: townWar.soldiers.filter((soldier) => soldier.faction === camp.id).length,
+        health: camp.health.current,
+        maxHealth: camp.health.max,
+        supply: { ...camp.supply },
+        control: { ...camp.control },
+        sustainment: { ...camp.sustainment, warnings: [...camp.sustainment.warnings], workPriorities: { ...camp.sustainment.workPriorities } },
+        destroyed: camp.destroyed
+      })),
+      townWar,
+      seams: {
+        runtimeOwners: {
+          simulation: "src/game/simulation.ts",
+          scene: "src/game/scene/RaidScene.ts",
+          routeLayout: "src/game/arena.ts",
+          agentSnapshot: "src/main.ts#getAgentSnapshot",
+          cli: "scripts/project-cli.mjs"
+        },
+        cutover: {
+          town: "Introduce TownState outside Phaser scenes",
+          camps: "Introduce two CampState entities with health/control",
+          soldiers: "Evolve from enemies/incidents/supports into SoldierState agents",
+          buildOrders: "Create build-order ledger (place -> execute -> payoff)",
+          cli: "Expose war.* in snapshot for automation"
+        }
+      },
+      runtimeHints: {
+        enemyCount: state.enemies.length,
+        incidentCount: state.frontlineIncidents.length,
+        supportCount: state.frontlineSupports.length
+      }
+    },
     ui: {
       topTab: stashUiState.activeTopTab,
       commandTab: stashUiState.activeCommandTab,
@@ -35401,6 +37120,17 @@ function getAgentSnapshot() {
               ammoPacks: state.carriedSupplies.ammoPacks
             },
             soundPressure: Number(state.soundPressure.toFixed(2)),
+            bullets: state.bullets.map((bullet) => ({
+              id: bullet.id,
+              faction: bullet.faction,
+              source: bullet.source,
+              fromPlayer: bullet.fromPlayer,
+              weaponId: bullet.weaponId,
+              position: {
+                x: Number(bullet.position.x.toFixed(1)),
+                y: Number(bullet.position.y.toFixed(1))
+              }
+            })),
             enemyCount: state.enemies.length,
             enemies: state.enemies.map((enemy) => ({
               id: enemy.id,
@@ -35413,6 +37143,7 @@ function getAgentSnapshot() {
               squadRoleLabel: formatEnemySquadRoleLabel(enemy.squadRole),
               compressionState: enemy.compressionState,
               casualtyState: enemy.casualtyState,
+              health: Number(enemy.health.toFixed(1)),
               position: {
                 x: Number(enemy.position.x.toFixed(1)),
                 y: Number(enemy.position.y.toFixed(1))
@@ -35420,6 +37151,21 @@ function getAgentSnapshot() {
               anchor: {
                 x: Number(enemy.anchor.x.toFixed(1)),
                 y: Number(enemy.anchor.y.toFixed(1))
+              }
+            })),
+            friendlyCombatants: state.friendlyCombatants.map((combatant) => ({
+              id: combatant.id,
+              ownerKind: combatant.ownerKind,
+              ownerId: combatant.ownerId,
+              squadMateId: combatant.squadMateId,
+              name: combatant.name,
+              voiceTag: combatant.voiceTag,
+              weaponId: combatant.weaponId,
+              casualtyState: combatant.casualtyState,
+              health: Number(combatant.health.toFixed(1)),
+              position: {
+                x: Number(combatant.position.x.toFixed(1)),
+                y: Number(combatant.position.y.toFixed(1))
               }
             })),
             enemySquads: enemySquadSummaries,
@@ -35624,28 +37370,35 @@ function getAgentSnapshot() {
         duration: order.duration
       })),
       ukrainianCombatants: {
-        count: state.frontlineIncidents.length + state.enemies.length,
+        count: state.enemies.length + state.frontlineIncidents.length,
         health: {
-          count: ukrainianHealthMetrics.count,
-          totalHealth: ukrainianHealthMetrics.total,
-          averageHealth: ukrainianHealthMetrics.averageHealth,
-          averageMaxHealth: ukrainianHealthMetrics.averageMaxHealth,
-          averageHealthPercent: ukrainianHealthMetrics.averagePercent,
-          minHealth: ukrainianHealthMetrics.minHealth
+          count: ukrainianFactionHealthMetrics.count,
+          totalHealth: ukrainianFactionHealthMetrics.total,
+          averageHealth: ukrainianFactionHealthMetrics.averageHealth,
+          averageMaxHealth: ukrainianFactionHealthMetrics.averageMaxHealth,
+          averageHealthPercent: ukrainianFactionHealthMetrics.averagePercent,
+          minHealth: ukrainianFactionHealthMetrics.minHealth
         },
         combatStrength: ukrainianCombatStrength,
-        samplePositions: getCombatPositionSamples(sampleUkrainians)
+        samplePositions: getCombatPositionSamples(sampleUkrainianFaction)
       },
       russianCombatants: {
-        count: state.frontlineSupports.length + 1,
-        playerHealthPercent: getSafePercent(state.player.health, state.player.maxHealth),
+        count: 1 + state.friendlyCombatants.length + state.frontlineSupports.length,
+        health: {
+          count: russianFactionHealthMetrics.count,
+          totalHealth: russianFactionHealthMetrics.total,
+          averageHealth: russianFactionHealthMetrics.averageHealth,
+          averageMaxHealth: russianFactionHealthMetrics.averageMaxHealth,
+          averageHealthPercent: russianFactionHealthMetrics.averagePercent,
+          minHealth: russianFactionHealthMetrics.minHealth
+        },
         combatStrength: russianCombatStrength,
-        samplePositions: getCombatPositionSamples(sampleRussians)
+        samplePositions: getCombatPositionSamples(sampleRussianFaction)
       },
       metrics: {
         fps: getNumericPercentString(cliRuntimeMetrics.fps, 1),
         frameTimeMs: getNumericPercentString(cliRuntimeMetrics.frameTimeMs, 2),
-        uptimeSeconds: getNumericPercentString((now - cliRuntimeMetrics.startedAt) / 1000, 2),
+        uptimeSeconds: Number(((now - cliRuntimeMetrics.startedAt) / 1000).toFixed(2)),
         actorTotals: {
           enemies: state.enemies.length,
           incidentSpots: state.frontlineIncidents.length,
@@ -35752,6 +37505,83 @@ function configureNextRaid(config: AgentConfigureInput): ReturnType<typeof getAg
 
   updateUi();
   return getAgentSnapshot();
+}
+
+function stageEnemyCornerUnstickScenario(): ReturnType<TopDownExtractionAgentApi["stageEnemyCornerUnstick"]> {
+  if (raidController.state.phase === "stash") {
+    raidController.setActiveRoute("broken-signal");
+    selectWeapon("rifle");
+    raidController.startRaid(raidController.state.selectedWeapon);
+  }
+
+  const { state } = raidController;
+  const obstacle =
+    state.obstacles.find((entry) => entry.width >= 110 && entry.height >= 90 && entry.doorways && entry.doorways.length > 0) ??
+    state.obstacles.find((entry) => entry.width >= 110 && entry.height >= 90) ??
+    null;
+  const enemy =
+    state.enemies.find((entry) => entry.casualtyState !== "dead" && entry.squadRole === "probe-rifle") ??
+    state.enemies.find((entry) => entry.casualtyState !== "dead" && entry.squadRole !== "support-gunner") ??
+    state.enemies.find((entry) => entry.casualtyState !== "dead") ??
+    null;
+
+  if (!obstacle || !enemy) {
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: false,
+      summary: "Enemy corner unstick staging failed: no suitable obstacle or enemy.",
+      enemyId: enemy?.id ?? null,
+      start: null,
+      goal: null,
+      obstacle: obstacle
+        ? { id: obstacle.id, label: obstacle.label ?? null, x: obstacle.x, y: obstacle.y, width: obstacle.width, height: obstacle.height }
+        : null,
+      snapshot
+    };
+  }
+
+  const start = {
+    x: Math.max(enemy.radius + 8, obstacle.x - enemy.radius - 1),
+    y: Math.max(enemy.radius + 8, obstacle.y - enemy.radius - 1)
+  };
+  const goal = {
+    x: obstacle.x + obstacle.width + 260,
+    y: obstacle.y + obstacle.height + 220
+  };
+
+  state.player.position = { ...goal };
+  state.player.health = state.player.maxHealth;
+  state.player.casualtyState = "healthy";
+  enemy.position = { ...start };
+  enemy.anchor = { ...goal };
+  enemy.investigateTarget = { ...goal };
+  enemy.investigateTimer = 6;
+  enemy.alert = true;
+  enemy.awareness = "engaged";
+  enemy.openingPosture = "patrol";
+  enemy.squadRole = "probe-rifle";
+  enemy.doctrineState = "probe-flank";
+  enemy.compressionState = "idle";
+  enemy.navigationStallTime = 0.5;
+  enemy.navigationRecoveryIndex = 0;
+  enemy.navigationCommittedTarget = null;
+  enemy.lastNavigationSample = { ...start };
+  enemy.pressureTimer = 0;
+  enemy.pressureType = null;
+  enemy.panicTimer = 0;
+
+  updateUi();
+  const snapshot = getAgentSnapshot();
+
+  return {
+    ok: true,
+    summary: `Enemy corner unstick staged for enemy-${enemy.id} around ${obstacle.label ?? `obstacle-${obstacle.id}`}.`,
+    enemyId: enemy.id,
+    start,
+    goal,
+    obstacle: { id: obstacle.id, label: obstacle.label ?? null, x: obstacle.x, y: obstacle.y, width: obstacle.width, height: obstacle.height },
+    snapshot
+  };
 }
 
 function getContainingObstacleIdForPoint(
@@ -35903,6 +37733,19 @@ function stageAgentState(stateId: AgentStageStateId): ReturnType<typeof getAgent
       } else {
         updateUi();
       }
+    }
+    return getAgentSnapshot();
+  }
+
+  if (stateId === "town-war") {
+    if (raidController.state.phase === "stash") {
+      clearLegacyRuntimeForNormalStateTransition();
+      townWarController.reset();
+      townWarController.ensureDemoSeeded();
+      cliRuntimeMetrics.townWarRealtimeEnabled = true;
+      raidController.state.player.position = { ...townWarController.getSnapshot().officer.position };
+      raidController.state.message = "Town war staged: seeded demo soldiers + town/camps for an active match.";
+      updateUi();
     }
     return getAgentSnapshot();
   }
@@ -36238,6 +38081,568 @@ topDownWindow.__topdownExtractionAgentApi = {
   getOptions: () => getAgentOptions(),
   configureNextRaid: (config) => configureNextRaid(config),
   stageState: (stateId) => stageAgentState(stateId),
+  stageEnemyCornerUnstick: () => stageEnemyCornerUnstickScenario(),
+  deployTownWarOfficer: (payload) => {
+    const campId = payload?.campId;
+    if (campId !== "camp-a" && campId !== "camp-b") {
+      const snapshot = getAgentSnapshot();
+      return { ok: false, summary: `Town war officer deploy failed: invalid camp id "${String(campId)}".`, war: snapshot.war ?? null };
+    }
+    const ok = townWarController.deployOfficer(campId);
+    if (ok) {
+      raidController.state.player.position = { ...townWarController.getSnapshot().officer.position };
+    }
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    const summary = ok
+      ? `Town war officer deployed to ${campId} spawn | next: snapshot`
+      : `Town war officer deploy failed (${campId}): current playable side is Russian camp-a on the right.`;
+    return { ok, summary, war: snapshot.war ?? null };
+  },
+  focusTownWarCamera: (payload) => {
+    const x = typeof payload?.x === "number" ? payload.x : payload?.x !== undefined ? Number(payload.x) : null;
+    const y = typeof payload?.y === "number" ? payload.y : payload?.y !== undefined ? Number(payload.y) : null;
+    const snapshotBefore = getAgentSnapshot();
+
+    if (x === null || y === null || !Number.isFinite(x) || !Number.isFinite(y)) {
+      return {
+        ok: false,
+        summary: "Town war camera focus failed: invalid position.",
+        war: snapshotBefore.war ?? null
+      };
+    }
+
+    raidController.state.player.position = { x, y };
+    updateUi();
+    const snapshot = getAgentSnapshot();
+
+    return {
+      ok: true,
+      summary: `Town war camera focused at ${Math.round(x)},${Math.round(y)}.`,
+      war: snapshot.war ?? null
+    };
+  },
+  reinforceTownWar: (payload) => {
+    const campId = payload?.campId;
+    if (campId !== "camp-a" && campId !== "camp-b") {
+      const snapshot = getAgentSnapshot();
+      const result = {
+        ok: false,
+        reason: "invalid-camp-id",
+        campId: "camp-a",
+        role: "rifleman",
+        requested: 0,
+        spawned: 0,
+        soldierIds: []
+      } as import("./game/townWar/controller").TownWarReinforceResult;
+      return { ok: false, summary: `Town war reinforcements failed: invalid camp id "${String(campId)}".`, result, war: snapshot.war ?? null };
+    }
+
+    const candidateRole = payload?.role;
+    const role =
+      candidateRole === "builder" || candidateRole === "rifleman" || candidateRole === "suppressor" || candidateRole === "medic" || candidateRole === "defender"
+        ? candidateRole
+        : "rifleman";
+
+    const count = typeof payload?.count === "number" ? payload.count : payload?.count !== undefined ? Number(payload.count) : 1;
+    const result = townWarController.reinforceCamp(campId, role, count);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    const summary = result.ok
+      ? `Town war reinforcements: ${campId} spawned ${result.spawned}/${result.requested} ${result.role} | next: snapshot`
+      : `Town war reinforcements failed (${campId}): ${result.reason ?? "unknown"}.`;
+    return { ok: result.ok, summary, result, war: snapshot.war ?? null };
+  },
+  damageTownWarCamp: (payload) => {
+    const campId = payload?.campId;
+    if (campId !== "camp-a" && campId !== "camp-b") {
+      return getAgentSnapshot();
+    }
+
+    const amount = typeof payload?.amount === "number" ? payload.amount : Number(payload?.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return getAgentSnapshot();
+    }
+
+    townWarController.ensureDemoSeeded();
+    townWarController.damageCamp(campId, amount);
+    updateUi();
+    return getAgentSnapshot();
+  },
+  lootTownWarAmmoCrate: (payload) => {
+    const looterFaction = payload?.looterFaction;
+    if (looterFaction !== "camp-a" && looterFaction !== "camp-b") {
+      const snapshot = getAgentSnapshot();
+      return { ok: false, summary: "Town war ammo crate loot failed: invalid looter faction.", crate: null, war: snapshot.war ?? null };
+    }
+
+    const crateId = typeof payload?.crateId === "string" ? payload.crateId : payload?.crateId !== undefined ? String(payload.crateId) : "";
+    if (!crateId) {
+      const snapshot = getAgentSnapshot();
+      return { ok: false, summary: "Town war ammo crate loot failed: missing crate id.", crate: null, war: snapshot.war ?? null };
+    }
+
+    const crate = townWarController.lootAmmoCrate(crateId, looterFaction);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+
+    const summary = crate
+      ? `Town war ammo crate looted: ${crate.id} (${crate.faction} -> ${looterFaction}) | next: snapshot`
+      : `Town war ammo crate loot failed: crate missing or already destroyed.`;
+
+    return { ok: Boolean(crate), summary, crate, war: snapshot.war ?? null };
+  },
+  orderTownWarTrench: (payload) => {
+    const campId = payload?.campId;
+    if (campId !== "camp-a" && campId !== "camp-b") {
+      const snapshot = getAgentSnapshot();
+      return {
+        ok: false,
+        summary: "Town war trench order failed: invalid camp id.",
+        order: { ok: false, reason: "invalid-camp-id", campId: "camp-a" },
+        war: snapshot.war ?? null
+      };
+    }
+
+    const x = typeof payload?.x === "number" ? payload.x : payload?.x !== undefined ? Number(payload.x) : null;
+    const y = typeof payload?.y === "number" ? payload.y : payload?.y !== undefined ? Number(payload.y) : null;
+    const facingAngleRadians =
+      typeof payload?.facingAngleRadians === "number"
+        ? payload.facingAngleRadians
+        : payload?.facingAngleRadians !== undefined
+          ? Number(payload.facingAngleRadians)
+          : null;
+    const targetPosition = x !== null && y !== null && Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+
+    const order = townWarController.orderTrench(campId, targetPosition, 25, facingAngleRadians !== null && Number.isFinite(facingAngleRadians) ? facingAngleRadians : undefined);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+
+    const supply = order.campSupply ? `build ${order.campSupply.build}, ammo ${order.campSupply.ammo}` : "supply unknown";
+    const etaSeconds = typeof order.etaSeconds === "number" && Number.isFinite(order.etaSeconds) ? order.etaSeconds.toFixed(1) : "?";
+    const riskTier = typeof order.riskTier === "string" ? order.riskTier : "unknown";
+    const orderId = typeof order.orderId === "string" ? order.orderId : "order";
+    const summary = order.ok
+      ? `Town war trench order: ${orderId} assigned ${order.assignedSoldierId ?? "builder"} (${campId}) | eta ${etaSeconds}s | risk ${riskTier} | ${supply} | next: war-advance --seconds 6`
+      : `Town war trench order failed (${campId}): ${order.reason ?? "unknown"} | ${supply}`;
+
+    return { ok: order.ok, summary, order, war: snapshot.war ?? null };
+  },
+  orderTownWarAmmoCrate: (payload) => {
+    const campId = payload?.campId;
+    if (campId !== "camp-a" && campId !== "camp-b") {
+      const snapshot = getAgentSnapshot();
+      return {
+        ok: false,
+        summary: "Town war ammo crate order failed: invalid camp id.",
+        order: { ok: false, reason: "invalid-camp-id", campId: "camp-a" },
+        war: snapshot.war ?? null
+      };
+    }
+
+    const x = typeof payload?.x === "number" ? payload.x : payload?.x !== undefined ? Number(payload.x) : null;
+    const y = typeof payload?.y === "number" ? payload.y : payload?.y !== undefined ? Number(payload.y) : null;
+    const targetPosition = x !== null && y !== null && Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+
+    const order = townWarController.orderAmmoCrate(campId, targetPosition);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+
+    const supply = order.campSupply ? `build ${order.campSupply.build}, ammo ${order.campSupply.ammo}` : "supply unknown";
+    const etaSeconds = typeof order.etaSeconds === "number" && Number.isFinite(order.etaSeconds) ? order.etaSeconds.toFixed(1) : "?";
+    const riskTier = typeof order.riskTier === "string" ? order.riskTier : "unknown";
+    const orderId = typeof order.orderId === "string" ? order.orderId : "order";
+    const summary = order.ok
+      ? `Town war ammo crate order: ${orderId} assigned ${order.assignedSoldierId ?? "builder"} (${campId}) | eta ${etaSeconds}s | risk ${riskTier} | ${supply} | next: war-advance --seconds 6`
+      : `Town war ammo crate order failed (${campId}): ${order.reason ?? "unknown"} | ${supply}`;
+
+    return { ok: order.ok, summary, order, war: snapshot.war ?? null };
+  },
+  orderTownWarDugout: (payload) => {
+    const campId = payload?.campId;
+    if (campId !== "camp-a" && campId !== "camp-b") {
+      const snapshot = getAgentSnapshot();
+      return {
+        ok: false,
+        summary: "Town war dugout order failed: invalid camp id.",
+        order: { ok: false, reason: "invalid-camp-id", campId: "camp-a" },
+        war: snapshot.war ?? null
+      };
+    }
+
+    const x = typeof payload?.x === "number" ? payload.x : payload?.x !== undefined ? Number(payload.x) : null;
+    const y = typeof payload?.y === "number" ? payload.y : payload?.y !== undefined ? Number(payload.y) : null;
+    const facingAngleRadians =
+      typeof payload?.facingAngleRadians === "number"
+        ? payload.facingAngleRadians
+        : payload?.facingAngleRadians !== undefined
+          ? Number(payload.facingAngleRadians)
+          : null;
+    const targetPosition = x !== null && y !== null && Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+
+    const order = townWarController.orderDugout(
+      campId,
+      targetPosition,
+      45,
+      facingAngleRadians !== null && Number.isFinite(facingAngleRadians) ? facingAngleRadians : undefined
+    );
+    updateUi();
+    const snapshot = getAgentSnapshot();
+
+    const supply = order.campSupply ? `build ${order.campSupply.build}, ammo ${order.campSupply.ammo}` : "supply unknown";
+    const etaSeconds = typeof order.etaSeconds === "number" && Number.isFinite(order.etaSeconds) ? order.etaSeconds.toFixed(1) : "?";
+    const riskTier = typeof order.riskTier === "string" ? order.riskTier : "unknown";
+    const orderId = typeof order.orderId === "string" ? order.orderId : "order";
+    const summary = order.ok
+      ? `Town war dugout order: ${orderId} assigned ${order.assignedSoldierId ?? "builder"} (${campId}) | eta ${etaSeconds}s | risk ${riskTier} | ${supply} | next: war-advance --seconds 6`
+      : `Town war dugout order failed (${campId}): ${order.reason ?? "unknown"} | ${supply}`;
+
+    return { ok: order.ok, summary, order, war: snapshot.war ?? null };
+  },
+  damageTownWarDugout: (payload) => {
+    const dugoutId = typeof payload?.dugoutId === "string" ? payload.dugoutId : "";
+    const amount = typeof payload?.amount === "number" ? payload.amount : Number(payload?.amount ?? 0);
+    const dugout = townWarController.damageDugout(dugoutId, amount);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: dugout !== null,
+      summary: dugout ? `${dugout.id} ${dugout.status}: ${dugout.readable}` : "Town war dugout damage failed: dugout missing.",
+      dugout,
+      war: snapshot.war ?? null
+    };
+  },
+  getTownWarDugoutReport: () => {
+    const report = townWarController.getDugoutReport();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: true,
+      summary: report.readable,
+      report,
+      war: snapshot.war ?? null
+    };
+  },
+  focusTownWarLane: (payload) => {
+    const campId = payload?.campId;
+    if (campId !== "camp-a" && campId !== "camp-b") {
+      const snapshot = getAgentSnapshot();
+      return {
+        ok: false,
+        summary: "Town war focus lane failed: invalid camp id.",
+        focus: { ok: false, reason: "invalid-camp-id", campId: "camp-a", lane: "mid", assignments: [] },
+        war: snapshot.war ?? null
+      };
+    }
+
+    const lane = payload?.lane;
+    if (lane !== "north" && lane !== "mid" && lane !== "south") {
+      const snapshot = getAgentSnapshot();
+      return {
+        ok: false,
+        summary: `Town war focus lane failed (${campId}): invalid lane "${String(lane)}".`,
+        focus: { ok: false, reason: "invalid-lane", campId, lane: "mid", assignments: [] },
+        war: snapshot.war ?? null
+      };
+    }
+
+    const focus = townWarController.focusLane(campId, lane);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    const summary = focus.ok
+      ? `Town war lane focus: ${campId} ordered ${focus.assignments.length} combatants to ${lane} | next: war-advance --seconds 8`
+      : `Town war lane focus failed (${campId}): ${focus.reason ?? "unknown"}.`;
+
+    return { ok: focus.ok, summary, focus, war: snapshot.war ?? null };
+  },
+  listTownWarPriorities: (payload) => {
+    const campId = payload?.campId;
+    if (campId !== undefined && campId !== "camp-a" && campId !== "camp-b") {
+      const snapshot = getAgentSnapshot();
+      return { ok: false, summary: "Town war priority list failed: invalid camp id.", soldiers: [], war: snapshot.war ?? null };
+    }
+
+    const soldiers = townWarController.listPriorities(campId ?? null);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: true,
+      summary: `Town war priorities: ${soldiers.length} soldiers${campId ? ` in ${campId}` : ""}.`,
+      soldiers,
+      war: snapshot.war ?? null
+    };
+  },
+  setTownWarPriority: (payload) => {
+    const soldierId = typeof payload?.soldierId === "string" ? payload.soldierId : "";
+    const work = typeof payload?.work === "string" ? payload.work : "";
+    const priority = typeof payload?.priority === "number" ? payload.priority : Number(payload?.priority);
+    const result = townWarController.setSoldierPriority(soldierId, work, priority);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    const summary = result.ok
+      ? `Town war priority set: ${result.soldierId} ${result.work}=${result.priority} | selected ${result.soldier?.taskDecision?.selectedWork ?? "none"}`
+      : `Town war priority set failed: ${result.reason ?? "unknown"}.`;
+    return { ok: result.ok, summary, result, war: snapshot.war ?? null };
+  },
+  presetTownWarPriority: (payload) => {
+    const soldierId = typeof payload?.soldierId === "string" ? payload.soldierId : "";
+    const preset = typeof payload?.preset === "string" ? payload.preset : "";
+    const result = townWarController.applySoldierPriorityPreset(soldierId, preset);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    const summary = result.ok
+      ? `Town war priority preset: ${result.soldierId} -> ${preset} | selected ${result.soldier?.taskDecision?.selectedWork ?? "none"}`
+      : `Town war priority preset failed: ${result.reason ?? "unknown"}.`;
+    return { ok: result.ok, summary, result, war: snapshot.war ?? null };
+  },
+  getTownWarTaskCandidates: (payload) => {
+    const soldierId = typeof payload?.soldierId === "string" ? payload.soldierId : "";
+    const result = townWarController.getTaskCandidates(soldierId);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    const top = result.candidates[0] ?? null;
+    const summary = result.ok
+      ? `Town war task candidates: ${result.soldierId} top ${top?.work ?? "none"} (${top?.score ?? 0})`
+      : `Town war task candidates failed: ${result.reason ?? "unknown"}.`;
+    return { ok: result.ok, summary, result, war: snapshot.war ?? null };
+  },
+  setTownWarSoldierNeeds: (payload) => {
+    const soldierId = typeof payload?.soldierId === "string" ? payload.soldierId : "";
+    const result = townWarController.setSoldierNeeds(soldierId, {
+      fatigue: typeof payload?.fatigue === "number" ? payload.fatigue : payload?.fatigue !== undefined ? Number(payload.fatigue) : undefined,
+      hunger: typeof payload?.hunger === "number" ? payload.hunger : payload?.hunger !== undefined ? Number(payload.hunger) : undefined,
+      morale: typeof payload?.morale === "number" ? payload.morale : payload?.morale !== undefined ? Number(payload.morale) : undefined
+    });
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    const summary = result.ok
+      ? `Town war soldier needs set: ${result.soldierId} | selected ${result.soldier?.taskDecision?.selectedWork ?? "none"}`
+      : `Town war soldier needs failed: ${result.reason ?? "unknown"}.`;
+    return { ok: result.ok, summary, result, war: snapshot.war ?? null };
+  },
+  setTownWarSoldierAmmo: (payload) => {
+    const soldierId = typeof payload?.soldierId === "string" ? payload.soldierId : "";
+    const result = townWarController.setSoldierAmmo(soldierId, {
+      inMag: typeof payload?.inMag === "number" ? payload.inMag : payload?.inMag !== undefined ? Number(payload.inMag) : undefined,
+      reserve: typeof payload?.reserve === "number" ? payload.reserve : payload?.reserve !== undefined ? Number(payload.reserve) : undefined,
+      maxMag: typeof payload?.maxMag === "number" ? payload.maxMag : payload?.maxMag !== undefined ? Number(payload.maxMag) : undefined
+    });
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    const summary = result.ok
+      ? `Town war soldier ammo set: ${result.soldierId} | ${result.soldier?.ammo?.inMag ?? "?"}/${result.soldier?.ammo?.reserve ?? "?"}`
+      : `Town war soldier ammo failed: ${result.reason ?? "unknown"}.`;
+    return { ok: result.ok, summary, result, war: snapshot.war ?? null };
+  },
+  orderTownWarBuildTest: (payload) => {
+    const builderId = typeof payload?.builderId === "string" ? payload.builderId : "";
+    const coveredById = typeof payload?.coveredById === "string" ? payload.coveredById : null;
+    const x = typeof payload?.x === "number" ? payload.x : payload?.x !== undefined ? Number(payload.x) : null;
+    const y = typeof payload?.y === "number" ? payload.y : payload?.y !== undefined ? Number(payload.y) : null;
+    const targetPosition = x !== null && y !== null && Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+    const order = townWarController.orderTrenchForBuilder(builderId, targetPosition, coveredById);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    const summary = order.ok
+      ? `Town war build test: ${order.orderId ?? "order"} assigned ${order.assignedSoldierId ?? builderId} covered by ${coveredById ?? "none"} | next: war-advance --seconds 12`
+      : `Town war build test failed: ${order.reason ?? "unknown"}.`;
+    return { ok: order.ok, summary, order, war: snapshot.war ?? null };
+  },
+  getTownWarBuildReport: (payload) => {
+    const orderId = typeof payload?.orderId === "string" ? payload.orderId : "";
+    const report = townWarController.getBuildReport(orderId);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    const summary = report.ok ? `Town war build report: ${report.readable}` : `Town war build report failed: ${report.reason ?? "unknown"}.`;
+    return { ok: report.ok, summary, report, war: snapshot.war ?? null };
+  },
+  stageTownWarCasualty: (payload) => {
+    const soldierId = typeof payload?.soldierId === "string" ? payload.soldierId : "";
+    const x = typeof payload?.x === "number" ? payload.x : payload?.x !== undefined ? Number(payload.x) : null;
+    const y = typeof payload?.y === "number" ? payload.y : payload?.y !== undefined ? Number(payload.y) : null;
+    const targetPosition = Number.isFinite(x) && Number.isFinite(y) ? { x: x as number, y: y as number } : null;
+    const severity = payload?.severity === "light" || payload?.severity === "serious" || payload?.severity === "critical" ? payload.severity : "serious";
+    const result = townWarController.stageCasualty(soldierId, targetPosition, severity);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    const summary = result.ok ? `Town war casualty staged: ${result.readable}` : `Town war casualty stage failed: ${result.reason ?? "unknown"}.`;
+    return { ok: result.ok, summary, result, war: snapshot.war ?? null };
+  },
+  orderTownWarMedicRescue: (payload) => {
+    const medicId = typeof payload?.medicId === "string" ? payload.medicId : "";
+    const targetSoldierId = typeof payload?.targetSoldierId === "string" ? payload.targetSoldierId : "";
+    const coveredById = typeof payload?.coveredById === "string" ? payload.coveredById : null;
+    const result = townWarController.orderMedicRescue(medicId, targetSoldierId, coveredById);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    const summary = result.ok ? `Town war medic order: ${result.readable}` : `Town war medic order held: ${result.readable}`;
+    return { ok: result.ok, summary, result, war: snapshot.war ?? null };
+  },
+  getTownWarRescueReport: () => {
+    const report = townWarController.getRescueReport();
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return { ok: report.ok, summary: `Town war rescue report: ${report.readable}`, report, war: snapshot.war ?? null };
+  },
+  getTownWarSustainmentReport: () => {
+    const report = townWarController.getSustainmentReport();
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return { ok: report.ok, summary: `Town war sustainment: ${report.readable}`, report, war: snapshot.war ?? null };
+  },
+  setTownWarCampWork: (payload) => {
+    const campId = payload?.campId;
+    const work = typeof payload?.work === "string" ? payload.work : "";
+    const priority = typeof payload?.priority === "number" ? payload.priority : Number(payload?.priority);
+    if (campId !== "camp-a" && campId !== "camp-b") {
+      const snapshot = getAgentSnapshot();
+      return {
+        ok: false,
+        summary: "Town war camp work failed: invalid camp id.",
+        result: { ok: false, reason: "invalid-camp-id", campId: "camp-a", work: null, priority: null, report: null },
+        war: snapshot.war ?? null
+      };
+    }
+    const result = townWarController.setCampWorkPriority(campId, work, priority);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    const summary = result.ok
+      ? `Town war camp work: ${campId} ${result.work}=${result.priority} | ${result.report?.readable ?? "no report"}`
+      : `Town war camp work failed: ${result.reason ?? "unknown"}.`;
+    return { ok: result.ok, summary, result, war: snapshot.war ?? null };
+  },
+  stageTownWarAmmoPressure: (payload) => {
+    const campId = payload?.campId;
+    if (campId !== "camp-a" && campId !== "camp-b") {
+      const snapshot = getAgentSnapshot();
+      return { ok: false, summary: "Town war ammo pressure failed: invalid camp id.", report: { ok: false, reason: "invalid-camp-id", camps: [], readable: "Invalid camp id." }, war: snapshot.war ?? null };
+    }
+    const report = townWarController.stageAmmoPressure(campId);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return { ok: report.ok, summary: `Town war ammo pressure staged: ${report.readable}`, report, war: snapshot.war ?? null };
+  },
+  stageTownWarFatigue: (payload) => {
+    const campId = payload?.campId;
+    const level = typeof payload?.level === "number" ? payload.level : Number(payload?.level);
+    if (campId !== "camp-a" && campId !== "camp-b") {
+      const snapshot = getAgentSnapshot();
+      return { ok: false, summary: "Town war fatigue stage failed: invalid camp id.", report: { ok: false, reason: "invalid-camp-id", camps: [], readable: "Invalid camp id." }, war: snapshot.war ?? null };
+    }
+    const report = townWarController.stageFatigue(campId, level);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return { ok: report.ok, summary: `Town war fatigue staged: ${report.readable}`, report, war: snapshot.war ?? null };
+  },
+  stageTownWarFlank: (payload) => {
+    const campId = payload?.campId === TOWN_WAR_ENEMY_FACTION ? TOWN_WAR_ENEMY_FACTION : TOWN_WAR_PLAYER_FACTION;
+    const lane = payload?.lane;
+    const pressure = payload?.pressure;
+    if (lane !== "north" && lane !== "mid" && lane !== "south") {
+      const snapshot = getAgentSnapshot();
+      return {
+        ok: false,
+        summary: "Town war flank stage failed: invalid lane.",
+        result: { ok: false, reason: "invalid-lane", flank: null, outcome: null, debrief: townWarController.getSkillDebrief(), scout: null, readable: "Invalid lane." },
+        war: snapshot.war ?? null
+      };
+    }
+    if (pressure !== "low" && pressure !== "medium" && pressure !== "high") {
+      const snapshot = getAgentSnapshot();
+      return {
+        ok: false,
+        summary: "Town war flank stage failed: invalid pressure.",
+        result: { ok: false, reason: "invalid-pressure", flank: null, outcome: null, debrief: townWarController.getSkillDebrief(), scout: null, readable: "Invalid pressure." },
+        war: snapshot.war ?? null
+      };
+    }
+    const result = townWarController.stageFlankPressure(lane, pressure, campId);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return { ok: result.ok, summary: `Town war flank: ${result.readable}`, result, war: snapshot.war ?? null };
+  },
+  runTownWarSkillEmergenceDemo: () => {
+    const result = townWarController.runSkillEmergenceDemo();
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return { ok: result.ok, summary: result.readable, result, war: snapshot.war ?? null };
+  },
+  getTownWarSkillDebrief: () => {
+    const debrief = townWarController.getSkillDebrief();
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return { ok: true, summary: `Town war skill debrief: ${debrief.summary} Next: ${debrief.recommendedNextPlan}`, debrief, war: snapshot.war ?? null };
+  },
+  prepareTownWarOperation: (payload) => {
+    const result = townWarController.prepareOperationStockpile({
+      ammo: typeof payload?.ammo === "number" ? payload.ammo : payload?.ammo !== undefined ? Number(payload.ammo) : undefined,
+      build: typeof payload?.build === "number" ? payload.build : payload?.build !== undefined ? Number(payload.build) : undefined,
+      food: typeof payload?.food === "number" ? payload.food : payload?.food !== undefined ? Number(payload.food) : undefined,
+      med: typeof payload?.med === "number" ? payload.med : payload?.med !== undefined ? Number(payload.med) : undefined
+    });
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return { ok: result.ok, summary: `Town war operation prep: ${result.readable}`, result, war: snapshot.war ?? null };
+  },
+  startNextTownWarOperation: () => {
+    const result = townWarController.startNextOperation();
+    raidController.state.player.position = { ...townWarController.getSnapshot().officer.position };
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return { ok: result.ok, summary: `Town war next operation: ${result.readable}`, result, war: snapshot.war ?? null };
+  },
+  endTownWarOperation: () => {
+    const result = townWarController.endOperation();
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return { ok: result.ok, summary: `Town war operation debrief: ${result.readable}`, result, war: snapshot.war ?? null };
+  },
+  getTownWarOperationReport: () => {
+    const result = townWarController.getOperationReport();
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return { ok: result.ok, summary: `Town war operation report: ${result.readable}`, result, war: snapshot.war ?? null };
+  },
+  advanceTownWar: (payload) => {
+    const seconds = typeof payload?.seconds === "number" ? payload.seconds : payload?.seconds !== undefined ? Number(payload.seconds) : 10;
+    const tickSeconds =
+      typeof payload?.tickSeconds === "number" ? payload.tickSeconds : payload?.tickSeconds !== undefined ? Number(payload.tickSeconds) : 0.25;
+
+    const advance = townWarController.advance(seconds, tickSeconds);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    const war = snapshot.war ?? null;
+    const townWar = war?.townWar ?? null;
+    const completedOrders = townWar?.orders?.filter((order) => order.status === "completed").length ?? null;
+    const activeOrders = townWar?.orders?.filter((order) => order.status !== "completed").length ?? null;
+    const activeCrates = townWar?.ammoCrates?.filter((crate) => crate.destroyedAtSeconds === null).length ?? null;
+    const crateAmmoRemaining =
+      townWar?.ammoCrates?.reduce((total, crate) => total + (typeof crate?.ammo === "number" && Number.isFinite(crate.ammo) ? crate.ammo : 0), 0) ??
+      null;
+    const clockSeconds =
+      typeof townWar?.clock?.seconds === "number" && Number.isFinite(townWar.clock.seconds) ? townWar.clock.seconds.toFixed(1) : "?";
+    const focusedLane = typeof townWar?.officer?.focusedLane === "string" ? townWar.officer.focusedLane : null;
+    const lastDramaKind = typeof war?.dialogue?.lastDramaEvent?.kind === "string" ? war.dialogue.lastDramaEvent.kind : null;
+    const activeBuildRead =
+      townWar?.orders
+        ?.filter((order) => order.status === "assigned")
+        .map((order) => {
+          const progress =
+            order.build.requiredProgress > 0 ? Math.round((order.build.progress / order.build.requiredProgress) * 100) : 0;
+          const state = order.build.stalled
+            ? `stalled ${order.build.stallReason ?? ""}`.trim()
+            : order.build.buildRate > 0
+              ? `${progress}% @ ${order.build.buildRate}/s`
+              : "builder en route";
+          return `${order.kind} ${order.id}: ${state}`;
+        })
+        .slice(0, 2)
+        .join(" | ") ?? "";
+    const summary = advance.ok
+      ? `Town war advanced ${advance.requestedSeconds}s (${advance.appliedTicks} ticks @ ${advance.tickSeconds}s) | clock ${clockSeconds}s | focus ${focusedLane ?? "none"} | orders ${completedOrders ?? "?"} done / ${activeOrders ?? "?"} active${activeBuildRead ? ` | build ${activeBuildRead}` : ""} | crates ${activeCrates ?? "?"} | crate ammo ${crateAmmoRemaining ?? "?"} | drama ${lastDramaKind ?? "none"}`
+      : `Town war advance failed: ${advance.reason ?? "unknown"}.`;
+
+    return { ok: advance.ok, summary, advance, war };
+  },
   setTopTab: (tabId) => {
     stashUiState.activeTopTab = tabId;
     updateUi();
@@ -36361,6 +38766,15 @@ const tick = (): void => {
   const now = performance.now();
   cliRuntimeMetrics.frameTimeMs = now - cliRuntimeMetrics.lastFrameAt;
   cliRuntimeMetrics.lastFrameAt = now;
+  if (raidController.state.phase === "raid" && !cliRuntimeMetrics.townWarRealtimeEnabled) {
+    townWarController.ensureDemoSeeded();
+    cliRuntimeMetrics.townWarRealtimeEnabled = true;
+  } else if (raidController.state.phase !== "raid" && cliRuntimeMetrics.townWarRealtimeEnabled) {
+    cliRuntimeMetrics.townWarRealtimeEnabled = false;
+  }
+  if (cliRuntimeMetrics.townWarRealtimeEnabled) {
+    townWarController.tick(cliRuntimeMetrics.frameTimeMs / 1000);
+  }
   cliRuntimeMetrics.frameAccumulatorMs += cliRuntimeMetrics.frameTimeMs;
   cliRuntimeMetrics.sampleFrames += 1;
   cliRuntimeMetrics.playerSampleAccumulatorMs += cliRuntimeMetrics.frameTimeMs;

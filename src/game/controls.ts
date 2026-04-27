@@ -36,6 +36,7 @@ export const RAID_ACTION_KEY_CODES = {
 export const RAID_SUPPORT_ORDER_KEY_CODES = {
   shiftFire: Phaser.Input.Keyboard.KeyCodes.Z,
   holdPosition: Phaser.Input.Keyboard.KeyCodes.B,
+  dropAmmoCrate: Phaser.Input.Keyboard.KeyCodes.N,
 } as const;
 
 export const RAID_SQUAD_SELECTION_KEY_CODES = {
@@ -157,6 +158,11 @@ export const RAID_CONTROL_GROUPS: RaidControlGroup[] = [
         keyLabel: FRONTLINE_SUPPORT_ORDERS["hold-position"].hotkey,
         action: FRONTLINE_SUPPORT_ORDERS["hold-position"].title,
         detail: FRONTLINE_SUPPORT_ORDERS["hold-position"].effectSummary
+      },
+      {
+        keyLabel: FRONTLINE_SUPPORT_ORDERS["drop-ammo-crate"].hotkey,
+        action: FRONTLINE_SUPPORT_ORDERS["drop-ammo-crate"].title,
+        detail: FRONTLINE_SUPPORT_ORDERS["drop-ammo-crate"].effectSummary
       }
     ]
   },

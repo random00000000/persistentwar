@@ -1,0 +1,526 @@
+{
+  "pack": "frontline-officer-russian-side-camp",
+  "factionUse": "Fictional opposing-side camp with Russian-side visual read. The art avoids real flags, unit marks, slogans, and political symbols.",
+  "anchor": "top-down Phaser sprites; transparent PNG unless noted",
+  "files": [
+    {
+      "file": "russian_command_bunker_128.png",
+      "size": [
+        128,
+        128
+      ],
+      "role": "camp command core / damage target"
+    },
+    {
+      "file": "russian_command_bunker_damaged_128.png",
+      "size": [
+        128,
+        96
+      ],
+      "role": "damaged command core state"
+    },
+    {
+      "file": "russian_barracks_tent_96.png",
+      "size": [
+        96,
+        96
+      ],
+      "role": "reinforcement or rest tent"
+    },
+    {
+      "file": "russian_barracks_tent_damaged_96.png",
+      "size": [
+        96,
+        96
+      ],
+      "role": "damaged reinforcement tent state"
+    },
+    {
+      "file": "russian_supply_depot_96.png",
+      "size": [
+        96,
+        96
+      ],
+      "role": "supply stockpile / logistics target"
+    },
+    {
+      "file": "russian_large_supply_dump_128.png",
+      "size": [
+        128,
+        128
+      ],
+      "role": "large camp stockpile / high-value logistics target"
+    },
+    {
+      "file": "russian_camo_net_storage_128.png",
+      "size": [
+        128,
+        128
+      ],
+      "role": "camouflaged depot or stash area"
+    },
+    {
+      "file": "russian_ammo_cache_64.png",
+      "size": [
+        64,
+        64
+      ],
+      "role": "ammo cache / resupply prop"
+    },
+    {
+      "file": "russian_fuel_drums_64.png",
+      "size": [
+        64,
+        64
+      ],
+      "role": "fuel/logistics prop"
+    },
+    {
+      "file": "russian_generator_trailer_96.png",
+      "size": [
+        96,
+        96
+      ],
+      "role": "power or communications support prop"
+    },
+    {
+      "file": "russian_radio_mast_64.png",
+      "size": [
+        64,
+        64
+      ],
+      "role": "command and observation prop"
+    },
+    {
+      "file": "russian_sandbag_wall_128x32.png",
+      "size": [
+        128,
+        32
+      ],
+      "role": "defensive wall / cover segment"
+    },
+    {
+      "file": "russian_trench_gate_128x64.png",
+      "size": [
+        128,
+        64
+      ],
+      "role": "trench entry / reinforced fighting line segment"
+    },
+    {
+      "file": "russian_trench_firing_bay_128x64.png",
+      "size": [
+        128,
+        64
+      ],
+      "role": "prepared firing bay or cover position"
+    },
+    {
+      "file": "russian_wire_belt_128x64.png",
+      "size": [
+        128,
+        64
+      ],
+      "role": "barbed wire obstacle / movement risk"
+    },
+    {
+      "file": "russian_watch_post_96.png",
+      "size": [
+        96,
+        96
+      ],
+      "role": "camp sentry or firing position"
+    },
+    {
+      "file": "russian_checkpoint_gate_128x64.png",
+      "size": [
+        128,
+        64
+      ],
+      "role": "camp boundary or road checkpoint"
+    },
+    {
+      "file": "russian_mortar_pit_96.png",
+      "size": [
+        96,
+        96
+      ],
+      "role": "indirect-fire threat prop or future emplacement"
+    },
+    {
+      "file": "russian_medical_dugout_96.png",
+      "size": [
+        96,
+        96
+      ],
+      "role": "aid post / casualty recovery surface"
+    },
+    {
+      "file": "russian_field_kitchen_64.png",
+      "size": [
+        64,
+        64
+      ],
+      "role": "camp life and logistics dressing"
+    },
+    {
+      "file": "russian_logistics_truck_128x96.png",
+      "size": [
+        128,
+        96
+      ],
+      "role": "vehicle logistics dressing"
+    },
+    {
+      "file": "russian_motor_pool_truck_128x96.png",
+      "size": [
+        128,
+        96
+      ],
+      "role": "motor pool / transport prop"
+    },
+    {
+      "file": "russian_vehicle_wreck_128x96.png",
+      "size": [
+        128,
+        96
+      ],
+      "role": "destroyed vehicle battlefield scar"
+    },
+    {
+      "file": "russian_camp_props_32_sheet.png",
+      "size": [
+        128,
+        128
+      ],
+      "frameSize": [
+        32,
+        32
+      ],
+      "role": "16 small camp scatter props"
+    },
+    {
+      "file": "russian_camp_preview_sheet.png",
+      "size": [
+        512,
+        384
+      ],
+      "role": "non-runtime visual index / camp mood board",
+      "opaque": true
+    },
+    {
+      "file": "russian_camp_extended_preview_sheet.png",
+      "size": [
+        512,
+        384
+      ],
+      "role": "non-runtime visual index for extended camp pieces",
+      "opaque": true
+    },
+    {
+      "file": "russian_camp_terrain_64_sheet.png",
+      "size": [
+        256,
+        256
+      ],
+      "role": "4x4 camp terrain sheet with 64 px tiles",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "russian_trench_modules_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "modular trench straight, corner, junction, and firing bay sheet",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "russian_damage_decals_32_sheet.png",
+      "size": [
+        256,
+        256
+      ],
+      "role": "8x8 transparent damage decals for blast and scorch marks",
+      "frameSize": [
+        32,
+        32
+      ]
+    },
+    {
+      "file": "russian_log_wall_128x64.png",
+      "size": [
+        128,
+        64
+      ],
+      "role": "timber defensive wall segment"
+    },
+    {
+      "file": "russian_steel_barricade_128x64.png",
+      "size": [
+        128,
+        64
+      ],
+      "role": "metal camp barricade segment"
+    },
+    {
+      "file": "russian_drone_control_table_96.png",
+      "size": [
+        96,
+        96
+      ],
+      "role": "drone and observation control prop"
+    },
+    {
+      "file": "russian_battery_bank_96.png",
+      "size": [
+        96,
+        96
+      ],
+      "role": "power and communications support prop"
+    },
+    {
+      "file": "russian_medical_van_128x96.png",
+      "size": [
+        128,
+        96
+      ],
+      "role": "medical/logistics van"
+    },
+    {
+      "file": "russian_medical_van_damaged_128x96.png",
+      "size": [
+        128,
+        96
+      ],
+      "role": "damaged medical/logistics van state"
+    },
+    {
+      "file": "russian_camp_terrain_preview_sheet.png",
+      "size": [
+        512,
+        384
+      ],
+      "role": "third non-runtime visual index focused on terrain and defenses",
+      "opaque": true
+    },
+    {
+      "file": "russian_barracks_tent_112x96.png",
+      "size": [
+        112,
+        96
+      ],
+      "role": "alternate larger barracks tent"
+    },
+    {
+      "file": "russian_command_core_160x144.png",
+      "size": [
+        160,
+        144
+      ],
+      "role": "larger camp command core"
+    },
+    {
+      "file": "russian_motor_pool_truck_144x96.png",
+      "size": [
+        144,
+        96
+      ],
+      "role": "alternate motor pool truck"
+    },
+    {
+      "file": "russian_supply_dump_128x112.png",
+      "size": [
+        128,
+        112
+      ],
+      "role": "alternate supply dump"
+    },
+    {
+      "file": "russian_camp_modules_64_sheet.png",
+      "size": [
+        256,
+        256
+      ],
+      "role": "4x4 runtime camp module sheet: command, tents, logistics, radio, defenses, vehicles, and support props",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "russian_camp_damage_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 damaged camp state sheet for blasted buildings, wrecked cover, craters, and disabled vehicles",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "russian_perimeter_defenses_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 runtime camp perimeter sheet: sandbags, wire, steel, logs, watch cover, and fighting pits",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "russian_fieldwork_build_stages_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4-stage trench and barricade construction progress sheet for build-order execution",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "russian_logistics_markers_32_sheet.png",
+      "size": [
+        256,
+        64
+      ],
+      "role": "8-frame 32 px logistics/command marker sheet for ammo, fuel, radio, power, food, and med props",
+      "frameSize": [
+        32,
+        32
+      ]
+    },
+    {
+      "file": "russian_camp_interiors_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 interior/support module sheet for command desks, bunk room, radio, planning tables, generator, storage, and mast base",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "russian_supply_stacks_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 logistics stack sheet for fuel, ammo, batteries, crates, sandbags, field stores, and mixed supply piles",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "russian_signal_panels_32_sheet.png",
+      "size": [
+        256,
+        64
+      ],
+      "role": "8-frame 32 px fictional identification panel sheet for camp markings, signs, and small command props",
+      "frameSize": [
+        32,
+        32
+      ]
+    },
+    {
+      "file": "russian_heavy_emplacements_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 heavy emplacement sheet for mortar pits, machine-gun cover, road guns, comms, and support vehicles",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "russian_camp_services_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 camp services sheet for kitchen, bunks, aid, repair, comms, stockpiles, generator, and storage",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "russian_ground_markers_32_sheet.png",
+      "size": [
+        256,
+        64
+      ],
+      "role": "8-frame 32 px fictional ground marker sheet for camp lane markings, warning plates, and command tags",
+      "frameSize": [
+        32,
+        32
+      ]
+    },
+    {
+      "file": "russian_abandoned_camp_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 abandoned and damaged camp evidence sheet for broken equipment, collapsed storage, and burned positions",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "russian_recovery_medical_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 casualty recovery and field medical prop sheet for aid, evacuation, supplies, and triage dressing",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "russian_camo_command_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 camouflaged command and covered support position sheet for fictional Russian-side camp dressing",
+      "frameSize": [
+        64,
+        64
+      ]
+    },
+    {
+      "file": "russian_night_watch_64_sheet.png",
+      "size": [
+        256,
+        128
+      ],
+      "role": "4x2 night-watch camp sheet for lit posts, watch lamps, dark cover, and low-light support props",
+      "frameSize": [
+        64,
+        64
+      ]
+    }
+  ]
+}

@@ -54,6 +54,23 @@ Critical inspect truths include:
 - `ui.overlays`
 - `ui.frontDoorPanel`
 - `raid.extraction`
+- `war.dialogue.lastDramaEvent`
+- `war.dialogue.recentDramaEvents`
+- `war.dialogue.activeOfficerWarTags`
+- `war.dialogue.activeScarTags`
+- `war.dramaMemories`
+- `war.locationScars`
+- `war.focusedLocationScar`
+- `war.dramaBeat.current`
+- `war.dramaBeat.chain`
+- `war.dramaBeat.lastPayoff`
+- `war.debriefEchoes`
+- `war.storyPackAudit`
+- `war.soldiers[*].dramaMemoryTags`
+- `war.soldiers[*].witnessedEventCount`
+- `war.soldiers[*].dramaArc`
+- `war.soldiers[*].trustInOfficer`
+- `war.soldiers[*].relationshipPressure`
 - `raid.pendingReinforcementSummary`
 - `raid.player.containingObstacleId`
 - `raid.pendingReinforcements[*].containingObstacleId`
@@ -77,6 +94,7 @@ Supported reproduction surface:
 - `stage-state --id front-door`
 - `stage-state --id stash`
 - `stage-state --id briefing`
+- `stage-state --id town-war`
 - `stage-state --id raid`
 - `stage-state --id extract-ready`
 - `stage-state --id extract-hold-active`
@@ -86,6 +104,80 @@ Supported reproduction surface:
 - `stage-state --id room-clear-pocket`
 
 Use `stage-state` instead of browser choreography or code edits when reproducing regression states.
+
+### Officer Orders (Town War)
+
+Supported officer-facing verbs for the town-war slice:
+
+- `war-quickstart`
+- `war-quickstart --side <camp-a|camp-b>`
+- `war-deploy-officer --id <camp-a|camp-b>`
+- `war-reinforce --id <camp-a|camp-b> [--role <builder|rifleman|suppressor|medic|defender>] [--count <n>] [--damage-before <n>]`
+- `war-roster [--camp <camp-a|camp-b>]`
+- `war-soldier --id <soldier-id>`
+- `war-priority list [--camp <camp-a|camp-b>]`
+- `war-priority set --soldier <id> --work <Build|Rescue|Resupply|Defend|Suppress|Rest> --priority <0-5>`
+- `war-priority preset --soldier <id> --preset <builder|medic|quartermaster|suppressor|rifleman|scout|rest-cycle>`
+- `war-task-candidates --soldier <id>`
+- `war-order-trench --id <camp-a|camp-b> [--x <n> --y <n>]`
+- `war-order-dugout --id <camp-a|camp-b> [--x <n> --y <n>] [--facing <radians>]`
+- `war-order-ammo-crate --id <camp-a|camp-b> [--x <n> --y <n>]`
+- `war-dugout-report`
+- `war-damage-dugout --id <dugout-id> --amount <n>`
+- `war-build-test --builder <id> [--covered-by <id>] [--x <n> --y <n>] [--advance-seconds <n>]`
+- `war-build-report --order <order-id>`
+- `war-stage-casualty --soldier <id> [--x <n> --y <n>] [--severity <light|serious|critical>]`
+- `war-medic-order --medic <id> --target <id> [--covered-by <id>] [--advance-seconds <n>]`
+- `war-rescue-report`
+- `war-sustainment`
+- `war-set-camp-work --camp <camp-a|camp-b> --work <Cook|Resupply|Rest> --priority <0-5>`
+- `war-stage-ammo-pressure --camp <camp-a|camp-b>`
+- `war-stage-fatigue --camp <camp-a|camp-b> --level <0-1>`
+- `war-stage-flank --lane <north|mid|south> --pressure <low|medium|high> [--camp <camp-a|camp-b>]`
+- `war-operation prepare [--ammo <n> --build <n> --food <n> --med <n>]`
+- `war-operation start`
+- `war-operation end`
+- `war-operation report`
+- `war-skill-emergence-demo`
+- `war-skill-debrief`
+- `war-focus-lane --id <camp-a|camp-b> --lane <north|mid|south>`
+- `war-advance --seconds <n> [--tick-seconds <n>]`
+
+Use these to stage a minimal officer loop (orders → soldiers move → supply drains) without relying on the inherited extraction raid flow.
+
+Each command returns JSON with a `summary` string plus the current `war` snapshot (including officer focus, build orders, camp health/supply, and soldier tasks) so agents can inspect the immediate consequence and decide the next pressure to apply.
+
+Soldier identity is now part of the town-war inspect surface. Use `war-roster` for readable summaries and `war-soldier --id <soldier-id>` for a single detailed record. Snapshot fields include `war.soldiers[*].displayName`, `archetype`, `skills`, `traits`, `needs`, `workPriorities`, `currentNeed`, `experience`, `identitySummary`, and `taskDecision`, mirrored under `war.townWar.soldiers[*]`.
+
+Priority scoring is inspectable through `war-priority` and `war-task-candidates`. The current formula combines work priority, skill fit, urgency, safety, morale/fatigue, supply need, and distance. `taskDecision` records the selected work, score, reason, blocked reason, and top candidate scores so agents can explain why a soldier builds, suppresses, resupplies, defends, scouts, rescues, or rests.
+
+Build execution under fire is inspectable through `war-build-test`, `war-build-report`, and `war.orders[*].build`. Construction and Engineering affect build speed, Nerve and fatigue affect stalls, exposure raises stall pressure, explicit suppressive cover lowers it, and support ammo state can remove that protection. Build reports expose progress, build rate, stall reason, supporting suppressor id, cover-fire support, support ammo state, exposure, outcome cause, and cause chain.
+
+Medical rescue emergence is inspectable through `war-stage-casualty`, `war-medic-order`, `war-rescue-report`, `war.casualties`, and `war.townWar.casualties`. Medical and Rescue priority drive rescue willingness, Social improves treatment, Nerve and fatigue affect exposed paths, cover/suppression can flip a stalled rescue, and outcomes record treatment progress, path risk, covered path, outcome cause, and cause chain.
+
+Camp sustainment is inspectable through `war-sustainment`, `war-set-camp-work`, `war-stage-ammo-pressure`, `war-stage-fatigue`, `war.camps[*].sustainment`, and `war.townWar.camps[*].sustainment`. Logistics controls ammo flow, Cooking improves readiness and recovery, Endurance/Rest affect fatigue recovery, and build reports can now show ammo-support or sustainment failures separately from trench placement failures.
+
+Operation persistence is inspectable through `war-operation`, `war.operation`, and `war.townWar.operation`. Use `war-operation prepare` to commit protected stockpile, `war-operation start` to launch the next Russian camp cycle, `war-operation end` to capture fatigue/wounds/memory/supply deltas, and `war-operation report` to read current recommendations. Build supply now affects construction rate, while carried soldier records preserve named wounds and fatigue into the next operation.
+
+Dugout networks are inspectable through `war-order-dugout`, `war-dugout-report`, `war-damage-dugout`, `war.townWar.dugouts`, and dugout-connected `war.townWar.aiTactics.coverSlots`. A Russian dugout acts as a rally/shelter node behind the trench line: nearby trench slots get stronger occupation priority, reinforcements can rally from the dugout instead of the camp spawn, wounded/suppressed soldiers can count as sheltering there, and damage changes its status/readable map feedback.
+
+Skill emergence is inspectable through `war-stage-flank`, `war-skill-emergence-demo`, `war-skill-debrief`, `war.flankPressures`, `war.townWar.flankPressures`, `war.skillDebrief`, and `war.townWar.skillDebrief`. Scout priority, Perception, Shooting, Nerve, ammo flow, and readiness can now produce held or failed flank outcomes such as `held-scout-warning` and `failed-ammo-dry`, with memory tags, location scars, debrief echoes, and a recommended next plan.
+
+The first emergent AI threat surface is exposed in `war.aiThreats` and mirrored on `war.townWar.aiThreats`. Use `playerThreatShare`, `frontlineFocus`, `contacts`, and `war.townWar.soldiers[*].targetIntent` to verify that NPCs are fighting the frontline instead of defaulting to player lock-on.
+
+The first cover and suppression surface is exposed in `war.aiTactics` and mirrored on `war.townWar.aiTactics`. Use `coverSlots`, `suppressionFields`, `tacticalPairs`, `completedConstructionImpact`, `war.townWar.soldiers[*].tacticalIntent`, and `war.townWar.soldiers[*].coverIntent` to verify that pressure changes soldier behavior instead of only changing health.
+
+Officer-war drama events are now part of that inspect surface. Build orders, risky builder movement, construction completion, ammo crate depletion/destruction, casualty pressure, and camp damage can update `war.dialogue.lastDramaEvent`, append to `war.dialogue.recentDramaEvents`, and feed `war.dialogue.activeOfficerWarTags`.
+
+Officer responsibility memory is also part of the inspect surface. Cause/witness records are stored in `war.dramaMemories`, soldier witness pressure is exposed on `war.soldiers[*]`, and later dialogue can mark `referencedMemoryTag` when it calls back to an earlier officer-caused event.
+
+Long-haul character pressure is now visible on each town-war soldier. Repeated officer-cost or officer-helped memories shift trust, resentment, guilt, confidence, and relationship pressure; those arc tags can make later lines come from the `Long Haul` story pack instead of the generic order chatter.
+
+Location-scar pressure is visible through `war.locationScars`, `war.focusedLocationScar`, and `war.dialogue.activeScarTags`. Repeat orders or fights near the same lane can now change eligible dialogue through scar tags such as `builder-hit-here`, `trench-saved-line`, `ammo-ran-dry`, and `camp-shelled`.
+
+Cinematic beat pressure is visible through `war.dramaBeat` and `war.debriefEchoes`. The beat director classifies systemic drama events as setup, rising pressure, complication, cost, reversal, payoff, aftermath, or echo; debrief echoes summarize the tracked event summaries instead of inventing new outcomes.
+
+Story-pack authoring health is visible through `war.storyPackAudit`. It reports duplicate template ids, unsupported memory tags, missing squad speakers, line-length warnings, and content totals grouped by story family.
 
 ### Verify
 
@@ -101,6 +193,19 @@ Current anti-collapse verify ladder:
 - `verify --id no-immortal-runtime`
 - `verify --id legacy-crossfire-disabled`
 - `verify --id legacy-runtime-clean-states`
+- `verify --id war-roster-skills`
+- `verify --id war-priority-skill-choice`
+- `verify --id war-build-skill-under-fire`
+- `verify --id war-medical-rescue-emergence`
+- `verify --id war-logistics-camp-readiness`
+- `verify --id war-skill-emergence-loop`
+- `verify --id war-drama-responsibility`
+- `verify --id war-drama-relationships`
+- `verify --id war-drama-location-scars`
+- `verify --id war-drama-beat-chain`
+- `verify --id emergent-war-drama`
+- `verify --id frontline-ai-player-decenter`
+- `verify --id frontline-ai-cover-suppression`
 
 Supporting authored checks that still matter for tactical runtime stability:
 
@@ -458,6 +563,14 @@ Notes:
 - `regression.legacyRuntime.supportCount`
 - `regression.legacyRuntime.incidentCount`
   - `regression.overlayTruth`
+- Emergent war drama truth is inspectable through:
+  - `war.dialogue.lastDramaEvent`
+  - `war.dialogue.activeOfficerWarTags`
+  - `war.dialogue.activeScarTags`
+  - `war.dramaMemories`
+  - `war.locationScars`
+  - `war.focusedLocationScar`
+  - `war.soldiers[*].dramaArc`
 
 ## Core Verify Ladder
 
@@ -475,6 +588,13 @@ npm run game:cli -- verify --id same-room-reinforcement-guard
 npm run game:cli -- verify --id no-immortal-runtime
 npm run game:cli -- verify --id legacy-crossfire-disabled
 npm run game:cli -- verify --id legacy-runtime-clean-states
+npm run game:cli -- verify --id war-roster-skills
+npm run game:cli -- verify --id war-priority-skill-choice
+npm run game:cli -- verify --id war-drama-responsibility
+npm run game:cli -- verify --id war-drama-relationships
+npm run game:cli -- verify --id war-drama-location-scars
+npm run game:cli -- verify --id war-drama-beat-chain
+npm run game:cli -- verify --id emergent-war-drama
 ```
 
 Supporting authored verifies that remain part of the stability ladder:
