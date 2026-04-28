@@ -210,6 +210,7 @@ type StashFilterId = "all" | "weapons" | "medical" | "gear" | "intel" | "utility
 type OfficerPriorityPresetId = "builder" | "fighter" | "medic" | "scout" | "sustainment";
 type StashDragKind = "weapon" | "resource" | "item";
 type StashDragSource = "rack" | "bench" | "equipment" | "container";
+type StashGearLayoutArea = "left-operator-workspace" | "right-stash-wall" | "left-quick-slots" | "full-planning";
 type StashActionId =
   | "inspect"
   | "stage-weapon"
@@ -248,6 +249,25 @@ const STASH_RACK_MANIFEST_TILE_LIMIT = 4;
 const STASH_CONTEXT_MENU_MARGIN_PX = 12;
 const STASH_CONTEXT_MENU_ESTIMATED_WIDTH_PX = 260;
 const STASH_CONTEXT_MENU_ESTIMATED_HEIGHT_PX = 360;
+const STASH_GEAR_LAYOUT_CONTRACT: Record<StashGearLayoutArea, { side: "left" | "right" | "full"; role: string }> = {
+  "left-operator-workspace": {
+    side: "left",
+    role: "Operator loadout, character equipment, doctrine cards, and the deploy/start button."
+  },
+  "right-stash-wall": {
+    side: "right",
+    role: "Persistent stash wall, rack filters, loose bench, open container tray, and carried storage surfaces."
+  },
+  "left-quick-slots": {
+    side: "left",
+    role: "Quick-use hotbar below the operator workspace."
+  },
+  "full-planning": {
+    side: "full",
+    role: "Expanded planning/debrief drawers below both columns."
+  }
+};
+const STASH_START_BUTTON_LAYOUT_AREA: StashGearLayoutArea = "left-operator-workspace";
 const STASH_ACTION_IDS = new Set<StashActionId>([
   "inspect",
   "stage-weapon",
@@ -988,6 +1008,19 @@ function renderRaidControlsReference(
       ).join("")}
     </section>
   `;
+}
+
+function getStashGearLayoutContractSnapshot() {
+  return {
+    layout: "gear-two-column",
+    startButtonArea: STASH_START_BUTTON_LAYOUT_AREA,
+    startButtonSide: STASH_GEAR_LAYOUT_CONTRACT[STASH_START_BUTTON_LAYOUT_AREA].side,
+    areas: Object.entries(STASH_GEAR_LAYOUT_CONTRACT).map(([area, definition]) => ({
+      area,
+      side: definition.side,
+      role: definition.role
+    }))
+  };
 }
 
 function renderBriefingIntel(entries: Array<{ label: string; value: string }>): string {
@@ -11266,9 +11299,9 @@ app.innerHTML = `
             <button class="stash-top-tab" data-stash-top-tab="tasks" type="button">Tasks</button>
           </nav>
 
-          <section class="stash-top-pane stash-top-pane-active" data-stash-top-pane="gear">
-          <div class="stash-rack-row">
-            <section class="stash-section stash-section-low" data-stash-region="stash-wall">
+          <section class="stash-top-pane stash-top-pane-active" data-stash-top-pane="gear" data-stash-layout="gear-two-column">
+          <div class="stash-rack-row" data-stash-region="gear-layout-shell">
+            <section class="stash-section stash-section-low" data-stash-region="stash-wall" data-stash-layout-area="right-stash-wall">
               <div class="section-heading">
                 <div>
                   <p class="eyebrow">Stash</p>
@@ -11380,7 +11413,7 @@ app.innerHTML = `
                   </section>
                 </div>
               </section>
-            <aside class="result-card stash-command-column stash-command-column-top stash-loadout-column" data-gear-workbench-pane="loadout" data-gear-workbench-persistent="true" data-stash-region="operator-workspace">
+            <aside class="result-card stash-command-column stash-command-column-top stash-loadout-column" data-gear-workbench-pane="loadout" data-gear-workbench-persistent="true" data-stash-region="operator-workspace" data-stash-layout-area="left-operator-workspace">
               <section class="stash-loadout-header">
                 <div class="stash-loadout-header-copy">
                   <p class="eyebrow">Loadout</p>
@@ -11389,7 +11422,7 @@ app.innerHTML = `
                     Start the first raid and find out what actually comes home to the stash.
                   </p>
                 </div>
-                <button class="start-button stash-start-button-inline" data-start-raid type="button">Deploy For 120 Credits</button>
+                <button class="start-button stash-start-button-inline" data-start-raid data-stash-start-anchor="left-operator-workspace" type="button">Deploy For 120 Credits</button>
               </section>
 
               <div class="summary-grid summary-grid-compact">
@@ -11558,7 +11591,7 @@ app.innerHTML = `
 
           <div class="stash-stage">
             <div class="stash-main">
-              <details class="stash-secondary-drawer hidden" data-gear-workbench-pane="planning">
+              <details class="stash-secondary-drawer hidden" data-gear-workbench-pane="planning" data-stash-layout-area="full-planning">
                 <summary>
                   <span>Planning Intel</span>
                   <strong>Open route notes, contract reads, and reserve selectors only when you need the extra planning layer.</strong>
@@ -11631,7 +11664,7 @@ app.innerHTML = `
               </details>
             </div>
 
-            <aside class="result-card stash-command-column stash-command-column-bottom hidden stash-inspector-dock">
+            <aside class="result-card stash-command-column stash-command-column-bottom hidden stash-inspector-dock" data-stash-layout-area="full-planning">
               <section class="stash-inspector-panel">
                 <div class="section-heading">
                   <div>
@@ -11653,7 +11686,7 @@ app.innerHTML = `
               </section>
             </aside>
 
-            <aside class="result-card stash-command-column stash-command-column-bottom hidden" data-gear-workbench-pane="planning">
+            <aside class="result-card stash-command-column stash-command-column-bottom hidden" data-gear-workbench-pane="planning" data-stash-layout-area="full-planning">
               <section class="stash-brief-grid stash-brief-grid-tight stash-brief-grid-compact">
                 <section class="contract-panel stash-compact-panel stash-brief-card">
                   <p class="eyebrow">Contract</p>
@@ -12033,7 +12066,7 @@ app.innerHTML = `
             </aside>
           </div>
 
-          <footer class="stash-bottom-rail">
+          <footer class="stash-bottom-rail" data-stash-region="quick-use-rail" data-stash-layout-area="left-quick-slots">
             <section class="stash-quickbar">
               <div class="stash-bottom-head">
                 <p class="eyebrow">Quick Use</p>
@@ -38214,6 +38247,7 @@ function getAgentSnapshot() {
     ui: {
       topTab: stashUiState.activeTopTab,
       commandTab: stashUiState.activeCommandTab,
+      stashGearLayout: getStashGearLayoutContractSnapshot(),
       tacticalDrawerOpen: raidHudState.tacticalDrawerOpen,
       briefingOpen: briefingState.open,
       frontDoorPanel: frontDoorState.panel,
