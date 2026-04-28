@@ -498,6 +498,24 @@ interface HostileAiBalanceProfile {
   retreatSpeed: number;
 }
 
+interface HostileTargetRead {
+  frontlineTarget: FrontlineTargetInfo | null;
+  targetKind: "player" | FrontlineTargetInfo["kind"];
+  targetPosition: Vec2;
+  targetRadius: number;
+  toTarget: Vec2;
+  distanceToTarget: number;
+  hasSight: boolean;
+  closeAssaultPressure: boolean;
+  preferredMinRange: number;
+  preferredMaxRange: number;
+  chaseSpeed: number;
+  flankSpeed: number;
+  quietIngressActive: boolean;
+  quietIngressCompromisedByNoise: boolean;
+  quietIngressBrokenBySight: boolean;
+}
+
 export interface FriendlyCombatantState {
   id: number;
   ownerKind: "squadmate" | "support" | "incident" | "town-war-soldier";
@@ -25359,6 +25377,90 @@ export class RaidController {
     }
   }
 
+  private getHostileTargetRead(enemy: EnemyState, profile: HostileAiBalanceProfile): HostileTargetRead {
+    const player = this.state.player;
+    const toPlayer = subtract(player.position, enemy.position);
+    const distanceToPlayer = length(toPlayer);
+    const playerHasSight = this.hasLineOfSight(enemy.position, player.position);
+    const frontlineTarget = this.getClosestFrontlineTargetToPoint(enemy.position, profile.engageRange * 0.92);
+    const targetKind =
+      frontlineTarget && (!playerHasSight || frontlineTarget.distance < distanceToPlayer * 0.84) ? frontlineTarget.kind : "player";
+    const targetPosition = targetKind === "player" ? player.position : frontlineTarget?.target.position ?? player.position;
+    const targetRadius = targetKind === "player" ? player.radius : frontlineTarget?.target.radius ?? player.radius;
+    const toTarget = subtract(targetPosition, enemy.position);
+    const distanceToTarget = length(toTarget);
+    const hasSight = this.hasLineOfSight(enemy.position, targetPosition);
+    const closeAssaultPressure =
+      targetKind === "player" &&
+      enemy.squadRole !== "support-gunner" &&
+      enemy.panicTimer === 0 &&
+      enemy.alert &&
+      (hasSight || enemy.investigateTimer > 0 || distanceToTarget <= profile.basePreferredMaxRange * 1.34);
+    const quietIngressActive = this.isQuietIngressActive();
+    const quietIngressCompromisedByNoise =
+      this.state.soundPressure >= QUIET_INGRESS_SOUND_BREAK_THRESHOLD ||
+      this.state.recentNoisePulse > 0 ||
+      this.state.noiseResponseLevel > 0;
+    const quietIngressConfirmRange = this.getQuietIngressConfirmRange(enemy, profile.engageRange);
+
+    return {
+      frontlineTarget,
+      targetKind,
+      targetPosition,
+      targetRadius,
+      toTarget,
+      distanceToTarget,
+      hasSight,
+      closeAssaultPressure,
+      preferredMinRange: closeAssaultPressure ? profile.basePreferredMinRange * 0.72 : profile.basePreferredMinRange,
+      preferredMaxRange: closeAssaultPressure ? profile.basePreferredMaxRange * 0.82 : profile.basePreferredMaxRange,
+      chaseSpeed: closeAssaultPressure ? profile.baseChaseSpeed * 1.18 : profile.baseChaseSpeed,
+      flankSpeed: closeAssaultPressure ? profile.baseFlankSpeed * 1.08 : profile.baseFlankSpeed,
+      quietIngressActive,
+      quietIngressCompromisedByNoise,
+      quietIngressBrokenBySight: targetKind === "player" && hasSight && distanceToTarget <= quietIngressConfirmRange
+    };
+  }
+
+  private updateHostileTargetAwareness(enemy: EnemyState, targetRead: HostileTargetRead, profile: HostileAiBalanceProfile): void {
+    if (targetRead.distanceToTarget >= profile.engageRange || !targetRead.hasSight) {
+      return;
+    }
+
+    if (
+      targetRead.quietIngressActive &&
+      targetRead.targetKind === "player" &&
+      !targetRead.quietIngressCompromisedByNoise &&
+      !targetRead.quietIngressBrokenBySight
+    ) {
+      enemy.investigateTarget = { ...targetRead.targetPosition };
+      enemy.investigateTimer = Math.max(
+        enemy.investigateTimer,
+        0.9 * profile.tapeCombatTuning.investigateDurationMultiplier
+      );
+      enemy.facing = normalize(targetRead.toTarget);
+      return;
+    }
+
+    if (
+      targetRead.quietIngressActive &&
+      targetRead.targetKind === "player" &&
+      (targetRead.quietIngressCompromisedByNoise || targetRead.quietIngressBrokenBySight)
+    ) {
+      this.breakQuietIngress(
+        targetRead.quietIngressCompromisedByNoise
+          ? "Quiet ingress burned. The lane heard enough to start hunting."
+          : targetRead.distanceToTarget <= QUIET_INGRESS_CLOSE_BREAK_RANGE
+            ? "Quiet ingress burned. A sentry got a close look at you and the pocket is live."
+            : "Quiet ingress burned. Your silhouette got made and the route is waking up."
+      );
+    }
+
+    enemy.alert = true;
+    enemy.investigateTarget = { ...targetRead.targetPosition };
+    enemy.investigateTimer = 1.75 * profile.tapeCombatTuning.investigateDurationMultiplier;
+  }
+
   private updateEnemies(deltaSeconds: number): void {
     const player = this.state.player;
 
@@ -26322,10 +26424,6 @@ export class RaidController {
         roleBoundToBuilding,
         machineGunner,
         engageRange,
-        basePreferredMinRange,
-        basePreferredMaxRange,
-        baseChaseSpeed,
-        baseFlankSpeed,
         retreatSpeed
       } = hostileProfile;
       const autoHostileRescueTarget = this.getAutoHostileRescueTarget(enemy);
@@ -26339,44 +26437,27 @@ export class RaidController {
         this.state.activeHostileRescueTask.task !== "stabilize";
       this.advanceHostileAiTimers(enemy, deltaSeconds);
 
-      const toPlayer = subtract(player.position, enemy.position);
-      const distanceToPlayer = length(toPlayer);
-      const playerHasSight = this.hasLineOfSight(enemy.position, player.position);
-      const frontlineTarget = this.getClosestFrontlineTargetToPoint(enemy.position, engageRange * 0.92);
-      const targetKind =
-        frontlineTarget && (!playerHasSight || frontlineTarget.distance < distanceToPlayer * 0.84) ? frontlineTarget.kind : "player";
-      const targetPosition =
-        targetKind === "player" ? player.position : frontlineTarget?.target.position ?? player.position;
-      const targetRadius =
-        targetKind === "player" ? player.radius : frontlineTarget?.target.radius ?? player.radius;
-      const toTarget = subtract(targetPosition, enemy.position);
-      const distanceToTarget = length(toTarget);
-      const hasSight = this.hasLineOfSight(enemy.position, targetPosition);
-      const closeAssaultPressure =
-        targetKind === "player" &&
-        enemy.squadRole !== "support-gunner" &&
-        enemy.panicTimer === 0 &&
-        enemy.alert &&
-        (hasSight || enemy.investigateTimer > 0 || distanceToTarget <= basePreferredMaxRange * 1.34);
-      const preferredMinRange = closeAssaultPressure ? basePreferredMinRange * 0.72 : basePreferredMinRange;
-      const preferredMaxRange = closeAssaultPressure ? basePreferredMaxRange * 0.82 : basePreferredMaxRange;
-      const chaseSpeed = closeAssaultPressure ? baseChaseSpeed * 1.18 : baseChaseSpeed;
-      const flankSpeed = closeAssaultPressure ? baseFlankSpeed * 1.08 : baseFlankSpeed;
+      const targetRead = this.getHostileTargetRead(enemy, hostileProfile);
+      const {
+        frontlineTarget,
+        targetKind,
+        targetPosition,
+        targetRadius,
+        toTarget,
+        distanceToTarget,
+        hasSight,
+        closeAssaultPressure,
+        preferredMinRange,
+        preferredMaxRange,
+        chaseSpeed,
+        flankSpeed
+      } = targetRead;
       const returnableFriendlyGrenade = this.getReturnableGrenadeNearPoint(
         enemy.position,
         "friendly",
         GRENADE_RETURN_AUTO_RADIUS
       );
       let returnedGrenade = false;
-
-      const quietIngressActive = this.isQuietIngressActive();
-      const quietIngressCompromisedByNoise =
-        this.state.soundPressure >= QUIET_INGRESS_SOUND_BREAK_THRESHOLD ||
-        this.state.recentNoisePulse > 0 ||
-        this.state.noiseResponseLevel > 0;
-      const quietIngressConfirmRange = this.getQuietIngressConfirmRange(enemy, engageRange);
-      const quietIngressBrokenBySight =
-        targetKind === "player" && hasSight && distanceToTarget <= quietIngressConfirmRange;
 
       const compressionReady =
         roleBoundToBuilding &&
@@ -26407,26 +26488,7 @@ export class RaidController {
           : "compressing"
         : "idle";
 
-      if (distanceToTarget < engageRange && hasSight) {
-        if (quietIngressActive && targetKind === "player" && !quietIngressCompromisedByNoise && !quietIngressBrokenBySight) {
-          enemy.investigateTarget = { ...targetPosition };
-          enemy.investigateTimer = Math.max(enemy.investigateTimer, 0.9 * tapeCombatTuning.investigateDurationMultiplier);
-          enemy.facing = normalize(toTarget);
-        } else {
-          if (quietIngressActive && targetKind === "player" && (quietIngressCompromisedByNoise || quietIngressBrokenBySight)) {
-            this.breakQuietIngress(
-              quietIngressCompromisedByNoise
-                ? "Quiet ingress burned. The lane heard enough to start hunting."
-                : distanceToTarget <= QUIET_INGRESS_CLOSE_BREAK_RANGE
-                  ? "Quiet ingress burned. A sentry got a close look at you and the pocket is live."
-                  : "Quiet ingress burned. Your silhouette got made and the route is waking up."
-            );
-          }
-          enemy.alert = true;
-          enemy.investigateTarget = { ...targetPosition };
-          enemy.investigateTimer = 1.75 * tapeCombatTuning.investigateDurationMultiplier;
-        }
-      }
+      this.updateHostileTargetAwareness(enemy, targetRead, hostileProfile);
       const steer = this.getAutonomousCombatantSteer({
         position: enemy.position,
         anchor: compressionAnchor,
