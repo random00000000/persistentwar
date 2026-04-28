@@ -334,7 +334,7 @@ const PLAYER_GRENADE_DAMAGE = 62;
 const PLAYER_GRENADE_CAMP_EXPLOSIVE_DAMAGE = 32;
 const RPG_CAMP_EXPLOSIVE_DAMAGE = 220;
 const C4_CAMP_EXPLOSIVE_DAMAGE = 340;
-const C4_FUSE_TIME = 4.8;
+const C4_FUSE_TIME = 6;
 const C4_BLAST_RADIUS = 156;
 const C4_PRESSURE_RADIUS = 244;
 const C4_BLAST_DAMAGE = 132;
@@ -24960,6 +24960,19 @@ export class RaidController {
     }
 
     this.state.plantedCharges = remainingCharges;
+    this.updatePlayerC4FuseReadout();
+  }
+
+  private updatePlayerC4FuseReadout(): void {
+    const playerCharge = this.state.plantedCharges.find((charge) => charge.source === "player") ?? null;
+    if (!playerCharge || this.state.phase !== "raid") {
+      return;
+    }
+
+    const secondsRemaining = Math.max(0, playerCharge.fuseTime - playerCharge.elapsed);
+    const distanceToCharge = distance(this.state.player.position, playerCharge.position);
+    const safetyRead = distanceToCharge <= playerCharge.radius ? "danger close" : "clear";
+    this.state.message = `C4 armed: ${secondsRemaining.toFixed(1)}s | ${safetyRead}. Keep moving until the blast lands.`;
   }
 
   private applyRaidExplosiveCampDamage(

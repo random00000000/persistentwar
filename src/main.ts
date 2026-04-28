@@ -36627,7 +36627,7 @@ interface TopDownExtractionAgentApi {
   setTopTab: (tabId: TopTabId) => ReturnType<typeof getAgentSnapshot>;
   setCommandTab: (tabId: CommandTabId) => ReturnType<typeof getAgentSnapshot>;
   startRaid: () => ReturnType<typeof getAgentSnapshot>;
-  advanceRaid: (payload?: { seconds?: number; tickSeconds?: number }) => ReturnType<typeof getAgentSnapshot>;
+  advanceRaid: (payload?: { seconds?: number; tickSeconds?: number; move?: { x: number; y: number } }) => ReturnType<typeof getAgentSnapshot>;
   completeOfficerSoloSurvival: () => ReturnType<typeof getAgentSnapshot>;
   rollRecruitCandidates: () => ReturnType<typeof getAgentSnapshot>;
   setMoveInput: (move: { x: number; y: number }) => ReturnType<typeof getAgentSnapshot>;
@@ -41193,12 +41193,26 @@ topDownWindow.__topdownExtractionAgentApi = {
   advanceRaid: (payload = {}) => {
     const seconds = Math.max(0, Math.min(600, Number(payload.seconds ?? 1)));
     const tickSeconds = Math.max(0.05, Math.min(5, Number(payload.tickSeconds ?? 0.25)));
+    const move =
+      payload.move &&
+      typeof payload.move.x === "number" &&
+      typeof payload.move.y === "number" &&
+      Number.isFinite(payload.move.x) &&
+      Number.isFinite(payload.move.y)
+        ? { x: payload.move.x, y: payload.move.y }
+        : null;
     if (raidController.state.phase === "raid" && Number.isFinite(seconds) && Number.isFinite(tickSeconds)) {
       let elapsed = 0;
       while (elapsed < seconds && raidController.state.phase === "raid") {
+        if (move) {
+          raidController.setMoveInput(move);
+        }
         const step = Math.min(tickSeconds, seconds - elapsed);
         raidController.update(step);
         elapsed += step;
+      }
+      if (move) {
+        raidController.setMoveInput({ x: 0, y: 0 });
       }
       updateUi();
     }
