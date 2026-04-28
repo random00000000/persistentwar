@@ -208,6 +208,22 @@ type PaperdollSlotId = "route" | "contract" | "support" | "weapon" | "medkits" |
 type StorageSurfaceId = "tactical-rig" | "pockets" | "backpack" | "pouch";
 type StashFilterId = "all" | "weapons" | "medical" | "gear" | "intel" | "utility";
 type OfficerPriorityPresetId = "builder" | "fighter" | "medic" | "scout" | "sustainment";
+type StashDragKind = "weapon" | "resource" | "item";
+type StashDragSource = "rack" | "bench" | "equipment" | "container";
+type StashActionId =
+  | "inspect"
+  | "stage-weapon"
+  | "equip-default"
+  | "assign-quick-slot"
+  | "add-resource"
+  | "remove-resource"
+  | "rotate-rack"
+  | "unequip-to-stash"
+  | "open-container"
+  | "close-container"
+  | "sell-now"
+  | "tag-broker"
+  | "untag-broker";
 const QUICK_SLOT_IDS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"] as const;
 const OFFICER_TOOLS_TABS: Array<{ id: OfficerToolsPaneId; label: string }> = [
   { id: "build", label: "Build" },
@@ -227,6 +243,26 @@ const OFFICER_PRIORITY_QUICK_WORKS: TownWarWorkPriorityId[] = ["Build", "Defend"
 const OFFICER_PRIORITY_INSPECTOR_WORKS: TownWarWorkPriorityId[] = ["Build", "Defend", "Suppress", "Resupply", "Medic", "Rescue", "Haul", "Rest"];
 const OFFICER_CAMP_WORKS: TownWarCampWorkPriorityId[] = ["Resupply", "Cook", "Rest"];
 const OFFICER_FLANK_LANES: TownWarFlankLaneId[] = ["north", "mid", "south"];
+const STASH_RACK_RESOURCE_TILE_LIMIT = 8;
+const STASH_RACK_MANIFEST_TILE_LIMIT = 4;
+const STASH_CONTEXT_MENU_MARGIN_PX = 12;
+const STASH_CONTEXT_MENU_ESTIMATED_WIDTH_PX = 260;
+const STASH_CONTEXT_MENU_ESTIMATED_HEIGHT_PX = 360;
+const STASH_ACTION_IDS = new Set<StashActionId>([
+  "inspect",
+  "stage-weapon",
+  "equip-default",
+  "assign-quick-slot",
+  "add-resource",
+  "remove-resource",
+  "rotate-rack",
+  "unequip-to-stash",
+  "open-container",
+  "close-container",
+  "sell-now",
+  "tag-broker",
+  "untag-broker"
+]);
 const WAR_VICTORY_REWARD_TIERS: Array<{
   label: string;
   title: string;
@@ -359,8 +395,8 @@ interface StashTileDefinition {
   compact?: boolean;
   slotTag?: string;
   draggable?: boolean;
-  dragKind?: "weapon" | "resource" | "item";
-  dragSource?: "rack" | "bench" | "equipment" | "container";
+  dragKind?: StashDragKind;
+  dragSource?: StashDragSource;
   weaponId?: WeaponId;
   resource?: PrepResource;
   rotated?: boolean;
@@ -398,7 +434,7 @@ interface OperatorPaperdollSlot {
 }
 
 interface StashActionDefinition {
-  id: string;
+  id: StashActionId;
   label: string;
 }
 
@@ -1837,6 +1873,160 @@ function renderStashRackGrid(tiles: StashTileDefinition[]): string {
   return `${cells}${tiles.map((tile) => renderStashTile(tile)).join("")}`;
 }
 
+function asRackTile(tile: StashTileDefinition, dragKind: StashDragKind): StashTileDefinition {
+  return {
+    ...tile,
+    draggable: true,
+    dragKind,
+    dragSource: "rack"
+  };
+}
+
+function createWeaponRackTile(weapon: (typeof WEAPONS)[WeaponId], selectedWeapon: WeaponId): StashTileDefinition {
+  return asRackTile(
+    {
+      id: `rack-weapon-${weapon.id}`,
+      tone: "weapon",
+      variant: weapon.id,
+      kicker: "Arsenal",
+      label: weapon.name,
+      meta: `${weapon.ammoPackAmmo} reserve per pack`,
+      detail: `${weapon.name} sits in the rack ready to swap onto the bench. Right click to stage it immediately or drag it onto the ready bench.`,
+      selected: weapon.id === selectedWeapon,
+      compact: true,
+      weaponId: weapon.id
+    },
+    "weapon"
+  );
+}
+
+function createStashSupplyRackTile(resource: PrepResource, index: number, total: number): StashTileDefinition {
+  const isMedkit = resource === "medkits";
+  return asRackTile(
+    {
+      id: isMedkit ? `rack-medkit-${index}` : `rack-ammo-${index}`,
+      tone: "supply",
+      variant: isMedkit ? (index % 2 === 0 ? "medkits" : "medical") : index % 2 === 0 ? "ammo" : "munitions",
+      kicker: "Stash",
+      label: isMedkit ? "Field dressing" : "Ammo pack",
+      meta:
+        index === 0
+          ? isMedkit
+            ? `${total} ready for deployment`
+            : `${total} packs in reserve`
+          : isMedkit
+            ? "sealed medical stock"
+            : "sealed reserve ammo",
+      detail: isMedkit
+        ? "A sealed field dressing pack ready to move into the raid rig. Send it straight to the prep card from the rack when the route demands more sustain."
+        : "A reserve ammo pack ready for deployment. Moving one into the rig widens the raid's margin for long fights and missed bursts.",
+      count: `${index + 1}`,
+      compact: true,
+      resource
+    },
+    "resource"
+  );
+}
+
+function createRecoveredManifestRackTile(kind: keyof LootManifest, index: number): StashTileDefinition {
+  const idPrefix =
+    kind === "medical"
+      ? "medical-haul"
+      : kind === "munitions"
+        ? "munitions-haul"
+        : kind === "hardware"
+          ? "hardware-haul"
+          : "intel";
+  const manifests: Record<keyof LootManifest, Pick<StashTileDefinition, "tone" | "variant" | "label" | "meta" | "detail">> = {
+    intel: {
+      tone: "intel",
+      variant: "intel",
+      label: "Intel dossier",
+      meta: index === 0 ? "last clean extract" : "archived route intel",
+      detail: "Recovered route intel archived in the stash after the last extract. It is not deployable gear, but it helps the stash feel like a place where raids leave scars and trophies."
+    },
+    medical: {
+      tone: "supply",
+      variant: "medical",
+      label: "Medical crate",
+      meta: index === 0 ? "sealed clinic haul" : "stashed recovery stock",
+      detail: "Recovered clinic stock from a prior raid. These non-rig haul tiles make the rack read more like a real stash wall instead of only a loadout picker."
+    },
+    munitions: {
+      tone: "supply",
+      variant: "munitions",
+      label: "Munitions case",
+      meta: index === 0 ? "ammo resale haul" : "boxed munitions",
+      detail: "Recovered munitions hauled out of the route. These tiles stay visual and economic, giving the stash more breadth without confusing what can be dragged into the rig."
+    },
+    hardware: {
+      tone: "supply",
+      variant: "hardware",
+      label: "Hardware crate",
+      meta: index === 0 ? "parts for the broker" : "tagged industrial salvage",
+      detail: "Recovered industrial salvage staged for resale. It is there to make the stash look richer and to remind the player that extraction feeds a bigger operation than one loadout."
+    }
+  };
+  const manifest = manifests[kind];
+  return asRackTile(
+    {
+      id: `rack-${idPrefix}-${index}`,
+      tone: manifest.tone,
+      variant: manifest.variant,
+      kicker: "Recovered",
+      label: manifest.label,
+      meta: manifest.meta,
+      detail: manifest.detail,
+      count: `${index + 1}`,
+      compact: true
+    },
+    "item"
+  );
+}
+
+function createCapturedWeaponRackTile(capturedWeapon: NonNullable<ReturnType<typeof getUnsoldCapturedWeapon>>): StashTileDefinition {
+  return asRackTile(
+    {
+      id: `rack-captured-weapon-${capturedWeapon.weaponId}`,
+      tone: "weapon",
+      variant: capturedWeapon.weaponId,
+      kicker: "Recovered",
+      label: capturedWeapon.weaponName,
+      meta: `${capturedWeapon.sourceLabel} // ${capturedWeapon.salvageValue} cr if sold`,
+      detail: `${capturedWeapon.weaponName} was carried home off ${capturedWeapon.sourceLabel.toLowerCase()}. It is a real doctrine pull for the next run, not just another credit bundle.`,
+      compact: true,
+      weaponId: capturedWeapon.weaponId
+    },
+    "weapon"
+  );
+}
+
+function createEmptyRackTile(activeDemandId: ContrabandCategoryId): StashTileDefinition {
+  return asRackTile(
+    {
+      id: "rack-empty",
+      tone: "demand",
+      variant: activeDemandId,
+      kicker: "Stash",
+      label: "Rack is empty",
+      meta: "Extract with gear and hot cargo to fill this wall.",
+      detail: "The stash rack is waiting for the first successful haul. Bring weapons, supplies, and contraband home so this wall stops looking empty."
+    },
+    "item"
+  );
+}
+
+function pushStashTileCopies(
+  count: number,
+  max: number,
+  createTile: (index: number) => StashTileDefinition,
+  tiles: StashTileDefinition[]
+): void {
+  for (let index = 0; index < Math.min(count, max); index += 1) {
+    tiles.push(createTile(index));
+  }
+}
+
 function buildReadyBenchTiles(
   route: ActiveRoute,
   weaponId: WeaponId,
@@ -2168,11 +2358,6 @@ function buildStashRackTiles(
     munitions: 0,
     hardware: 0
   };
-  const pushRepeat = (count: number, max: number, createTile: (index: number) => StashTileDefinition): void => {
-    for (let index = 0; index < Math.min(count, max); index += 1) {
-      tiles.push(createTile(index));
-    }
-  };
 
   const arsenalWeapons = Object.values(WEAPONS)
     .filter((entry) => entry.id !== "none")
@@ -2187,148 +2372,55 @@ function buildStashRackTiles(
     });
 
   for (const weapon of arsenalWeapons) {
-    tiles.push({
-      id: `rack-weapon-${weapon.id}`,
-      tone: "weapon",
-      variant: weapon.id,
-      kicker: "Arsenal",
-      label: weapon.name,
-      meta: `${weapon.ammoPackAmmo} reserve per pack`,
-      detail: `${weapon.name} sits in the rack ready to swap onto the bench. Right click to stage it immediately or drag it onto the ready bench.`,
-      selected: weapon.id === selectedWeapon,
-      compact: true,
-      draggable: true,
-      dragKind: "weapon",
-      dragSource: "rack",
-      weaponId: weapon.id
-    });
+    tiles.push(createWeaponRackTile(weapon, selectedWeapon));
   }
 
-  pushRepeat(stashSupplies.medkits, 8, (index) => ({
-    id: `rack-medkit-${index}`,
-    tone: "supply",
-    variant: index % 2 === 0 ? "medkits" : "medical",
-    kicker: "Stash",
-    label: "Field dressing",
-    meta: index === 0 ? `${stashSupplies.medkits} ready for deployment` : "sealed medical stock",
-    detail: "A sealed field dressing pack ready to move into the raid rig. Send it straight to the prep card from the rack when the route demands more sustain.",
-    count: `${index + 1}`,
-    compact: true,
-    draggable: true,
-    dragKind: "resource",
-    dragSource: "rack",
-    resource: "medkits"
-  }));
-
-  pushRepeat(stashSupplies.ammoPacks, 8, (index) => ({
-    id: `rack-ammo-${index}`,
-    tone: "supply",
-    variant: index % 2 === 0 ? "ammo" : "munitions",
-    kicker: "Stash",
-    label: "Ammo pack",
-    meta: index === 0 ? `${stashSupplies.ammoPacks} packs in reserve` : "sealed reserve ammo",
-    detail: "A reserve ammo pack ready for deployment. Moving one into the rig widens the raid's margin for long fights and missed bursts.",
-    count: `${index + 1}`,
-    compact: true,
-    draggable: true,
-    dragKind: "resource",
-    dragSource: "rack",
-    resource: "ammoPacks"
-  }));
-
-  pushRepeat(lastManifest.intel, 4, (index) => ({
-    id: `rack-intel-${index}`,
-    tone: "intel",
-    variant: "intel",
-    kicker: "Recovered",
-    label: "Intel dossier",
-    meta: index === 0 ? "last clean extract" : "archived route intel",
-    detail: "Recovered route intel archived in the stash after the last extract. It is not deployable gear, but it helps the stash feel like a place where raids leave scars and trophies.",
-    count: `${index + 1}`,
-    compact: true,
-    draggable: true,
-    dragKind: "item",
-    dragSource: "rack"
-  }));
-
-  pushRepeat(lastManifest.medical, 4, (index) => ({
-    id: `rack-medical-haul-${index}`,
-    tone: "supply",
-    variant: "medical",
-    kicker: "Recovered",
-    label: "Medical crate",
-    meta: index === 0 ? "sealed clinic haul" : "stashed recovery stock",
-    detail: "Recovered clinic stock from a prior raid. These non-rig haul tiles make the rack read more like a real stash wall instead of only a loadout picker.",
-    count: `${index + 1}`,
-    compact: true,
-    draggable: true,
-    dragKind: "item",
-    dragSource: "rack"
-  }));
-
-  pushRepeat(lastManifest.munitions, 4, (index) => ({
-    id: `rack-munitions-haul-${index}`,
-    tone: "supply",
-    variant: "munitions",
-    kicker: "Recovered",
-    label: "Munitions case",
-    meta: index === 0 ? "ammo resale haul" : "boxed munitions",
-    detail: "Recovered munitions hauled out of the route. These tiles stay visual and economic, giving the stash more breadth without confusing what can be dragged into the rig.",
-    count: `${index + 1}`,
-    compact: true,
-    draggable: true,
-    dragKind: "item",
-    dragSource: "rack"
-  }));
-
-  pushRepeat(lastManifest.hardware, 4, (index) => ({
-    id: `rack-hardware-haul-${index}`,
-    tone: "supply",
-    variant: "hardware",
-    kicker: "Recovered",
-    label: "Hardware crate",
-    meta: index === 0 ? "parts for the broker" : "tagged industrial salvage",
-      detail: "Recovered industrial salvage staged for resale. It is there to make the stash look richer and to remind the player that extraction feeds a bigger operation than one loadout.",
-      count: `${index + 1}`,
-    compact: true,
-    draggable: true,
-    dragKind: "item",
-    dragSource: "rack"
-  }));
+  pushStashTileCopies(
+    stashSupplies.medkits,
+    STASH_RACK_RESOURCE_TILE_LIMIT,
+    (index) => createStashSupplyRackTile("medkits", index, stashSupplies.medkits),
+    tiles
+  );
+  pushStashTileCopies(
+    stashSupplies.ammoPacks,
+    STASH_RACK_RESOURCE_TILE_LIMIT,
+    (index) => createStashSupplyRackTile("ammoPacks", index, stashSupplies.ammoPacks),
+    tiles
+  );
+  pushStashTileCopies(
+    lastManifest.intel,
+    STASH_RACK_MANIFEST_TILE_LIMIT,
+    (index) => createRecoveredManifestRackTile("intel", index),
+    tiles
+  );
+  pushStashTileCopies(
+    lastManifest.medical,
+    STASH_RACK_MANIFEST_TILE_LIMIT,
+    (index) => createRecoveredManifestRackTile("medical", index),
+    tiles
+  );
+  pushStashTileCopies(
+    lastManifest.munitions,
+    STASH_RACK_MANIFEST_TILE_LIMIT,
+    (index) => createRecoveredManifestRackTile("munitions", index),
+    tiles
+  );
+  pushStashTileCopies(
+    lastManifest.hardware,
+    STASH_RACK_MANIFEST_TILE_LIMIT,
+    (index) => createRecoveredManifestRackTile("hardware", index),
+    tiles
+  );
 
   const capturedWeapon = getUnsoldCapturedWeapon(lastRaidSummary);
   if (capturedWeapon) {
-    tiles.push({
-      id: `rack-captured-weapon-${capturedWeapon.weaponId}`,
-      tone: "weapon",
-      variant: capturedWeapon.weaponId,
-      kicker: "Recovered",
-      label: capturedWeapon.weaponName,
-      meta: `${capturedWeapon.sourceLabel} // ${capturedWeapon.salvageValue} cr if sold`,
-      detail: `${capturedWeapon.weaponName} was carried home off ${capturedWeapon.sourceLabel.toLowerCase()}. It is a real doctrine pull for the next run, not just another credit bundle.`,
-      compact: true,
-      draggable: true,
-      dragKind: "weapon",
-      dragSource: "rack",
-      weaponId: capturedWeapon.weaponId
-    });
+    tiles.push(createCapturedWeaponRackTile(capturedWeapon));
   }
 
   tiles.push(...buildAmbientRackTiles(route, activeDemandId, stashSupplies, lastRaidSummary));
 
   if (tiles.length === 0) {
-    tiles.push({
-      id: "rack-empty",
-      tone: "demand",
-      variant: activeDemandId,
-      kicker: "Stash",
-      label: "Rack is empty",
-      meta: "Extract with gear and hot cargo to fill this wall.",
-      detail: "The stash rack is waiting for the first successful haul. Bring weapons, supplies, and contraband home so this wall stops looking empty.",
-      draggable: true,
-      dragKind: "item",
-      dragSource: "rack"
-    });
+    tiles.push(createEmptyRackTile(activeDemandId));
   }
 
   return tiles;
@@ -13393,7 +13485,7 @@ stashOverlay.addEventListener("click", (event) => {
     const actionId = actionButton.dataset.stashAction;
     const tile = tileId ? findStashTile(tileId) : null;
 
-    if (tile && actionId) {
+    if (tile && actionId && isStashActionId(actionId)) {
       runStashTileAction(tile, actionId);
     }
 
@@ -16671,8 +16763,8 @@ function renderSpritePaintLab(nowMs: number): void {
 }
 
 interface StashDragState {
-  kind: "weapon" | "resource" | "item";
-  source: "rack" | "bench" | "equipment" | "container";
+  kind: StashDragKind;
+  source: StashDragSource;
   tileId: string;
   weaponId?: WeaponId;
   resource?: PrepResource;
@@ -17972,54 +18064,83 @@ function renderTabReadout(entries: Array<{ label: string; value: string }>): str
     .join("");
 }
 
+function addStashAction(actions: StashActionDefinition[], id: StashActionId, label: string, priority: "front" | "back" = "front"): void {
+  if (priority === "front") {
+    actions.unshift({ id, label });
+    return;
+  }
+
+  actions.push({ id, label });
+}
+
+function isStashActionId(actionId: string): actionId is StashActionId {
+  return STASH_ACTION_IDS.has(actionId as StashActionId);
+}
+
+function getStashTilePayload(
+  tile: StashTileDefinition,
+  source: StashDragSource = tile.dragSource === "bench" ? "bench" : "rack"
+): StashDragState {
+  return {
+    kind: tile.dragKind ?? (tile.weaponId ? "weapon" : "item"),
+    source,
+    tileId: tile.id,
+    weaponId: tile.weaponId,
+    resource: tile.resource
+  };
+}
+
 function getStashTileActions(tile: StashTileDefinition): StashActionDefinition[] {
   const actions: StashActionDefinition[] = [{ id: "inspect", label: "Inspect Item" }];
   const preferredEquipSlot = getPreferredEquipSlot(tile);
   const equippedSlot = findEquippedSlotByTileId(tile.id);
 
   if (tile.dragKind === "weapon" && tile.dragSource === "rack" && tile.weaponId) {
-    actions.unshift({ id: "stage-weapon", label: "Stage On Bench" });
+    addStashAction(actions, "stage-weapon", "Stage On Bench");
   }
 
   if (tile.dragSource === "rack" && preferredEquipSlot) {
-    actions.unshift({ id: "equip-default", label: `Equip To ${getEquipmentSlotLabel(preferredEquipSlot)}` });
+    addStashAction(actions, "equip-default", `Equip To ${getEquipmentSlotLabel(preferredEquipSlot)}`);
   }
 
   if (canAssignTileToQuickSlot(tile)) {
-    actions.unshift({ id: "assign-quick-slot", label: `Assign To Slot ${getNextOpenQuickSlotId()}` });
+    addStashAction(actions, "assign-quick-slot", `Assign To Slot ${getNextOpenQuickSlotId()}`);
   }
 
   if (tile.dragKind === "resource" && tile.dragSource === "rack" && tile.resource) {
-    actions.unshift({ id: "add-resource", label: "Send To Rig" });
+    addStashAction(actions, "add-resource", "Send To Rig");
   }
 
   if (tile.dragKind === "resource" && tile.dragSource === "bench" && tile.resource) {
-    actions.unshift({ id: "remove-resource", label: "Return To Rack" });
+    addStashAction(actions, "remove-resource", "Return To Rack");
   }
 
   if (tile.dragSource === "rack" && canRotateRackTile(tile)) {
-    actions.unshift({ id: "rotate-rack", label: tile.rotated ? "Set Horizontal" : "Rotate Vertical" });
+    addStashAction(actions, "rotate-rack", tile.rotated ? "Set Horizontal" : "Rotate Vertical");
   }
 
   if (equippedSlot) {
-    actions.unshift({ id: "unequip-to-stash", label: "Unequip To Stash" });
+    addStashAction(actions, "unequip-to-stash", "Unequip To Stash");
   }
 
   if (isContainerTile(tile)) {
-    actions.unshift({
-      id: stashUiState.openContainerTileId === tile.id ? "close-container" : "open-container",
-      label: stashUiState.openContainerTileId === tile.id ? "Close Container" : "Open Container"
-    });
+    addStashAction(
+      actions,
+      stashUiState.openContainerTileId === tile.id ? "close-container" : "open-container",
+      stashUiState.openContainerTileId === tile.id ? "Close Container" : "Open Container"
+    );
   }
 
   if (canSellStashTile(tile)) {
-    actions.unshift({ id: "sell-now", label: `Sell For ${getStashTileSellValue(tile)} cr` });
+    addStashAction(actions, "sell-now", `Sell For ${getStashTileSellValue(tile)} cr`);
   }
 
-  actions.push({
-    id: stashUiState.brokerTaggedTileIds.has(tile.id) ? "untag-broker" : "tag-broker",
-    label: stashUiState.brokerTaggedTileIds.has(tile.id) ? "Clear Broker Tag" : "Tag For Broker"
-  });
+  addStashAction(
+    actions,
+    stashUiState.brokerTaggedTileIds.has(tile.id) ? "untag-broker" : "tag-broker",
+    stashUiState.brokerTaggedTileIds.has(tile.id) ? "Clear Broker Tag" : "Tag For Broker",
+    "back"
+  );
 
   return actions;
 }
@@ -18056,18 +18177,36 @@ function renderStashInspector(tile: StashTileDefinition | null): void {
     .join("");
 }
 
+function getStashContextMenuPosition(clientX: number, clientY: number): { left: number; top: number } {
+  return {
+    left: Math.max(
+      STASH_CONTEXT_MENU_MARGIN_PX,
+      Math.min(clientX, window.innerWidth - STASH_CONTEXT_MENU_ESTIMATED_WIDTH_PX - STASH_CONTEXT_MENU_MARGIN_PX)
+    ),
+    top: Math.max(
+      STASH_CONTEXT_MENU_MARGIN_PX,
+      Math.min(clientY, window.innerHeight - STASH_CONTEXT_MENU_ESTIMATED_HEIGHT_PX - STASH_CONTEXT_MENU_MARGIN_PX)
+    )
+  };
+}
+
+function clearStashContextMenu(): void {
+  stashContextMenu.classList.add("hidden");
+  stashContextMenu.innerHTML = "";
+  stashContextMenu.style.left = "";
+  stashContextMenu.style.top = "";
+}
+
 function renderStashContextMenu(tile: StashTileDefinition | null): void {
   if (!tile || stashUiState.contextTileId !== tile.id) {
-    stashContextMenu.classList.add("hidden");
-    stashContextMenu.innerHTML = "";
-    stashContextMenu.style.left = "";
-    stashContextMenu.style.top = "";
+    clearStashContextMenu();
     return;
   }
 
+  const position = getStashContextMenuPosition(stashUiState.contextX, stashUiState.contextY);
   stashContextMenu.classList.remove("hidden");
-  stashContextMenu.style.left = `${stashUiState.contextX}px`;
-  stashContextMenu.style.top = `${stashUiState.contextY}px`;
+  stashContextMenu.style.left = `${position.left}px`;
+  stashContextMenu.style.top = `${position.top}px`;
   stashContextMenu.innerHTML = `
     <div class="stash-context-head">
       <span>${tile.kicker}</span>
@@ -18322,20 +18461,14 @@ function renderStorageSurfaceGrid(surfaceId: StorageSurfaceId, selectedWeapon: W
   `;
 }
 
-function runStashTileAction(tile: StashTileDefinition, actionId: string): void {
+function runStashTileAction(tile: StashTileDefinition, actionId: StashActionId): void {
   stashUiState.selectedTileId = tile.id;
 
   if (actionId === "equip-default") {
     const slotId = getPreferredEquipSlot(tile);
 
     if (slotId) {
-      handleEquipmentDrop(slotId, {
-        kind: tile.dragKind ?? (tile.weaponId ? "weapon" : "item"),
-        source: tile.dragSource === "bench" ? "bench" : "rack",
-        tileId: tile.id,
-        weaponId: tile.weaponId,
-        resource: tile.resource
-      });
+      handleEquipmentDrop(slotId, getStashTilePayload(tile));
     }
 
     return;
@@ -18343,11 +18476,7 @@ function runStashTileAction(tile: StashTileDefinition, actionId: string): void {
 
   if (actionId === "unequip-to-stash") {
     handleRackDrop({
-      kind: tile.dragKind ?? (tile.weaponId ? "weapon" : "item"),
-      source: "equipment",
-      tileId: tile.id,
-      weaponId: tile.weaponId,
-      resource: tile.resource,
+      ...getStashTilePayload(tile, "equipment"),
       equipmentSlotId: findEquippedSlotByTileId(tile.id) ?? undefined
     });
     return;
