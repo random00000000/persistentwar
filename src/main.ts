@@ -2126,7 +2126,19 @@ function buildStashRackTiles(
     }
   };
 
-  for (const weapon of Object.values(WEAPONS).filter((entry) => entry.id !== "none")) {
+  const arsenalWeapons = Object.values(WEAPONS)
+    .filter((entry) => entry.id !== "none")
+    .sort((left, right) => {
+      if (left.id === "rpg") {
+        return -1;
+      }
+      if (right.id === "rpg") {
+        return 1;
+      }
+      return 0;
+    });
+
+  for (const weapon of arsenalWeapons) {
     tiles.push({
       id: `rack-weapon-${weapon.id}`,
       tone: "weapon",

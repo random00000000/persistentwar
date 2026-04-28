@@ -16,6 +16,7 @@ export type InventoryItemSubcategory =
   | "shotgun"
   | "pkm"
   | "amr"
+  | "rpg"
   | "pistol"
   | "magazine"
   | "medical"
@@ -248,6 +249,23 @@ const INVENTORY_ITEM_DEFINITIONS: Record<string, InventoryItemDefinition> = {
     value: 880,
     description: "Heavy anti-materiel rifle for late-war lane dominance and plated kills.",
     tags: ["primary", "endgame", "precision", "operator"]
+  },
+  "weapon-rpg": {
+    itemId: "weapon-rpg",
+    displayName: "RPG-7 Launcher",
+    category: "weapon",
+    subcategory: "rpg",
+    width: 4,
+    height: 2,
+    weight: 7.8,
+    stackable: false,
+    maxStack: 1,
+    allowedSlots: ["on-sling", "on-back"],
+    allowedParents: ["stash", "backpack"],
+    rotationAllowed: true,
+    value: 980,
+    description: "Earned siege launcher for cracking bunker mouths, camp anchors, and packed trench lines.",
+    tags: ["primary", "endgame", "siege", "rocket", "operator"]
   },
   "item-pistol": {
     itemId: "item-pistol",
