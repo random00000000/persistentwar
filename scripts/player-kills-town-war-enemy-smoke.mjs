@@ -126,7 +126,16 @@ async function runPlayerKillsTownWarEnemySmoke() {
         api.startRaid();
 
         let snapshot = api.getSnapshot();
+        const unlinkedEnemies = snapshot.raid.enemies.filter((enemy) => !enemy.townWarSoldierId);
         let linkedEnemy = snapshot.raid.enemies.find((enemy) => enemy.townWarSoldierId && enemy.casualtyState !== "downed");
+        if (unlinkedEnemies.length > 0) {
+          return {
+            ok: false,
+            reason: "legacy-enemies-present",
+            unlinkedEnemies,
+            enemies: snapshot.raid.enemies
+          };
+        }
         if (!linkedEnemy) {
           return {
             ok: false,
@@ -156,6 +165,7 @@ async function runPlayerKillsTownWarEnemySmoke() {
         snapshot = api.getSnapshot();
         const enemyAfter = snapshot.raid.enemies.find((enemy) => enemy.id === linkedEnemy.id);
         const soldierAfter = snapshot.war.townWar.soldiers.find((soldier) => soldier.id === linkedEnemy.townWarSoldierId);
+        const unlinkedEnemiesAfter = snapshot.raid.enemies.filter((enemy) => !enemy.townWarSoldierId);
         return {
           ok: true,
           linkedEnemyId: linkedEnemy.id,
@@ -169,6 +179,8 @@ async function runPlayerKillsTownWarEnemySmoke() {
           soldierAfter: soldierAfter
             ? { id: soldierAfter.id, health: soldierAfter.health.current, currentNeed: soldierAfter.currentNeed, task: soldierAfter.task }
             : null,
+          unlinkedEnemiesAfter,
+          pendingReinforcementCount: snapshot.raid.pendingReinforcements.length,
           player: snapshot.raid.player
         };
       });
@@ -183,6 +195,16 @@ async function runPlayerKillsTownWarEnemySmoke() {
       assertSmoke(
         result.soldierAfter?.health === 0,
         "Expected player rifle fire to write the kill back to the town-war enemy soldier.",
+        result
+      );
+      assertSmoke(
+        result.unlinkedEnemiesAfter.length === 0,
+        "Expected no legacy Ukrainian raid AI to appear after player gunfire.",
+        result
+      );
+      assertSmoke(
+        result.pendingReinforcementCount === 0,
+        "Expected legacy Ukrainian reinforcement waves to stay on hold.",
         result
       );
       assertSmoke(pageErrors.length === 0, "Expected no browser errors during player kill smoke.", pageErrors);

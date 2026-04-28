@@ -2334,6 +2334,10 @@ const OFFICER_AMMO_CRATE_LOSS_SECONDS = 2.6;
 const OFFICER_AMMO_CRATE_DEFAULT_STOCK = 120;
 const TOWN_WAR_RAID_PROJECTION_LIMIT = 4;
 const TOWN_WAR_RAID_ENEMY_PROJECTION_LIMIT = 6;
+// Legacy route enemies and reactive waves are held off while Frontline Officer
+// moves Ukrainian combat onto shared town-war soldiers. Flip this only when
+// deliberately testing the old extraction-shooter hostile AI again.
+const LEGACY_UKRAINIAN_RAID_AI_ENABLED = false;
 const TOWN_WAR_RAID_TRENCH_FIRE_RANGE_MULTIPLIER = 1.2;
 const TOWN_WAR_RAID_TRENCH_DAMAGE_MULTIPLIER = 0.1;
 const ACTIVE_SQUAD_MATE_LIMIT = 3;
@@ -17610,17 +17614,24 @@ export class RaidController {
       this.state.player.reserveAmmo += activeFrontlineDefinition.bonusAmmoPacks * weapon.ammoPackAmmo;
       this.syncActivePlayerWeaponSlot();
     }
-    this.state.enemies = this.createRaidEnemies(
-      route,
-      stagedPlan.enemySpawns,
-      this.state.player.position,
-      (activeFrontlineDefinition?.enemyReduction ?? 0) + sectorEnemyReduction,
-      townWarSnapshot
-    );
+    // Old extraction-shooter route enemies stay available behind
+    // LEGACY_UKRAINIAN_RAID_AI_ENABLED, but the active game should start with
+    // only shared town-war Ukrainian soldiers on the board.
+    this.state.enemies = LEGACY_UKRAINIAN_RAID_AI_ENABLED
+      ? this.createRaidEnemies(
+          route,
+          stagedPlan.enemySpawns,
+          this.state.player.position,
+          (activeFrontlineDefinition?.enemyReduction ?? 0) + sectorEnemyReduction,
+          townWarSnapshot
+        )
+      : [];
     const enemyTownWarSoldiers = this.createEnemyTownWarSoldierGarrison(townWarSnapshot, this.state.player.position);
     if (enemyTownWarSoldiers.length > 0) {
       this.state.enemies.push(...enemyTownWarSoldiers);
-    } else {
+    } else if (LEGACY_UKRAINIAN_RAID_AI_ENABLED) {
+      // Fallback to the old generic camp/patrol enemies only when explicitly
+      // re-enabling legacy Ukrainian raid AI for comparison or recovery.
       this.state.enemies.push(...this.createEnemyCampGarrison(townWarSnapshot, this.state.player.position));
       this.state.enemies.push(...this.createEnemyFrontlinePatrol(townWarSnapshot, this.state.player.position));
     }
@@ -29697,6 +29708,13 @@ export class RaidController {
     briefing: string,
     targetPosition: Vec2
   ): void {
+    if (!LEGACY_UKRAINIAN_RAID_AI_ENABLED) {
+      // Old extraction-style Ukrainian waves are intentionally on hold. Keep
+      // the callers and spawn specs intact so the previous AI can be restored
+      // by flipping LEGACY_UKRAINIAN_RAID_AI_ENABLED instead of rebuilding it.
+      return;
+    }
+
     const townWarEnemySideLimit = this.getTownWarEnemySideLimit();
     const reservedPoints = [
       this.state.player.position,
@@ -29748,6 +29766,13 @@ export class RaidController {
   }
 
   private updatePendingReinforcements(deltaSeconds: number): void {
+    if (!LEGACY_UKRAINIAN_RAID_AI_ENABLED) {
+      if (this.state.pendingReinforcements.length > 0) {
+        this.state.pendingReinforcements = [];
+      }
+      return;
+    }
+
     if (this.state.pendingReinforcements.length === 0) {
       return;
     }
