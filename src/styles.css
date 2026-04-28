@@ -411,6 +411,38 @@ body.stash-open .hud {
   font-size: 0.72rem;
 }
 
+.hud-weapon-swap {
+  pointer-events: auto;
+  display: inline-grid;
+  gap: 2px;
+  min-width: 150px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+}
+
+.hud-weapon-swap:not(:disabled):hover {
+  border-color: rgba(56, 189, 248, 0.34);
+  background: rgba(8, 47, 73, 0.38);
+}
+
+.hud-weapon-swap-disabled,
+.hud-weapon-swap:disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+
+.hud-weapon-swap span,
+.hud-weapon-swap strong {
+  display: block;
+}
+
+.hud-weapon-swap strong {
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+}
+
 .hud-ribbon-foot {
   display: flex;
   flex-wrap: wrap;

@@ -10121,6 +10121,10 @@ app.innerHTML = `
               <button type="button" data-first-minute-action="objective">Objective</button>
             </div>
           </section>
+          <button class="hud-toggle hud-weapon-swap" data-weapon-swap type="button" title="Swap Sling 1 / Sling 2 with Q">
+            <span>Swap</span>
+            <strong data-weapon-swap-label>Sling 2</strong>
+          </button>
           <section class="field-strip field-strip-compact">
             <div class="field-strip-copy">
               <p class="eyebrow">Field Read</p>
@@ -12607,6 +12611,8 @@ app.innerHTML = `
 const healthValue = requireElement<HTMLElement>("[data-health]");
 const weaponValue = requireElement<HTMLElement>("[data-weapon]");
 const ammoValue = requireElement<HTMLElement>("[data-ammo]");
+const weaponSwapButton = requireElement<HTMLButtonElement>("[data-weapon-swap]");
+const weaponSwapLabelValue = requireElement<HTMLElement>("[data-weapon-swap-label]");
 const medkitsValue = requireElement<HTMLElement>("[data-medkits]");
 const grenadesValue = requireElement<HTMLElement>("[data-grenades]");
 const carriedValue = requireElement<HTMLElement>("[data-carried]");
@@ -18742,6 +18748,29 @@ function renderStorageSurfaceGrid(surfaceId: StorageSurfaceId, selectedWeapon: W
   `;
 }
 
+function getRaidWeaponSwapReadout(player: typeof raidController.state.player): {
+  disabled: boolean;
+  label: string;
+  title: string;
+} {
+  const currentSlot = player.weaponSlots.find((slot) => slot.slotId === player.activeWeaponSlotId) ?? null;
+  const nextSlot = player.weaponSlots.find((slot) => slot.slotId !== player.activeWeaponSlotId) ?? null;
+
+  if (!currentSlot || !nextSlot) {
+    return {
+      disabled: true,
+      label: "Sling 2 empty",
+      title: "No second primary staged. Equip a weapon on Sling 2 from the stash."
+    };
+  }
+
+  return {
+    disabled: false,
+    label: `${nextSlot.label}: ${WEAPONS[nextSlot.weaponId].name}`,
+    title: `Swap from ${currentSlot.label} to ${nextSlot.label} (${WEAPONS[nextSlot.weaponId].name}). Shortcut: Q.`
+  };
+}
+
 function runStashTileAction(tile: StashTileDefinition, actionId: StashActionId): void {
   stashUiState.selectedTileId = tile.id;
 
@@ -19884,6 +19913,11 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-war-vic
 
 hudToggleButton.addEventListener("click", () => {
   raidHudState.tacticalDrawerOpen = !raidHudState.tacticalDrawerOpen;
+  updateUi();
+});
+
+weaponSwapButton.addEventListener("click", () => {
+  raidController.switchPlayerWeaponSlot();
   updateUi();
 });
 
@@ -24804,6 +24838,11 @@ function updateUi(): void {
   setTextIfChanged(healthValue, `${Math.max(0, Math.ceil(player.health))}`);
   setTextIfChanged(weaponValue, WEAPONS[player.weaponId].name);
   setTextIfChanged(ammoValue, formatAmmoState(player));
+  const weaponSwapReadout = getRaidWeaponSwapReadout(player);
+  setTextIfChanged(weaponSwapLabelValue, weaponSwapReadout.label);
+  weaponSwapButton.disabled = weaponSwapReadout.disabled || phase !== "raid";
+  weaponSwapButton.title = weaponSwapReadout.title;
+  weaponSwapButton.classList.toggle("hud-weapon-swap-disabled", weaponSwapButton.disabled);
   setTextIfChanged(medkitsValue, `${player.medkits}`);
   setTextIfChanged(
     grenadesValue,

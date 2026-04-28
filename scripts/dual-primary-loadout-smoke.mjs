@@ -83,14 +83,20 @@ try {
   assert(snapshot.raid, "Raid did not start.");
   assert(snapshot.raid.player.weaponId === "worn-ak", `Expected active Worn AK, got ${snapshot.raid.player.weaponId}`);
   assert(snapshot.raid.player.activeWeaponSlotId === "primary", `Expected primary active, got ${snapshot.raid.player.activeWeaponSlotId}`);
+  const swapLabelBefore = await page.locator("[data-weapon-swap-label]").textContent();
+  assert(swapLabelBefore?.trim() === "Sling 2: RPG-7 Launcher", `Expected swap button to target Sling 2 RPG, got "${swapLabelBefore?.trim()}"`);
+  assert(!(await page.locator("[data-weapon-swap]").isDisabled()), "Swap button should be enabled when Sling 2 is staged.");
   assert(
     snapshot.raid.player.weaponSlots.some((slot) => slot.slotId === "secondary" && slot.weaponId === "rpg"),
     "RPG was not carried as the secondary long gun."
   );
 
-  snapshot = await page.evaluate(() => window.__topdownExtractionAgentApi.switchWeaponSlot("secondary"));
+  await page.locator("[data-weapon-swap]").click();
+  snapshot = await page.evaluate(() => window.__topdownExtractionAgentApi.getSnapshot());
   assert(snapshot.raid.player.weaponId === "rpg", `Expected RPG after swap, got ${snapshot.raid.player.weaponId}`);
   assert(snapshot.raid.player.activeWeaponSlotId === "secondary", `Expected secondary active, got ${snapshot.raid.player.activeWeaponSlotId}`);
+  const swapLabelAfter = await page.locator("[data-weapon-swap-label]").textContent();
+  assert(swapLabelAfter?.trim() === "Sling 1: Worn AK", `Expected swap button to target Sling 1 Worn AK, got "${swapLabelAfter?.trim()}"`);
 
   const ammoBeforeRpg = getActiveAmmo(snapshot.raid.player);
   const playerPosition = snapshot.raid.player.position;
@@ -105,7 +111,8 @@ try {
   const ammoAfterRpg = getActiveAmmo(snapshot.raid.player);
   assert(ammoAfterRpg < ammoBeforeRpg, `RPG ammo did not change after firing. before=${ammoBeforeRpg}, after=${ammoAfterRpg}`);
 
-  snapshot = await page.evaluate(() => window.__topdownExtractionAgentApi.switchWeaponSlot("primary"));
+  await page.locator("[data-weapon-swap]").click();
+  snapshot = await page.evaluate(() => window.__topdownExtractionAgentApi.getSnapshot());
   assert(snapshot.raid.player.weaponId === "worn-ak", `Expected Worn AK after swap back, got ${snapshot.raid.player.weaponId}`);
   assert(snapshot.raid.player.activeWeaponSlotId === "primary", `Expected primary active after swap back, got ${snapshot.raid.player.activeWeaponSlotId}`);
   assert(consoleErrors.length === 0, `Console errors during dual-primary smoke: ${consoleErrors.slice(0, 3).join(" | ")}`);
