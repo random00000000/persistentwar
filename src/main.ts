@@ -40275,7 +40275,7 @@ topDownWindow.__topdownExtractionAgentApi = {
       typeof payload?.damage === "number"
         ? payload.damage
         : tool === "rpg"
-          ? 220
+          ? 260
           : 32;
 
     if (x === undefined || y === undefined || !Number.isFinite(x) || !Number.isFinite(y)) {

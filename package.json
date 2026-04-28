@@ -29,6 +29,7 @@
     "smoke:town-war-russian-dialogue": "node scripts/town-war-russian-dialogue-smoke.mjs",
     "smoke:town-war-soldier-inspector": "node scripts/town-war-soldier-inspector-smoke.mjs",
     "smoke:c4": "node scripts/c4-plant-smoke.mjs",
+    "smoke:rpg-four-hit-camp": "node scripts/rpg-four-hit-camp-smoke.mjs",
     "smoke:enemy-corner-unstick": "node scripts/enemy-corner-unstick-smoke.mjs",
     "smoke:enemy-spawn-side": "node scripts/enemy-spawn-side-smoke.mjs",
     "smoke": "node scripts/smoke.mjs"
