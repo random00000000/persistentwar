@@ -47,6 +47,21 @@ try {
   assert(snapshot.raid.player.weaponId === "rpg", `Expected RPG after swap, got ${snapshot.raid.player.weaponId}`);
   assert(snapshot.raid.player.activeWeaponSlotId === "secondary", `Expected secondary active, got ${snapshot.raid.player.activeWeaponSlotId}`);
 
+  const getActiveAmmo = (raidPlayer) =>
+    raidPlayer.weaponSlots.find((slot) => slot.slotId === raidPlayer.activeWeaponSlotId)?.ammoInMag ?? raidPlayer.ammoInMag;
+  const ammoBeforeRpg = getActiveAmmo(snapshot.raid.player);
+  const playerPosition = snapshot.raid.player.position;
+  await page.evaluate(
+    (target) => window.__topdownExtractionAgentApi.setAimTarget(target),
+    { x: playerPosition.x + 960, y: playerPosition.y }
+  );
+  await page.evaluate(() => window.__topdownExtractionAgentApi.setTriggerHeld(true));
+  snapshot = await page.evaluate(() => window.__topdownExtractionAgentApi.advanceRaid({ seconds: 0.75, tickSeconds: 0.05 }));
+  await page.evaluate(() => window.__topdownExtractionAgentApi.setTriggerHeld(false));
+  snapshot = await page.evaluate(() => window.__topdownExtractionAgentApi.advanceRaid({ seconds: 0.25, tickSeconds: 0.05 }));
+  const ammoAfterRpg = getActiveAmmo(snapshot.raid.player);
+  assert(ammoAfterRpg < ammoBeforeRpg, `RPG ammo did not change after firing. before=${ammoBeforeRpg}, after=${ammoAfterRpg}`);
+
   snapshot = await page.evaluate(() => window.__topdownExtractionAgentApi.switchWeaponSlot("primary"));
   assert(snapshot.raid.player.weaponId === "worn-ak", `Expected Worn AK after swap back, got ${snapshot.raid.player.weaponId}`);
   assert(snapshot.raid.player.activeWeaponSlotId === "primary", `Expected primary active after swap back, got ${snapshot.raid.player.activeWeaponSlotId}`);
@@ -58,6 +73,10 @@ try {
         ok: true,
         activeWeapon: snapshot.raid.player.weaponId,
         activeSlot: snapshot.raid.player.activeWeaponSlotId,
+        combat: {
+          activeTracerCount: snapshot.combat.activeTracerCount,
+          activeImpactCount: snapshot.combat.activeImpactCount
+        },
         weaponSlots: snapshot.raid.player.weaponSlots
       },
       null,

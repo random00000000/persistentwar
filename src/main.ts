@@ -1583,6 +1583,32 @@ function getSecondaryWeaponId(): WeaponId | null {
   return weaponId && weaponId !== raidController.state.selectedWeapon ? weaponId : null;
 }
 
+function revealWeaponRackTile(tile: StashTileDefinition | null | undefined): void {
+  if (!tile?.weaponId) {
+    return;
+  }
+
+  stashUiState.hiddenRackTileIds.delete(tile.id);
+  stashUiState.hiddenRackTileIds.delete(`rack-weapon-${tile.weaponId}`);
+}
+
+function clearSecondaryWeaponSlot(): void {
+  revealWeaponRackTile(stashUiState.equippedItems["on-back"]);
+  delete stashUiState.equippedItems["on-back"];
+}
+
+function stageSecondaryWeapon(weaponId: WeaponId, sourceTileId = `rack-weapon-${weaponId}`): void {
+  if (weaponId === "none" || weaponId === "pistol" || weaponId === raidController.state.selectedWeapon) {
+    clearSecondaryWeaponSlot();
+    return;
+  }
+
+  revealWeaponRackTile(stashUiState.equippedItems["on-back"]);
+  stashUiState.equippedItems["on-back"] = createEquippedWeaponTile("on-back", weaponId, sourceTileId);
+  stashUiState.hiddenRackTileIds.add(sourceTileId);
+  stashUiState.hiddenRackTileIds.add(`rack-weapon-${weaponId}`);
+}
+
 function syncSelectedWeaponFromEquipment(): void {
   const primaryTile = stashUiState.equippedItems["on-sling"];
   const nextWeaponId = primaryTile?.weaponId ?? getHolsterWeaponId() ?? "none";
@@ -1597,7 +1623,7 @@ function ensureWeaponLoadoutAuthority(): void {
     const equippedTile = stashUiState.equippedItems[slotId];
 
     if (equippedTile?.weaponId) {
-      stashUiState.equippedItems[slotId] = createEquippedWeaponTile(slotId, equippedTile.weaponId);
+      stashUiState.equippedItems[slotId] = createEquippedWeaponTile(slotId, equippedTile.weaponId, equippedTile.id);
     }
   }
 
@@ -18221,7 +18247,7 @@ function getStashTileActions(tile: StashTileDefinition): StashActionDefinition[]
   const equippedSlot = findEquippedSlotByTileId(tile.id);
 
   if (tile.dragKind === "weapon" && tile.dragSource === "rack" && tile.weaponId) {
-    addStashAction(actions, "stage-weapon", "Stage On Bench");
+    addStashAction(actions, "stage-weapon", "Equip On Sling");
     if (tile.weaponId !== "none" && tile.weaponId !== "pistol" && tile.weaponId !== raidController.state.selectedWeapon) {
       addStashAction(actions, "stage-back-weapon", "Stage On Back");
     }
@@ -18743,7 +18769,9 @@ function runStashTileAction(tile: StashTileDefinition, actionId: StashActionId):
   }
 
   if (actionId === "stage-back-weapon" && tile.weaponId) {
-    handleEquipmentDrop("on-back", getStashTilePayload(tile));
+    stageSecondaryWeapon(tile.weaponId, tile.id);
+    stashUiState.activeGearWorkbenchTab = "loadout";
+    updateUi();
     return;
   }
 
@@ -20012,9 +20040,7 @@ window.addEventListener("keydown", (event) => {
 function selectWeapon(weaponId: WeaponId): void {
   const previousPrimary = getEquipmentTile("on-sling", raidController.state.selectedWeapon);
 
-  if (previousPrimary) {
-    stashUiState.hiddenRackTileIds.delete(previousPrimary.id);
-  }
+  revealWeaponRackTile(previousPrimary);
 
   for (const weapon of Object.values(WEAPONS)) {
     if (weapon.id !== "none") {
@@ -20029,6 +20055,12 @@ function selectWeapon(weaponId: WeaponId): void {
     stashUiState.equippedItems.holster = createEquippedSidearmTile();
   } else {
     stashUiState.equippedItems["on-sling"] = createEquippedWeaponTile("on-sling", weaponId);
+  }
+
+  if (stashUiState.equippedItems["on-back"]?.weaponId === weaponId) {
+    clearSecondaryWeaponSlot();
+  } else if (stashUiState.equippedItems["on-back"]?.weaponId) {
+    stashUiState.hiddenRackTileIds.add(`rack-weapon-${stashUiState.equippedItems["on-back"].weaponId}`);
   }
 
   raidController.setSelectedWeapon(weaponId);
@@ -38794,6 +38826,12 @@ function getAgentSnapshot() {
           player: {
             weaponId: state.player.weaponId,
             weaponName: WEAPONS[state.player.weaponId].name,
+            position: {
+              x: Number(state.player.position.x.toFixed(1)),
+              y: Number(state.player.position.y.toFixed(1))
+            },
+            ammoInMag: state.player.ammoInMag,
+            reserveAmmo: state.player.reserveAmmo,
             activeWeaponSlotId: state.player.activeWeaponSlotId,
             weaponSlots: state.player.weaponSlots.map((slot) => ({
               slotId: slot.slotId,
@@ -39418,15 +39456,10 @@ function configureNextRaid(config: AgentConfigureInput): ReturnType<typeof getAg
   }
 
   if (config.secondaryWeaponId !== undefined) {
-    if (config.secondaryWeaponId && config.secondaryWeaponId !== "none" && config.secondaryWeaponId !== "pistol") {
-      stashUiState.equippedItems["on-back"] = createEquippedWeaponTile("on-back", config.secondaryWeaponId, `rack-weapon-${config.secondaryWeaponId}`);
-      stashUiState.hiddenRackTileIds.add(`rack-weapon-${config.secondaryWeaponId}`);
+    if (config.secondaryWeaponId) {
+      stageSecondaryWeapon(config.secondaryWeaponId);
     } else {
-      const previousBackWeapon = stashUiState.equippedItems["on-back"];
-      if (previousBackWeapon) {
-        stashUiState.hiddenRackTileIds.delete(previousBackWeapon.id);
-      }
-      delete stashUiState.equippedItems["on-back"];
+      clearSecondaryWeaponSlot();
     }
   }
 
