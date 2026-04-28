@@ -8901,7 +8901,7 @@ const createPlayerWeaponSlot = (
   prepLoadout: SupplyStock
 ): PlayerWeaponSlotState => ({
   slotId,
-  label: slotId === "primary" ? "On sling" : "On back",
+  label: slotId === "primary" ? "Sling 1" : "Sling 2",
   weaponId: weapon.id,
   ammoInMag: weapon.magazineSize,
   reserveAmmo: getPlayerStartingReserveAmmo(weapon, prepLoadout)

@@ -1537,13 +1537,13 @@ function createEquippedWeaponTile(slotId: "on-sling" | "on-back", weaponId: Weap
     id: tileId,
     tone: "weapon",
     variant: weaponId,
-    kicker: slotId === "on-sling" ? "Equipped" : "Secondary",
+    kicker: slotId === "on-sling" ? "Sling 1" : "Sling 2",
     label: WEAPONS[weaponId].name,
-    meta: slotId === "on-sling" ? "live primary weapon" : "backup long gun",
+    meta: slotId === "on-sling" ? "sling 1 live primary" : "sling 2 swap weapon",
     detail:
       slotId === "on-sling"
-        ? "Primary weapon staged through the worn kit. Whatever sits on the sling is what goes into the raid."
-        : "Backup long gun staged on the operator. It deploys with the sling weapon and swaps in raid with Q.",
+        ? "Sling 1 is the live primary when the raid starts."
+        : "Sling 2 deploys with Sling 1 and swaps in raid with Q.",
     compact: true,
     draggable: true,
     dragKind: "weapon",
@@ -11571,14 +11571,14 @@ app.innerHTML = `
 
               <section class="stash-slot-strip">
                 <article class="stash-slot-card">
-                  <span class="label">On Sling</span>
+                  <span class="label">Sling 1</span>
                   <strong data-arsenal-primary>Drag a primary from the stash wall</strong>
                   <p>Live raid gun.</p>
                 </article>
                 <article class="stash-slot-card">
-                  <span class="label">On Back</span>
+                  <span class="label">Sling 2</span>
                   <strong data-arsenal-secondary>Optional backup long gun</strong>
-                  <p>Spare rifle, SMG, or shotgun.</p>
+                  <p>Second primary, swapped with Q.</p>
                 </article>
                 <article class="stash-slot-card">
                   <span class="label">Holster</span>
@@ -11694,7 +11694,7 @@ app.innerHTML = `
                   <section class="stash-drawer-panel stash-selection-panel">
                     <div class="stash-selection-lead">
                       <h2>Weapon Reference</h2>
-                      <p class="section-copy">Read doctrine here, but drag the actual weapon from the stash wall into On Sling or On Back.</p>
+                      <p class="section-copy">Read doctrine here, but drag the actual weapon from the stash wall into Sling 1 or Sling 2.</p>
                     </div>
                     <div class="weapon-grid" data-weapon-grid></div>
                   </section>
@@ -18247,13 +18247,13 @@ function getStashTileActions(tile: StashTileDefinition): StashActionDefinition[]
   const equippedSlot = findEquippedSlotByTileId(tile.id);
 
   if (tile.dragKind === "weapon" && tile.dragSource === "rack" && tile.weaponId) {
-    addStashAction(actions, "stage-weapon", "Equip On Sling");
+    addStashAction(actions, "stage-weapon", "Equip On Sling 1");
     if (tile.weaponId !== "none" && tile.weaponId !== "pistol" && tile.weaponId !== raidController.state.selectedWeapon) {
-      addStashAction(actions, "stage-back-weapon", "Stage On Back");
+      addStashAction(actions, "stage-back-weapon", "Equip On Sling 2");
     }
   }
 
-  if (tile.dragSource === "rack" && preferredEquipSlot) {
+  if (tile.dragSource === "rack" && preferredEquipSlot && tile.dragKind !== "weapon") {
     addStashAction(actions, "equip-default", `Equip To ${getEquipmentSlotLabel(preferredEquipSlot)}`);
   }
 
@@ -18545,8 +18545,8 @@ function getEquipmentSlotDetail(slotId: EquipmentSlotId): string {
     pockets: "quick-access row",
     pouch: "secure container slot",
     holster: "pistols only",
-    "on-sling": "primary weapon",
-    "on-back": "secondary long gun",
+    "on-sling": "sling 1 primary weapon",
+    "on-back": "sling 2 second primary",
     melee: "knife or melee tool"
   };
 
@@ -18566,8 +18566,8 @@ function getEquipmentSlotLabel(slotId: EquipmentSlotId): string {
     pockets: "Pockets",
     pouch: "Pouch",
     holster: "Holster",
-    "on-sling": "On Sling",
-    "on-back": "On Back",
+    "on-sling": "Sling 1",
+    "on-back": "Sling 2",
     melee: "Scabbard"
   };
 
@@ -18581,9 +18581,9 @@ function renderEquipmentSlot(slotId: EquipmentSlotId, selectedWeapon: WeaponId):
     tile
       ? tile.meta
       : slotId === "on-sling"
-        ? "drag a rack weapon here"
+        ? "drag a rack weapon here for Sling 1"
         : slotId === "on-back"
-          ? "optional backup long gun"
+          ? "drag a rack weapon here for Sling 2"
           : slotId === "holster"
             ? "drag a sidearm here"
             : getEquipmentSlotDetail(slotId);
@@ -18614,9 +18614,9 @@ function renderEquipmentSlot(slotId: EquipmentSlotId, selectedWeapon: WeaponId):
         tile
           ? "Drag out to stash or into another valid slot"
           : slotId === "on-sling"
-            ? "Rack primary weapons here to decide what enters the raid"
+            ? "Rack the starting primary here"
             : slotId === "on-back"
-              ? "Drag a spare rifle, SMG, or shotgun here"
+              ? "Rack the second primary here, then swap with Q in raid"
               : slotId === "holster"
                 ? "Drag a sidearm here to stage a fallback weapon"
                 : getEquipmentSlotDetail(slotId)
