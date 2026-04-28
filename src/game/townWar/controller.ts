@@ -10429,6 +10429,56 @@ export class TownWarController {
     return soldier;
   }
 
+  applySoldierRaidDamage(
+    soldierId: string,
+    input: {
+      damage?: number | null;
+      healthCurrent?: number | null;
+      pressure?: number | null;
+      killed?: boolean | null;
+      sourceLabel?: string | null;
+      position?: Vec2 | null;
+    }
+  ): TownWarSoldierState | null {
+    this.ensureDemoSeeded();
+    const soldier = this.findSoldierById(soldierId);
+    if (!soldier) {
+      return null;
+    }
+
+    if (input.killed) {
+      soldier.health.current = 0;
+    } else if (Number.isFinite(input.healthCurrent)) {
+      soldier.health.current = Math.max(0, Math.min(soldier.health.max, Math.round(input.healthCurrent ?? soldier.health.current)));
+    } else if (Number.isFinite(input.damage)) {
+      soldier.health.current = Math.max(0, Math.min(soldier.health.max, Math.round(soldier.health.current - Math.max(0, input.damage ?? 0))));
+    }
+
+    if (Number.isFinite(input.pressure)) {
+      soldier.morale.pressure = Math.max(0, Math.min(soldier.morale.maxPressure, soldier.morale.pressure + Math.max(0, input.pressure ?? 0)));
+    }
+
+    if (input.position && Number.isFinite(input.position.x) && Number.isFinite(input.position.y)) {
+      soldier.position = cloneVec2(input.position);
+    }
+
+    if (soldier.health.current <= 0) {
+      soldier.currentNeed = "wounded";
+      soldier.task = {
+        kind: "hold",
+        label: input.sourceLabel ? `Downed by ${input.sourceLabel}` : "Downed in raid",
+        targetPosition: null,
+        targetEntityId: null
+      };
+    } else {
+      soldier.currentNeed = deriveCurrentNeed(soldier.needs, soldier.health.current, soldier.health.max, soldier.ammo.reserve);
+      this.refreshTaskDecisionForSoldier(soldier, soldier.task.targetPosition ?? soldier.position);
+    }
+
+    soldier.identitySummary = buildIdentitySummary(soldier.skills, soldier.traits, soldier.currentNeed, soldier.dramaArc.trustInOfficer);
+    return soldier;
+  }
+
   private getTrenchResumeCombatTask(soldier: TownWarSoldierState, slot: TownWarCoverSlotState): TownWarTask {
     const combatKind =
       soldier.task.kind === "attack" || soldier.task.kind === "suppress" || soldier.task.kind === "defend"

@@ -36717,6 +36717,13 @@ interface TopDownExtractionAgentApi {
   advanceRaid: (payload?: { seconds?: number; tickSeconds?: number; move?: { x: number; y: number } }) => ReturnType<typeof getAgentSnapshot>;
   switchWeaponSlot: (slotId?: "primary" | "secondary") => ReturnType<typeof getAgentSnapshot>;
   stageRaidWeaponLoot: (payload: { weaponId?: WeaponId }) => ReturnType<typeof getAgentSnapshot>;
+  stagePlayerNearTownWarEnemy: (payload?: { enemyId?: number }) => {
+    ok: boolean;
+    summary: string;
+    enemyId: number | null;
+    townWarSoldierId: string | null;
+    snapshot: ReturnType<typeof getAgentSnapshot>;
+  };
   completeOfficerSoloSurvival: () => ReturnType<typeof getAgentSnapshot>;
   rollRecruitCandidates: () => ReturnType<typeof getAgentSnapshot>;
   setMoveInput: (move: { x: number; y: number }) => ReturnType<typeof getAgentSnapshot>;
@@ -38158,6 +38165,7 @@ function getAgentSnapshot() {
                   weaponId: string;
                   openingPosture: string;
                   squadRole: string;
+                  townWarSoldierId: string | null;
                   squadRoleLabel: string;
                   supportStrongpointLabel: string | null;
                   supportStrongpointTier: string | null;
@@ -38182,6 +38190,7 @@ function getAgentSnapshot() {
               weaponId: enemy.weaponId,
               openingPosture: enemy.openingPosture,
               squadRole: enemy.squadRole,
+              townWarSoldierId: enemy.townWarSoldierId,
               squadRoleLabel: formatEnemySquadRoleLabel(enemy.squadRole),
               supportStrongpointLabel: enemy.supportStrongpointLabel,
               supportStrongpointTier: enemy.supportStrongpointTier,
@@ -38209,6 +38218,7 @@ function getAgentSnapshot() {
               weaponId: string;
               openingPosture: string;
               squadRole: string;
+              townWarSoldierId: string | null;
               squadRoleLabel: string;
               supportStrongpointLabel: string | null;
               supportStrongpointTier: string | null;
@@ -39159,6 +39169,7 @@ function getAgentSnapshot() {
               openingPosture: enemy.openingPosture,
               squadId: enemy.squadId,
               squadRole: enemy.squadRole,
+              townWarSoldierId: enemy.townWarSoldierId,
               squadRoleLabel: formatEnemySquadRoleLabel(enemy.squadRole),
               compressionState: enemy.compressionState,
               casualtyState: enemy.casualtyState,
@@ -41356,6 +41367,22 @@ topDownWindow.__topdownExtractionAgentApi = {
     raidController.stageFieldWeaponLootForDebug(weaponId);
     updateUi();
     return getAgentSnapshot();
+  },
+  stagePlayerNearTownWarEnemy: (payload = {}) => {
+    const enemyId =
+      typeof payload?.enemyId === "number" && Number.isFinite(payload.enemyId) ? Math.round(payload.enemyId) : null;
+    const enemy = raidController.stagePlayerNearTownWarEnemyForDebug(enemyId);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: enemy !== null,
+      summary: enemy
+        ? `Player staged near linked enemy ${enemy.id} (${enemy.townWarSoldierId ?? "no-town-war-id"}).`
+        : "No linked town-war enemy was available in the raid.",
+      enemyId: enemy?.id ?? null,
+      townWarSoldierId: enemy?.townWarSoldierId ?? null,
+      snapshot
+    };
   },
   completeOfficerSoloSurvival: () => {
     raidController.completeOfficerSoloSurvivalForDebug();

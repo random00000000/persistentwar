@@ -496,6 +496,8 @@ export interface EnemyState {
   stabilized: boolean;
   compressionState: EnemyCompressionState;
   compressionTimer: number;
+  townWarSoldierId: string | null;
+  townWarProjection?: TownWarRaidProjectionMetadata;
 }
 
 interface HostileAiBalanceProfile {
@@ -2331,6 +2333,7 @@ const OFFICER_AMMO_CRATE_THREAT_RADIUS = 132;
 const OFFICER_AMMO_CRATE_LOSS_SECONDS = 2.6;
 const OFFICER_AMMO_CRATE_DEFAULT_STOCK = 120;
 const TOWN_WAR_RAID_PROJECTION_LIMIT = 4;
+const TOWN_WAR_RAID_ENEMY_PROJECTION_LIMIT = 6;
 const TOWN_WAR_RAID_TRENCH_FIRE_RANGE_MULTIPLIER = 1.2;
 const TOWN_WAR_RAID_TRENCH_DAMAGE_MULTIPLIER = 0.1;
 const ACTIVE_SQUAD_MATE_LIMIT = 3;
@@ -14735,7 +14738,9 @@ const createEnemy = (
     bleedoutTimer: 0,
     stabilized: false,
     compressionState: "idle",
-    compressionTimer: 0
+    compressionTimer: 0,
+    townWarSoldierId: null,
+    townWarProjection: undefined
   };
 };
 
@@ -15373,6 +15378,14 @@ function canProjectTownWarSoldierIntoRaid(soldier: TownWarSoldierState): boolean
     soldier.faction === TOWN_WAR_PLAYER_FACTION &&
     soldier.health.current > 0 &&
     soldier.squadBridge.status !== "assigned" &&
+    (soldier.task.kind !== "hold" || soldier.role === "defender" || soldier.role === "rifleman" || soldier.role === "suppressor")
+  );
+}
+
+function canProjectTownWarEnemySoldierIntoRaid(soldier: TownWarSoldierState): boolean {
+  return (
+    soldier.faction === TOWN_WAR_ENEMY_FACTION &&
+    soldier.health.current > 0 &&
     (soldier.task.kind !== "hold" || soldier.role === "defender" || soldier.role === "rifleman" || soldier.role === "suppressor")
   );
 }
@@ -17604,8 +17617,13 @@ export class RaidController {
       (activeFrontlineDefinition?.enemyReduction ?? 0) + sectorEnemyReduction,
       townWarSnapshot
     );
-    this.state.enemies.push(...this.createEnemyCampGarrison(townWarSnapshot, this.state.player.position));
-    this.state.enemies.push(...this.createEnemyFrontlinePatrol(townWarSnapshot, this.state.player.position));
+    const enemyTownWarSoldiers = this.createEnemyTownWarSoldierGarrison(townWarSnapshot, this.state.player.position);
+    if (enemyTownWarSoldiers.length > 0) {
+      this.state.enemies.push(...enemyTownWarSoldiers);
+    } else {
+      this.state.enemies.push(...this.createEnemyCampGarrison(townWarSnapshot, this.state.player.position));
+      this.state.enemies.push(...this.createEnemyFrontlinePatrol(townWarSnapshot, this.state.player.position));
+    }
     this.state.bullets = [];
     this.state.grenades = [];
     this.state.plantedCharges = [];
@@ -18309,6 +18327,44 @@ export class RaidController {
     return loot;
   }
 
+  public stagePlayerNearTownWarEnemyForDebug(enemyId?: number | null): EnemyState | null {
+    if (this.state.phase !== "raid") {
+      return null;
+    }
+
+    const target =
+      this.state.enemies.find((enemy) => enemy.id === enemyId && enemy.townWarSoldierId && enemy.casualtyState !== "downed" && enemy.casualtyState !== "dead") ??
+      this.state.enemies.find((enemy) => enemy.townWarSoldierId && enemy.casualtyState !== "downed" && enemy.casualtyState !== "dead") ??
+      null;
+    if (!target) {
+      return null;
+    }
+
+    const offsetDirection = length(target.facing) > 0.001 ? multiply(target.facing, -1) : { x: -1, y: 0 };
+    const desiredPosition = clampWorldPoint(add(target.position, multiply(offsetDirection, 72)));
+    const playerPosition = findWalkableSpawnPoint(
+      desiredPosition,
+      this.state.player.radius,
+      22,
+      this.state.obstacles,
+      [target.position],
+      96
+    );
+    this.state.player.position = playerPosition;
+    this.state.player.velocity = { x: 0, y: 0 };
+    this.state.player.facing = normalize(subtract(target.position, playerPosition));
+    this.aimTarget = { ...target.position };
+    this.moveInput = { x: 0, y: 0 };
+    this.triggerHeldByAgent = false;
+    this.triggerHeld = this.triggerHeldByLiveInput;
+    target.awareness = "engaged";
+    target.alert = true;
+    target.investigateTarget = { ...playerPosition };
+    target.facing = normalize(subtract(playerPosition, target.position));
+    this.state.message = `Debug staged ${target.townWarSoldierId} in player weapon range.`;
+    return target;
+  }
+
   private getNearbyDownedSquadMate(radius = SQUAD_STABILIZE_RADIUS): FriendlyCombatantState | null {
     let closest: FriendlyCombatantState | null = null;
     let closestDistance = radius;
@@ -18945,6 +19001,20 @@ export class RaidController {
     }
   }
 
+  private syncTownWarEnemyRaidDamage(enemy: EnemyState, sourceLabel: string, killed = false): void {
+    if (!enemy.townWarSoldierId) {
+      return;
+    }
+
+    townWarController.applySoldierRaidDamage(enemy.townWarSoldierId, {
+      healthCurrent: killed ? 0 : enemy.health,
+      killed,
+      pressure: killed ? 35 : enemy.pressureType === "pinned" ? 12 : enemy.pressureType === "suppressed" ? 8 : 4,
+      sourceLabel,
+      position: enemy.position
+    });
+  }
+
   private downEnemy(enemy: EnemyState): void {
     if (enemy.casualtyState === "downed" || enemy.casualtyState === "dead") {
       return;
@@ -18958,6 +19028,7 @@ export class RaidController {
     enemy.velocity = { x: 0, y: 0 };
     enemy.alert = true;
     enemy.awareness = "engaged";
+    this.syncTownWarEnemyRaidDamage(enemy, "raid combat", true);
   }
 
   private downFriendlyCombatant(combatant: FriendlyCombatantState): void {
@@ -21369,6 +21440,7 @@ export class RaidController {
       pressureType === "staggered" ? 1.2 : 1
     );
     this.applyEnemyPressure(enemy, pressureType, pressureDuration, sourcePosition);
+    this.syncTownWarEnemyRaidDamage(enemy, "friendly squad fire");
 
     if (this.shouldEnterDownedState(enemy.health, enemy.maxHealth, "enemy")) {
       this.downEnemy(enemy);
@@ -24439,6 +24511,13 @@ export class RaidController {
       .slice(0, TOWN_WAR_RAID_PROJECTION_LIMIT);
   }
 
+  private getProjectedTownWarEnemySoldiers(townWarSnapshot: TownWarSnapshot): TownWarSoldierState[] {
+    return townWarSnapshot.soldiers
+      .filter((soldier) => canProjectTownWarEnemySoldierIntoRaid(soldier))
+      .sort((left, right) => scoreTownWarSoldierRaidProjection(right) - scoreTownWarSoldierRaidProjection(left))
+      .slice(0, TOWN_WAR_RAID_ENEMY_PROJECTION_LIMIT);
+  }
+
   private getTownWarSoldierOccupiedTrenchSlot(townWarSnapshot: TownWarSnapshot, soldier: TownWarSoldierState): TownWarCoverSlotState | null {
     return (
       townWarSnapshot.aiTactics.coverSlots.find(
@@ -24572,6 +24651,54 @@ export class RaidController {
 
     return this.getProjectedTownWarSoldiers(townWarSnapshot).map((soldier) =>
       this.createTownWarSoldierRaidCombatant(townWarSnapshot, soldier, enemyCamp)
+    );
+  }
+
+  private createTownWarEnemyRaidCombatant(
+    townWarSnapshot: TownWarSnapshot,
+    soldier: TownWarSoldierState,
+    playerCamp: TownWarCampSnapshot,
+    playerPosition: Vec2
+  ): EnemyState {
+    const projection = this.buildTownWarRaidCombatantProjection(townWarSnapshot, soldier, playerCamp);
+    const { archetypeId, weaponId, health, position, facingTarget, townWarProjection } = projection;
+    const combatProfile = getSharedWeaponCombatProfile(weaponId, archetypeId);
+    const enemy = createEnemy(this.enemyId++, position, archetypeId, facingTarget, true);
+
+    enemy.weaponId = weaponId;
+    enemy.health = health.current;
+    enemy.maxHealth = health.max;
+    enemy.anchor = { ...position };
+    enemy.cooldown =
+      combatProfile.fireIntervalMin + Math.random() * Math.max(0.05, combatProfile.fireIntervalMax - combatProfile.fireIntervalMin);
+    enemy.grenadeStock = projection.grenadeStock;
+    enemy.openingPosture = soldier.task.kind === "attack" ? "patrol" : "hold";
+    enemy.squadId = "town-war-ukrainian-shared-soldiers";
+    enemy.squadRole = soldier.role === "suppressor" ? "support-gunner" : soldier.role === "builder" || soldier.role === "medic" ? "probe-rifle" : "anchor-rifle";
+    enemy.supportStrongpointLabel = soldier.task.label ?? "Ukrainian shared soldier";
+    enemy.supportStrongpointTier = townWarProjection?.fixedCoverKind === "trench" ? "must-own" : "guarded";
+    enemy.supportLaneLabel = soldier.tacticalIntent.reason || "Enemy commander order";
+    enemy.doctrineState = soldier.task.kind === "attack" ? "probe-flank" : "hold-threshold";
+    enemy.doctrineWatchDirection = normalize(subtract(playerPosition, enemy.position));
+    enemy.doctrineWatchArcDegrees = townWarProjection?.fixedCoverKind === "trench" ? 150 : 128;
+    enemy.awareness = projection.awareness === "engaged" ? "engaged" : "investigating";
+    enemy.investigateTarget = { ...playerPosition };
+    enemy.investigateTimer = Math.max(enemy.investigateTimer, 1.8);
+    enemy.facing = normalize(subtract(playerPosition, enemy.position));
+    enemy.townWarSoldierId = soldier.id;
+    enemy.townWarProjection = townWarProjection;
+    return enemy;
+  }
+
+  private createEnemyTownWarSoldierGarrison(townWarSnapshot: TownWarSnapshot, playerPosition: Vec2): EnemyState[] {
+    const playerCamp = townWarSnapshot.camps.find((camp) => camp.id === TOWN_WAR_PLAYER_FACTION) ?? null;
+    const enemyCamp = townWarSnapshot.camps.find((camp) => camp.id === TOWN_WAR_ENEMY_FACTION) ?? null;
+    if (!playerCamp || !enemyCamp || enemyCamp.destroyed) {
+      return [];
+    }
+
+    return this.getProjectedTownWarEnemySoldiers(townWarSnapshot).map((soldier) =>
+      this.createTownWarEnemyRaidCombatant(townWarSnapshot, soldier, playerCamp, playerPosition)
     );
   }
 
@@ -24883,6 +25010,7 @@ export class RaidController {
     hitEnemy.facing = normalize(subtract(player.position, hitEnemy.position));
     hitEnemy.fleshFlash = 0.18;
     this.applyEnemyPressure(hitEnemy, "staggered", 0.82, player.position);
+    this.syncTownWarEnemyRaidDamage(hitEnemy, "player knife");
     this.emitFrontlineImpact(hitEnemy.position, Math.atan2(player.facing.y, player.facing.x), weapon.color, "friendly", "impact", 0.96, "default", weapon.id);
 
     for (const enemy of this.state.enemies) {
@@ -25183,6 +25311,7 @@ export class RaidController {
       enemy.fleshFlash = Math.max(enemy.fleshFlash, 0.34);
       this.applyEnemyPanic(enemy, 2.1 * falloff + 0.5, blastPosition);
       this.applyEnemyPressure(enemy, distanceToBlast < charge.radius * 0.54 ? "staggered" : "suppressed", 1.65 * falloff + 0.5, blastPosition);
+      this.syncTownWarEnemyRaidDamage(enemy, "player C4");
       if (this.shouldEnterDownedState(enemy.health, enemy.maxHealth, "enemy")) {
         this.downEnemy(enemy);
       } else {
@@ -25251,6 +25380,7 @@ export class RaidController {
         enemy.fleshFlash = Math.max(enemy.fleshFlash, 0.22);
         this.applyEnemyPanic(enemy, 1.5 * falloff + 0.4, blastPosition);
         this.applyEnemyPressure(enemy, distanceToBlast < grenade.radius * 0.46 ? "staggered" : "suppressed", 1.1 * falloff + 0.35, blastPosition);
+        this.syncTownWarEnemyRaidDamage(enemy, "friendly grenade");
         if (this.shouldEnterDownedState(enemy.health, enemy.maxHealth, "enemy")) {
           this.downEnemy(enemy);
         } else {
@@ -27199,6 +27329,7 @@ export class RaidController {
             hitEnemy.armorFlash = damageProfile.armored ? 0.18 : 0;
             hitEnemy.fleshFlash = damageProfile.armored ? 0 : 0.16;
             this.applyPlayerBulletPressure(hitEnemy, bullet);
+            this.syncTownWarEnemyRaidDamage(hitEnemy, `${bullet.weaponId ? WEAPONS[bullet.weaponId].name : "Player"} fire`);
             if (damageProfile.armored && hitEnemy.health > 0) {
               this.state.message =
                 bullet.weaponId === "smg"
@@ -27319,6 +27450,7 @@ export class RaidController {
         enemy.fleshFlash = Math.max(enemy.fleshFlash, 0.28);
         this.applyEnemyPanic(enemy, 1.8 * falloff + 0.5, blastPosition);
         this.applyEnemyPressure(enemy, distanceToBlast < blastRadius * 0.48 ? "staggered" : "suppressed", 1.35 * falloff + 0.42, blastPosition);
+        this.syncTownWarEnemyRaidDamage(enemy, "friendly RPG");
         if (this.shouldEnterDownedState(enemy.health, enemy.maxHealth, "enemy")) {
           this.downEnemy(enemy);
         } else {
