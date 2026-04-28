@@ -329,6 +329,7 @@ const BODY_ALARM_WAVE_LAYOUT: ReadonlyArray<{
   { archetypeId: "skirmisher", squadRole: "probe-rifle", openingPosture: "reserve", doctrineState: "probe-flank" }
 ];
 const PLAYER_GRENADE_STOCK = 2;
+const RPG_TEST_RESERVE_AMMO = 99;
 const PLAYER_GRENADE_DAMAGE = 62;
 const HOSTILE_GRENADE_DAMAGE = 46;
 const GRENADE_FUSE_TIME = 0.92;
@@ -8815,6 +8816,14 @@ function getSharedWeaponCombatProfile(
   };
 }
 
+function getPlayerStartingReserveAmmo(weapon: WeaponDefinition, prepLoadout: SupplyStock): number {
+  if (weapon.id === "rpg") {
+    return RPG_TEST_RESERVE_AMMO;
+  }
+
+  return weapon.reserveAmmo + prepLoadout.ammoPacks * weapon.ammoPackAmmo;
+}
+
 const createPlayer = (weapon: WeaponDefinition, prepLoadout: SupplyStock, insertion: RaidInsertionDefinition): PlayerState => ({
   position: { ...insertion.position },
   velocity: { x: 0, y: 0 },
@@ -8824,7 +8833,7 @@ const createPlayer = (weapon: WeaponDefinition, prepLoadout: SupplyStock, insert
   radius: 18,
   weaponId: weapon.id,
   ammoInMag: weapon.magazineSize,
-  reserveAmmo: weapon.reserveAmmo + prepLoadout.ammoPacks * weapon.ammoPackAmmo,
+  reserveAmmo: getPlayerStartingReserveAmmo(weapon, prepLoadout),
   fireCooldown: 0,
   grenades: PLAYER_GRENADE_STOCK,
   grenadeCooldown: 0,
@@ -17987,7 +17996,7 @@ export class RaidController {
 
   public getProjectedReserveAmmo(weaponId = this.state.selectedWeapon): number {
     const weapon = WEAPONS[weaponId];
-    return weapon.reserveAmmo + this.state.prepLoadout.ammoPacks * weapon.ammoPackAmmo;
+    return getPlayerStartingReserveAmmo(weapon, this.getPreparedLoadout());
   }
 
   public getSupplyPrice(resource: PrepResource): number {
@@ -24576,6 +24585,8 @@ export class RaidController {
       this.state.message = "Shotgun blast out. Own the corner before you expose the lane.";
     } else if (weapon.id === "smg") {
       this.state.message = "SMG spray out. Collapse quickly before the spread blooms.";
+    } else if (weapon.id === "rpg") {
+      this.state.message = "Rocket away. Move before the blast lane answers back.";
     } else {
       this.state.message = player.focusActive
         ? "Braced rifle shot out. Pin the lane before they stabilize."

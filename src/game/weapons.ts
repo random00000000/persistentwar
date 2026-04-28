@@ -325,7 +325,7 @@ export const WEAPONS: Record<WeaponId, WeaponDefinition> = {
     id: "rpg",
     name: "RPG-7 Launcher",
     description: "Earned siege weapon for cracking camp anchors, bunker mouths, and packed trench lines. Slow, loud, expensive, and decisive.",
-    raidCost: 720,
+    raidCost: 480,
     damage: 150,
     pellets: 1,
     spread: 0.045,
