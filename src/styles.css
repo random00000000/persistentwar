@@ -11947,13 +11947,30 @@ body.town-war-officer-mode .first-minute-rail:not(.hidden) {
   width: auto;
   max-width: 100%;
   min-width: 0;
-  justify-self: start;
   padding: 10px 14px;
   font-size: 0.8rem;
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.stash-start-button-slot {
+  display: flex;
+  min-width: 0;
+}
+
+.stash-start-button-slot:empty {
+  display: none;
+}
+
+.stash-start-button-slot-left {
+  justify-self: start;
+}
+
+.stash-start-button-slot-right {
+  justify-self: end;
+  align-self: start;
 }
 
 .weapon-grid,

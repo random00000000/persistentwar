@@ -211,6 +211,7 @@ type OfficerPriorityPresetId = "builder" | "fighter" | "medic" | "scout" | "sust
 type StashDragKind = "weapon" | "resource" | "item";
 type StashDragSource = "rack" | "bench" | "equipment" | "container";
 type StashGearLayoutArea = "left-operator-workspace" | "right-stash-wall" | "left-quick-slots" | "full-planning";
+type StashStartButtonArea = Extract<StashGearLayoutArea, "left-operator-workspace" | "right-stash-wall">;
 type StashActionId =
   | "inspect"
   | "stage-weapon"
@@ -267,7 +268,8 @@ const STASH_GEAR_LAYOUT_CONTRACT: Record<StashGearLayoutArea, { side: "left" | "
     role: "Expanded planning/debrief drawers below both columns."
   }
 };
-const STASH_START_BUTTON_LAYOUT_AREA: StashGearLayoutArea = "left-operator-workspace";
+const STASH_START_BUTTON_SUPPORTED_AREAS: StashStartButtonArea[] = ["left-operator-workspace", "right-stash-wall"];
+const STASH_START_BUTTON_LAYOUT_AREA: StashStartButtonArea = "left-operator-workspace";
 const STASH_ACTION_IDS = new Set<StashActionId>([
   "inspect",
   "stage-weapon",
@@ -1015,12 +1017,30 @@ function getStashGearLayoutContractSnapshot() {
     layout: "gear-two-column",
     startButtonArea: STASH_START_BUTTON_LAYOUT_AREA,
     startButtonSide: STASH_GEAR_LAYOUT_CONTRACT[STASH_START_BUTTON_LAYOUT_AREA].side,
+    startButtonSupportedAreas: [...STASH_START_BUTTON_SUPPORTED_AREAS],
+    startButtonMoveInstruction:
+      "To move Deploy Loadout, change STASH_START_BUTTON_LAYOUT_AREA to one of startButtonSupportedAreas. The DOM slot sync moves the existing button.",
     areas: Object.entries(STASH_GEAR_LAYOUT_CONTRACT).map(([area, definition]) => ({
       area,
       side: definition.side,
       role: definition.role
     }))
   };
+}
+
+function syncStashStartButtonSlot(): void {
+  const targetSlot =
+    stashStartButtonSlots.find((slot) => slot.dataset.stashStartSlot === STASH_START_BUTTON_LAYOUT_AREA) ??
+    stashStartButtonSlots.find((slot) => slot.dataset.stashStartSlot === "left-operator-workspace") ??
+    null;
+
+  if (!targetSlot || startRaidButton.parentElement === targetSlot) {
+    startRaidButton.dataset.stashStartAnchor = STASH_START_BUTTON_LAYOUT_AREA;
+    return;
+  }
+
+  targetSlot.append(startRaidButton);
+  startRaidButton.dataset.stashStartAnchor = STASH_START_BUTTON_LAYOUT_AREA;
 }
 
 function renderBriefingIntel(entries: Array<{ label: string; value: string }>): string {
@@ -11308,6 +11328,7 @@ app.innerHTML = `
                   <h2>Stash Wall</h2>
                 </div>
                 <p class="section-copy">Every stored item stays on the right. Drag it into the rig, or drag worn gear back out.</p>
+                <div class="stash-start-button-slot stash-start-button-slot-right" data-stash-start-slot="right-stash-wall"></div>
               </div>
                 <div class="stash-rack-primary" data-stash-region="stash-rack-primary">
                 <div class="stash-rack-toolbar">
@@ -11422,7 +11443,9 @@ app.innerHTML = `
                     Start the first raid and find out what actually comes home to the stash.
                   </p>
                 </div>
-                <button class="start-button stash-start-button-inline" data-start-raid data-stash-start-anchor="left-operator-workspace" type="button">Deploy For 120 Credits</button>
+                <div class="stash-start-button-slot stash-start-button-slot-left" data-stash-start-slot="left-operator-workspace">
+                  <button class="start-button stash-start-button-inline" data-start-raid data-stash-start-anchor="left-operator-workspace" type="button">Deploy For 120 Credits</button>
+                </div>
               </section>
 
               <div class="summary-grid summary-grid-compact">
@@ -12911,6 +12934,7 @@ const debriefRecruitRosterValue = requireElement<HTMLElement>("[data-debrief-rec
 const debriefMemorialMetaValue = requireElement<HTMLElement>("[data-debrief-memorial-meta]");
 const debriefMemorialWallValue = requireElement<HTMLElement>("[data-debrief-memorial-wall]");
 const startRaidButton = requireElement<HTMLButtonElement>("[data-start-raid]");
+const stashStartButtonSlots = Array.from(document.querySelectorAll<HTMLElement>("[data-stash-start-slot]"));
 const briefingTitleValue = requireElement<HTMLElement>("[data-briefing-title]");
 const briefingSubtitleValue = requireElement<HTMLElement>("[data-briefing-subtitle]");
 const briefingProgressValue = requireElement<HTMLElement>("[data-briefing-progress]");
@@ -24271,6 +24295,7 @@ function stepSurvivorWalkTest(nowMs: number): void {
 }
 
 function updateUi(): void {
+  syncStashStartButtonSlot();
   ensureWeaponLoadoutAuthority();
   cleanupQuickSlotAssignments();
 
