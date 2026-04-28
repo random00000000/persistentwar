@@ -112,10 +112,34 @@ async function runSoldierInspectorSmoke() {
         api.stageState("stash");
         api.completeOfficerSoloSurvival();
         const snapshot = api.getSnapshot();
+        const sharedSoldiers = snapshot.war?.townWar.sharedSoldiers ?? [];
+        const townSoldiers = snapshot.war?.townWar.soldiers ?? [];
+        const sharedRussian = sharedSoldiers.find((soldier) => soldier.faction === "camp-a") ?? null;
+        const sharedUkrainian = sharedSoldiers.find((soldier) => soldier.faction === "camp-b") ?? null;
+        const sharedContractOk =
+          sharedSoldiers.length === townSoldiers.length &&
+          Boolean(sharedRussian) &&
+          Boolean(sharedUkrainian) &&
+          sharedSoldiers.every(
+            (soldier) =>
+              soldier.contractVersion === 1 &&
+              soldier.identity?.id &&
+              soldier.faction &&
+              soldier.role &&
+              soldier.weapon?.weaponId &&
+              typeof soldier.ammo?.inMag === "number" &&
+              typeof soldier.health?.current === "number" &&
+              typeof soldier.morale?.pressureRatio === "number" &&
+              soldier.suppression?.tacticalState &&
+              soldier.needs?.currentNeed &&
+              soldier.currentOrder?.kind &&
+              soldier.coverAssignment?.state &&
+              soldier.squadAssignment?.status
+          );
         const unifiedSoldier =
           snapshot.war?.townWar.unifiedSoldiers.find((entry) => entry.faction === "camp-a" && entry.squad.assignable) ?? null;
         if (!unifiedSoldier) {
-          return { found: false };
+          return { found: false, sharedContractOk, sharedCount: sharedSoldiers.length, townCount: townSoldiers.length };
         }
         const assigned = api.assignUnifiedSoldierToSquad({ unifiedSoldierId: unifiedSoldier.id });
         const assignedSoldier = assigned.war?.townWar.unifiedSoldiers.find((entry) => entry.id === unifiedSoldier.id) ?? null;
@@ -123,6 +147,11 @@ async function runSoldierInspectorSmoke() {
         const unassignedSoldier = unassigned.war?.townWar.unifiedSoldiers.find((entry) => entry.id === unifiedSoldier.id) ?? null;
         return {
           found: true,
+          sharedContractOk,
+          sharedCount: sharedSoldiers.length,
+          townCount: townSoldiers.length,
+          sharedRussianId: sharedRussian?.identity.id ?? null,
+          sharedUkrainianId: sharedUkrainian?.identity.id ?? null,
           unifiedSoldierId: unifiedSoldier.id,
           soldierId: unifiedSoldier.soldierId,
           assignOk: assigned.ok,
@@ -138,6 +167,7 @@ async function runSoldierInspectorSmoke() {
       });
       if (
         !bridgeRoundTrip.found ||
+        !bridgeRoundTrip.sharedContractOk ||
         !bridgeRoundTrip.assignOk ||
         bridgeRoundTrip.assignedStatus !== "assigned" ||
         !bridgeRoundTrip.assignedRosterId ||

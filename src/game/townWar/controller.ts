@@ -1,6 +1,7 @@
 import { WORLD_HEIGHT, WORLD_WIDTH, type Vec2 } from "../arena";
 import { HOSTILE_DIALOGUE_TEMPLATES, SQUAD_DIALOGUE_TEMPLATES } from "../dialogue/storyPacks";
 import type { HostileDialogueTemplateDefinition, SquadDialogueTemplateDefinition } from "../dialogue/storyPackSchema";
+import { buildSharedSoldierFromTownWarSoldier } from "./sharedSoldierAdapter";
 import { TOWN_WAR_ENEMY_FACTION, TOWN_WAR_PLAYER_FACTION } from "./types";
 import type {
   TownWarCurrentNeedId,
@@ -11754,6 +11755,10 @@ export class TownWarController {
     return this.state.soldiers.map((soldier) => this.buildUnifiedSoldierReadModel(soldier));
   }
 
+  private getSharedSoldierReadModels() {
+    return this.state.soldiers.map((soldier) => buildSharedSoldierFromTownWarSoldier(soldier, this.state.clock.seconds));
+  }
+
   getSnapshot(): TownWarState {
     return {
       version: this.state.version,
@@ -11934,6 +11939,7 @@ export class TownWarController {
             : soldier.task.resumeTask ?? null
         }
       })),
+      sharedSoldiers: this.getSharedSoldierReadModels(),
       unifiedSoldiers: this.getUnifiedSoldierReadModels()
     };
   }

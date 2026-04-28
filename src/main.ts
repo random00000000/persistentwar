@@ -38421,6 +38421,7 @@ function getAgentSnapshot() {
       playerThreatShare: townWar.aiThreats.playerThreatShare,
       frontlineFocus: townWar.aiThreats.frontlineFocus,
       casualties: townWar.casualties,
+      sharedSoldiers: townWar.sharedSoldiers,
       soldiers: townWar.soldiers.map((soldier) => ({
         id: soldier.id,
         faction: soldier.faction,

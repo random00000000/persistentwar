@@ -1,5 +1,6 @@
 import { WORLD_HEIGHT, WORLD_WIDTH, type Vec2 } from "../arena";
 import type { WeaponId } from "../weapons";
+import type { SharedSoldierState } from "../soldiers/sharedSoldier";
 import { TOWN_WAR_ENEMY_FACTION, TOWN_WAR_PLAYER_FACTION } from "./types";
 import type {
   TownWarCurrentNeedId,
@@ -1066,6 +1067,7 @@ export interface TownWarState {
   aiTactics: TownWarAiTacticsState;
   combatants: TownWarCombatantState[];
   soldiers: TownWarSoldierState[];
+  sharedSoldiers: SharedSoldierState[];
   unifiedSoldiers: TownWarUnifiedSoldierState[];
 }
 
@@ -1349,6 +1351,7 @@ export function createTownWarState(): TownWarState {
     },
     combatants: [],
     soldiers: [],
+    sharedSoldiers: [],
     unifiedSoldiers: []
   };
 }
