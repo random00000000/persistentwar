@@ -50,6 +50,7 @@ try {
       matchEnded: Boolean(hit.result?.matchEnded),
       readable: hit.result?.readable ?? hit.summary
     });
+    assert(hit.result?.campDamage === 250, `Expected each RPG to deal 250 camp damage, got ${hit.result?.campDamage}`);
     snapshot = await page.evaluate(() => window.__topdownExtractionAgentApi.getSnapshot());
     enemyCamp = snapshot.war?.camps.find((camp) => camp.id === "camp-b") ?? null;
     assert(enemyCamp, `Enemy camp missing after RPG hit ${hitIndex}.`);

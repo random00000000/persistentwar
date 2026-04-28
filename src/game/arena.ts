@@ -1237,6 +1237,6 @@ const WORLD_BOUNDS = computeArenaExtents(
 export const WORLD_WIDTH = Math.max(WORLD_BOUNDS.maxX - WORLD_BOUNDS.minX, WORLD_MIN_WIDTH);
 export const WORLD_HEIGHT = Math.max(WORLD_BOUNDS.maxY - WORLD_BOUNDS.minY, WORLD_MIN_HEIGHT);
 export const PLAYER_SPAWN: Vec2 = scaleVec2({ x: 240, y: 760 });
-export const RAID_TIME_SECONDS = 230;
+export const RAID_TIME_SECONDS = 1500;
 export const ARENA_OBSTACLES: ArenaObstacle[] = BASE_ARENA_OBSTACLES.map(scaleObstacle);
 export const RAID_ROUTES: ReadonlyArray<RaidRouteDefinition> = BASE_RAID_ROUTES.map(scaleRoute);

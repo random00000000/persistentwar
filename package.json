@@ -31,6 +31,7 @@
     "smoke:c4": "node scripts/c4-plant-smoke.mjs",
     "smoke:dual-primary": "node scripts/dual-primary-loadout-smoke.mjs",
     "smoke:enemy-commander": "node scripts/enemy-commander-smoke.mjs",
+    "smoke:run-balance": "node scripts/run-balance-smoke.mjs",
     "smoke:field-pickup-sling2": "node scripts/field-pickup-sling2-smoke.mjs",
     "smoke:rpg-four-hit-camp": "node scripts/rpg-four-hit-camp-smoke.mjs",
     "smoke:enemy-corner-unstick": "node scripts/enemy-corner-unstick-smoke.mjs",
