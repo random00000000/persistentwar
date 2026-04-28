@@ -243,6 +243,15 @@ const TOWN_WAR_DEMOLITION_TOOL_DAMAGE: Record<TownWarDemolitionToolId, { weakPoi
   "demo-charge": { weakPoint: 270, camp: 135, ammoCost: 28, buildCost: 38 },
   rpg: { weakPoint: 350, camp: 220, ammoCost: 46, buildCost: 12 }
 };
+type TownWarCampDamageType = "direct" | "explosive";
+type TownWarExplosiveRaidToolId = Extract<TownWarDemolitionToolId, "grenade" | "rpg">;
+type TownWarCampDamageOptions = {
+  attackerFaction?: TownWarFactionId | null;
+  damageType?: TownWarCampDamageType;
+  tool?: TownWarDemolitionToolId | "raid-explosive" | null;
+  sourceLabel?: string | null;
+  position?: Vec2 | null;
+};
 const TOWN_WAR_CAMP_BREACH_DETONATION_SECONDS = 84;
 
 const DEBRIEF_AFTER_ACTION_TEMPLATES = [
@@ -11428,7 +11437,7 @@ export class TownWarController {
     return { ok: true, reason: null, requestedSeconds: seconds, appliedTicks: ticks, tickSeconds };
   }
 
-  damageCamp(campId: TownWarFactionId, amount: number): TownWarCampState | null {
+  damageCamp(campId: TownWarFactionId, amount: number, options: TownWarCampDamageOptions = {}): TownWarCampState | null {
     const beforeMatchStatus = this.state.match.status;
     const beforeCamp = this.getCamp(campId);
     const beforeHealth = beforeCamp?.health.current ?? null;
@@ -11445,9 +11454,15 @@ export class TownWarController {
         campId,
         locationLabel: camp.label,
         summary: camp.destroyed
-          ? `${camp.label} was destroyed after taking ${Math.round(damage)} damage.`
-          : `${camp.label} took ${Math.round(damage)} damage and sits at ${Math.round(camp.health.current)}/${camp.health.max}.`,
-        tags: ["camp", camp.destroyed ? "destroyed" : "damaged"]
+          ? `${camp.label} was destroyed after taking ${Math.round(damage)} ${options.damageType ?? "direct"} damage.`
+          : `${camp.label} took ${Math.round(damage)} ${options.damageType ?? "direct"} damage and sits at ${Math.round(camp.health.current)}/${camp.health.max}.`,
+        tags: [
+          "camp",
+          camp.destroyed ? "destroyed" : "damaged",
+          options.damageType ?? "direct",
+          ...(options.tool ? [options.tool] : []),
+          ...(options.sourceLabel ? [options.sourceLabel] : [])
+        ]
       });
     }
 
@@ -11464,6 +11479,128 @@ export class TownWarController {
     }
 
     return camp;
+  }
+
+  applyExplosiveDamage(input: {
+    attackerFaction: TownWarFactionId;
+    targetCampId?: TownWarFactionId | null;
+    position: Vec2;
+    radius: number;
+    damage: number;
+    tool: TownWarExplosiveRaidToolId;
+    sourceLabel?: string | null;
+  }): {
+    ok: boolean;
+    reason: string | null;
+    targetCampId: TownWarFactionId;
+    campDamage: number;
+    weakPointDamage: number;
+    destroyed: boolean;
+    matchEnded: boolean;
+    readable: string;
+  } {
+    this.ensureDemoSeeded();
+    const targetCampId = input.targetCampId ?? this.getOpposingCampId(input.attackerFaction);
+    const targetCamp = this.getCamp(targetCampId);
+    if (!targetCamp) {
+      return {
+        ok: false,
+        reason: "target-camp-missing",
+        targetCampId,
+        campDamage: 0,
+        weakPointDamage: 0,
+        destroyed: false,
+        matchEnded: this.state.match.status === "ended",
+        readable: "Explosive damage failed: target camp missing."
+      };
+    }
+    if (this.state.match.status !== "active" || targetCamp.destroyed) {
+      return {
+        ok: false,
+        reason: "camp-not-active",
+        targetCampId,
+        campDamage: 0,
+        weakPointDamage: 0,
+        destroyed: targetCamp.destroyed,
+        matchEnded: this.state.match.status === "ended",
+        readable: `${targetCamp.label} is no longer an active explosive target.`
+      };
+    }
+
+    const radius = Math.max(1, input.radius);
+    const blastPosition = cloneVec2(input.position);
+    const blastKey = `raid-${input.tool}-${Math.round(blastPosition.x)}-${Math.round(blastPosition.y)}-${Math.round(this.state.clock.seconds)}`;
+    let weakPointDamage = 0;
+    let bestWeakPointFalloff = 0;
+
+    for (const weakPoint of this.getCampWeakPoints(targetCampId)) {
+      if (weakPoint.status === "destroyed") {
+        continue;
+      }
+      const distanceToWeakPoint = getDistance(weakPoint.position, blastPosition);
+      if (distanceToWeakPoint > radius) {
+        continue;
+      }
+
+      const falloff = clamp(1 - distanceToWeakPoint / radius, 0.18, 1);
+      bestWeakPointFalloff = Math.max(bestWeakPointFalloff, falloff);
+      weakPointDamage += this.applyWeakPointDamage(
+        weakPoint,
+        input.attackerFaction,
+        input.damage * falloff,
+        blastKey
+      );
+    }
+
+    const distanceToCamp = getDistance(targetCamp.spawn.position, blastPosition);
+    const campFalloff =
+      distanceToCamp <= radius + targetCamp.spawn.radius
+        ? clamp(1 - Math.max(0, distanceToCamp - targetCamp.spawn.radius) / radius, 0.18, 1)
+        : 0;
+    const damageFalloff = Math.max(bestWeakPointFalloff * 0.72, campFalloff);
+    const campDamageAmount = damageFalloff > 0 ? Math.max(1, input.damage * damageFalloff) : 0;
+    const beforeHealth = targetCamp.health.current;
+    if (campDamageAmount > 0) {
+      this.damageCamp(targetCampId, campDamageAmount, {
+        attackerFaction: input.attackerFaction,
+        damageType: "explosive",
+        tool: input.tool,
+        sourceLabel: input.sourceLabel ?? "raid-explosive",
+        position: blastPosition
+      });
+    }
+    const refreshedCamp = this.getCamp(targetCampId) ?? targetCamp;
+    const campDamage = Math.max(0, beforeHealth - refreshedCamp.health.current);
+
+    if (campDamage > 0 || weakPointDamage > 0) {
+      this.state.officer.lastCommandRead = `${input.tool.toUpperCase()} explosive hit`;
+      this.state.officer.lastCommandAtSeconds = this.state.clock.seconds;
+      this.emitDramaEvent({
+        kind: refreshedCamp.destroyed ? "camp-destroyed" : "camp-damaged",
+        faction: input.attackerFaction,
+        campId: targetCampId,
+        orderId: blastKey,
+        position: blastPosition,
+        locationLabel: refreshedCamp.label,
+        riskTier: this.computeRiskTier(input.attackerFaction, blastPosition),
+        summary: `${input.tool.toUpperCase()} explosive hit ${refreshedCamp.label} for ${Math.round(campDamage)} camp damage and ${Math.round(weakPointDamage)} weak-point damage.`,
+        tags: ["camp", "explosive", input.tool, campDamage > 0 ? "camp-damage" : "weak-point-only"]
+      });
+    }
+
+    return {
+      ok: campDamage > 0 || weakPointDamage > 0,
+      reason: campDamage > 0 || weakPointDamage > 0 ? null : "blast-out-of-range",
+      targetCampId,
+      campDamage,
+      weakPointDamage,
+      destroyed: refreshedCamp.destroyed,
+      matchEnded: refreshedCamp.destroyed || this.state.match.reason !== null,
+      readable:
+        campDamage > 0 || weakPointDamage > 0
+          ? `${refreshedCamp.label} took ${Math.round(campDamage)} explosive camp damage and ${Math.round(weakPointDamage)} weak-point damage.`
+          : `${input.tool.toUpperCase()} blast landed outside ${refreshedCamp.label} explosive damage range.`
+    };
   }
 
   lootAmmoCrate(crateId: string, looterFaction: TownWarFactionId): TownWarAmmoCrateState | null {

@@ -331,6 +331,8 @@ const BODY_ALARM_WAVE_LAYOUT: ReadonlyArray<{
 const PLAYER_GRENADE_STOCK = 2;
 const RPG_TEST_RESERVE_AMMO = 99;
 const PLAYER_GRENADE_DAMAGE = 62;
+const PLAYER_GRENADE_CAMP_EXPLOSIVE_DAMAGE = 32;
+const RPG_CAMP_EXPLOSIVE_DAMAGE = 220;
 const HOSTILE_GRENADE_DAMAGE = 46;
 const GRENADE_FUSE_TIME = 0.92;
 const GRENADE_TRAVEL_TIME = 0.28;
@@ -24845,6 +24847,26 @@ export class RaidController {
     this.state.grenades = remainingGrenades;
   }
 
+  private applyRaidExplosiveCampDamage(
+    position: Vec2,
+    radius: number,
+    tool: "grenade" | "rpg",
+    faction: "friendly" | "hostile"
+  ): ReturnType<typeof townWarController.applyExplosiveDamage> | null {
+    const damage = tool === "rpg" ? RPG_CAMP_EXPLOSIVE_DAMAGE : PLAYER_GRENADE_CAMP_EXPLOSIVE_DAMAGE;
+    const attackerFaction = faction === "friendly" ? TOWN_WAR_PLAYER_FACTION : TOWN_WAR_ENEMY_FACTION;
+    const targetCampId = faction === "friendly" ? TOWN_WAR_ENEMY_FACTION : TOWN_WAR_PLAYER_FACTION;
+    return townWarController.applyExplosiveDamage({
+      attackerFaction,
+      targetCampId,
+      position,
+      radius,
+      damage,
+      tool,
+      sourceLabel: `raid-${tool}`
+    });
+  }
+
   private explodeGrenade(grenade: GrenadeState): void {
     const blastPosition = { ...grenade.target };
     const blastAngle = Math.atan2(blastPosition.y - grenade.origin.y, blastPosition.x - grenade.origin.x);
@@ -24856,6 +24878,7 @@ export class RaidController {
       grenade.faction === "friendly" ? "Frag crack" : "Incoming frag"
     );
     this.emitFrontlineImpact(blastPosition, blastAngle, impactColor, grenade.faction, "blast", 1.8, "dust", null);
+    const campExplosiveHit = this.applyRaidExplosiveCampDamage(blastPosition, grenade.radius, "grenade", grenade.faction);
 
     if (grenade.faction === "friendly") {
       const struckEnemies = [...this.state.enemies];
@@ -24886,7 +24909,11 @@ export class RaidController {
         }
       }
 
-      this.state.message = "Frag burst landed. Push the shaken pocket before it restacks.";
+      this.state.message = campExplosiveHit?.destroyed
+        ? "Frag burst cracked the enemy camp. The town fight is ending around that blast."
+        : campExplosiveHit?.ok
+          ? `Frag burst landed on camp structure. ${campExplosiveHit.readable}`
+          : "Frag burst landed. Push the shaken pocket before it restacks.";
       return;
     }
 
@@ -26834,6 +26861,7 @@ export class RaidController {
     const blastDamage = 96;
     this.emitNoise(blastPosition, 980, faction === "friendly" ? 3.1 : 2.7, faction === "friendly" ? "RPG blast" : "Incoming rocket");
     this.emitFrontlineImpact(blastPosition, blastAngle, impactColor, faction, "blast", 2.45, "concrete", "rpg");
+    const campExplosiveHit = this.applyRaidExplosiveCampDamage(blastPosition, blastRadius, "rpg", faction);
 
     if (faction === "friendly") {
       const struckEnemies = [...this.state.enemies];
@@ -26865,7 +26893,11 @@ export class RaidController {
       }
 
       if (fromPlayer) {
-        this.state.message = "RPG impact landed. The camp line has a real breach window now.";
+        this.state.message = campExplosiveHit?.destroyed
+          ? "RPG impact destroyed the enemy camp. The town fight is ending around that blast."
+          : campExplosiveHit?.ok
+            ? `RPG impact hit camp structure. ${campExplosiveHit.readable}`
+            : "RPG impact landed. The camp line has a real breach window now.";
       }
       return;
     }
@@ -26891,6 +26923,12 @@ export class RaidController {
     for (const combatant of this.state.friendlyCombatants.filter((combatant) => distance(combatant.position, blastPosition) <= blastRadius)) {
       const falloff = clamp(1 - distance(combatant.position, blastPosition) / blastRadius, 0.24, 1);
       this.applyHostileDamageToFriendlyCombatant(combatant, blastPosition, Math.max(10, Math.round(blastDamage * 0.62 * falloff)));
+    }
+
+    if (campExplosiveHit?.destroyed) {
+      this.state.message = "Enemy rocket destroyed the player camp. The town fight is collapsing around that blast.";
+    } else if (campExplosiveHit?.ok && distanceToPlayer > blastRadius) {
+      this.state.message = `Enemy rocket hit camp structure. ${campExplosiveHit.readable}`;
     }
   }
 

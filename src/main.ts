@@ -35677,6 +35677,20 @@ interface TopDownExtractionAgentApi {
     war: ReturnType<typeof getAgentSnapshot>["war"] | null;
   };
   damageTownWarCamp: (payload: { campId: "camp-a" | "camp-b"; amount: number }) => ReturnType<typeof getAgentSnapshot>;
+  applyTownWarExplosiveDamage: (payload: {
+    attackerFaction?: "camp-a" | "camp-b";
+    targetCampId?: "camp-a" | "camp-b";
+    x?: number;
+    y?: number;
+    radius?: number;
+    damage?: number;
+    tool?: "grenade" | "rpg";
+  }) => {
+    ok: boolean;
+    summary: string;
+    result: ReturnType<typeof townWarController.applyExplosiveDamage> | null;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
   lootTownWarAmmoCrate: (payload: { crateId: string; looterFaction: "camp-a" | "camp-b" }) => {
     ok: boolean;
     summary: string;
@@ -39630,6 +39644,50 @@ topDownWindow.__topdownExtractionAgentApi = {
     townWarController.damageCamp(campId, amount);
     updateUi();
     return getAgentSnapshot();
+  },
+  applyTownWarExplosiveDamage: (payload) => {
+    const attackerFaction = payload?.attackerFaction === "camp-b" ? "camp-b" : "camp-a";
+    const targetCampId =
+      payload?.targetCampId === "camp-a" || payload?.targetCampId === "camp-b"
+        ? payload.targetCampId
+        : attackerFaction === "camp-a"
+          ? "camp-b"
+          : "camp-a";
+    const snapshotBefore = getAgentSnapshot();
+    const targetCamp = snapshotBefore.war?.camps.find((camp) => camp.id === targetCampId) ?? null;
+    const x = typeof payload?.x === "number" ? payload.x : targetCamp?.spawn.position.x;
+    const y = typeof payload?.y === "number" ? payload.y : targetCamp?.spawn.position.y;
+    const radius = typeof payload?.radius === "number" ? payload.radius : 128;
+    const tool = payload?.tool === "grenade" ? "grenade" : "rpg";
+    const damage =
+      typeof payload?.damage === "number"
+        ? payload.damage
+        : tool === "rpg"
+          ? 220
+          : 32;
+
+    if (x === undefined || y === undefined || !Number.isFinite(x) || !Number.isFinite(y)) {
+      return { ok: false, summary: "Town war explosive damage failed: invalid target position.", result: null, war: snapshotBefore.war ?? null };
+    }
+
+    townWarController.ensureDemoSeeded();
+    const result = townWarController.applyExplosiveDamage({
+      attackerFaction,
+      targetCampId,
+      position: { x, y },
+      radius,
+      damage,
+      tool,
+      sourceLabel: `agent-${tool}`
+    });
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: result.ok,
+      summary: `Town war explosive damage: ${result.readable}`,
+      result,
+      war: snapshot.war ?? null
+    };
   },
   lootTownWarAmmoCrate: (payload) => {
     const looterFaction = payload?.looterFaction;
