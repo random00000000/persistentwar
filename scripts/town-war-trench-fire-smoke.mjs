@@ -183,6 +183,57 @@ async function runTrenchFireSmoke() {
         api.advanceTownWar({ seconds: 1, tickSeconds: 1 });
         const afterOrdered = api.getSnapshot().war.townWar;
         const afterOrderedShooter = afterOrdered.soldiers.find((soldier) => soldier.id === shooter.id);
+
+        api.resetTownWar();
+        api.stageState("town-war");
+        api.focusTownWarLane({ campId: "camp-a", lane: "mid" });
+        const enemyPath = api.getSnapshot().war.townWar;
+        const ukrainianShooter = enemyPath.soldiers
+          .filter((soldier) => soldier.faction === "camp-b" && soldier.health.current > 0)
+          .sort((left, right) => left.position.x - right.position.x)[0];
+        const russianTarget = enemyPath.soldiers
+          .filter((soldier) => soldier.faction === "camp-a" && soldier.health.current > 0)
+          .sort((left, right) => left.position.x - right.position.x)[0];
+        const enemyTrenchPosition = {
+          x: russianTarget.position.x - 260,
+          y: russianTarget.position.y
+        };
+        const enemyTrench = api.placeDebugTownWarTrench({
+          campId: "camp-b",
+          x: enemyTrenchPosition.x,
+          y: enemyTrenchPosition.y,
+          facingAngleRadians: 0
+        });
+        const enemyStaged = api.stageTownWarSoldierInCover({
+          soldierId: ukrainianShooter.id,
+          coverSlotId: enemyTrench.result.coverSlot.id,
+          kind: "suppress"
+        });
+        const enemyAmmo = api.setTownWarSoldierAmmo({
+          soldierId: ukrainianShooter.id,
+          inMag: 60,
+          reserve: 120,
+          maxMag: 60
+        });
+        const beforeEnemyShared = api.getSnapshot().war.townWar;
+        const beforeUkrainianShooter = beforeEnemyShared.soldiers.find((soldier) => soldier.id === ukrainianShooter.id);
+        const beforeRussianTarget = beforeEnemyShared.soldiers.find((soldier) => soldier.id === russianTarget.id);
+        const beforeRussianHealth = beforeEnemyShared.soldiers
+          .filter((soldier) => soldier.faction === "camp-a")
+          .reduce((total, soldier) => total + soldier.health.current, 0);
+        const beforeRussianPressure = beforeEnemyShared.soldiers
+          .filter((soldier) => soldier.faction === "camp-a")
+          .reduce((total, soldier) => total + soldier.morale.pressure, 0);
+        api.advanceTownWar({ seconds: 8, tickSeconds: 0.25 });
+        const afterEnemyShared = api.getSnapshot().war.townWar;
+        const afterUkrainianShooter = afterEnemyShared.soldiers.find((soldier) => soldier.id === ukrainianShooter.id);
+        const afterRussianTarget = afterEnemyShared.soldiers.find((soldier) => soldier.id === russianTarget.id);
+        const afterRussianHealth = afterEnemyShared.soldiers
+          .filter((soldier) => soldier.faction === "camp-a")
+          .reduce((total, soldier) => total + soldier.health.current, 0);
+        const afterRussianPressure = afterEnemyShared.soldiers
+          .filter((soldier) => soldier.faction === "camp-a")
+          .reduce((total, soldier) => total + soldier.morale.pressure, 0);
         api.focusTownWarCamera({ x: trenchPosition.x + 120, y: trenchPosition.y + 60 });
 
         return {
@@ -212,6 +263,27 @@ async function runTrenchFireSmoke() {
             afterTargetKind: afterOrderedShooter.targetIntent.targetKind,
             afterTargetReason: afterOrderedShooter.targetIntent.reason
           },
+          enemyShared: {
+            shooterId: ukrainianShooter.id,
+            targetId: russianTarget.id,
+            trench: enemyTrench,
+            staged: enemyStaged,
+            ammo: enemyAmmo,
+            beforeAmmo: beforeUkrainianShooter.ammo.inMag + beforeUkrainianShooter.ammo.reserve,
+            afterAmmo: afterUkrainianShooter.ammo.inMag + afterUkrainianShooter.ammo.reserve,
+            beforeTargetHealth: beforeRussianTarget.health.current,
+            afterTargetHealth: afterRussianTarget.health.current,
+            beforeTargetPressure: beforeRussianTarget.morale.pressure,
+            afterTargetPressure: afterRussianTarget.morale.pressure,
+            beforeRussianHealth,
+            afterRussianHealth,
+            beforeRussianPressure,
+            afterRussianPressure,
+            afterTask: afterUkrainianShooter.task.kind,
+            afterTargetKind: afterUkrainianShooter.targetIntent.targetKind,
+            afterTargetReason: afterUkrainianShooter.targetIntent.reason,
+            afterCoverState: afterUkrainianShooter.coverIntent.state
+          },
           overlay: holdOverlay
         };
       });
@@ -232,6 +304,19 @@ async function runTrenchFireSmoke() {
       assertSmoke(result.ordered.ammo.ok, "Expected ordered soldier ammo staging to succeed.", result.ordered.ammo);
       assertSmoke(result.ordered.afterTask.kind !== "move", "Expected armed trench occupant to stay braced instead of leaving for the order marker.", result.ordered);
       assertSmoke(result.ordered.afterAmmo < result.ordered.beforeAmmo, "Expected trench occupant with an active order marker to still spend ammo.", result.ordered);
+      assertSmoke(result.enemyShared.trench.ok, "Expected Ukrainian debug trench placement to succeed.", result.enemyShared.trench);
+      assertSmoke(result.enemyShared.staged.ok, "Expected Ukrainian soldier cover staging to succeed.", result.enemyShared.staged);
+      assertSmoke(result.enemyShared.ammo.ok, "Expected Ukrainian soldier ammo staging to succeed.", result.enemyShared.ammo);
+      assertSmoke(result.enemyShared.afterTask === "suppress", "Expected Ukrainian shooter to stay on suppress task.", result.enemyShared);
+      assertSmoke(result.enemyShared.afterCoverState === "occupying", "Expected Ukrainian shooter to occupy cover through the same cover path.", result.enemyShared);
+      assertSmoke(result.enemyShared.afterTargetKind !== "none", "Expected Ukrainian shooter to acquire a target.", result.enemyShared);
+      assertSmoke(result.enemyShared.afterAmmo < result.enemyShared.beforeAmmo, "Expected Ukrainian shooter to spend/reload ammo through shared combat.", result.enemyShared);
+      assertSmoke(
+        result.enemyShared.afterRussianHealth < result.enemyShared.beforeRussianHealth ||
+          result.enemyShared.afterRussianPressure > result.enemyShared.beforeRussianPressure,
+        "Expected Ukrainian shooter to apply shared damage or suppression to the Russian side.",
+        result.enemyShared
+      );
       assertSmoke(
         result.overlay.icons.some((icon) => icon.targetType === "soldier" && icon.targetId === result.shooterId && icon.label === "Soldier firing"),
         "Expected readability overlay to report hold-task trench soldier firing.",
@@ -247,7 +332,7 @@ async function runTrenchFireSmoke() {
 
       await writeFile(`${artifactDir}/trench-fire-report.json`, JSON.stringify({ ...result, screenshot: screenshotPath }, null, 2));
       console.log(
-        `town-war-trench-fire smoke passed: ${result.shooterId} stayed on hold, spent ${result.before.shooterAmmo - result.after.shooterAmmo} ammo, enemy health ${result.before.enemyHealth.toFixed(1)}->${result.after.enemyHealth.toFixed(1)}.`
+        `town-war-trench-fire smoke passed: ${result.shooterId} stayed on hold, spent ${result.before.shooterAmmo - result.after.shooterAmmo} ammo; Ukrainian ${result.enemyShared.shooterId} spent ${result.enemyShared.beforeAmmo - result.enemyShared.afterAmmo} ammo through shared combat.`
       );
     } finally {
       await page.close().catch(() => {});

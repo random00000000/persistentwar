@@ -1,6 +1,13 @@
 import { WORLD_HEIGHT, WORLD_WIDTH, type Vec2 } from "../arena";
 import { HOSTILE_DIALOGUE_TEMPLATES, SQUAD_DIALOGUE_TEMPLATES } from "../dialogue/storyPacks";
 import type { HostileDialogueTemplateDefinition, SquadDialogueTemplateDefinition } from "../dialogue/storyPackSchema";
+import {
+  applySharedSoldierIncomingFire,
+  canSharedSoldierShoot,
+  consumeSharedSoldierFireAmmo,
+  recoverSharedSoldierPressure,
+  shouldSharedSoldierRetreatFromSuppression
+} from "../soldiers";
 import { buildSharedSoldierFromTownWarSoldier } from "./sharedSoldierAdapter";
 import { TOWN_WAR_ENEMY_FACTION, TOWN_WAR_PLAYER_FACTION } from "./types";
 import type {
@@ -4994,27 +5001,14 @@ export class TownWarController {
         continue;
       }
 
-      for (let shot = 0; shot < shots; shot += 1) {
-        if (combatant.ammo.inMag > 0) {
-          combatant.ammo.inMag = Math.max(0, combatant.ammo.inMag - 1);
-          continue;
-        }
-
-        if (combatant.ammo.reserve <= 0) {
-          break;
-        }
-
-        const load = Math.min(combatant.ammo.maxMag, combatant.ammo.reserve);
-        combatant.ammo.inMag = load;
-        combatant.ammo.reserve = Math.max(0, combatant.ammo.reserve - load);
-      }
+      consumeSharedSoldierFireAmmo(combatant, shots);
     }
   }
 
   private tickPressureRecovery(deltaSeconds: number): void {
     for (const combatant of this.state.combatants) {
       const trenchRecoveryScale = this.getOccupiedTrenchSlot(combatant) ? 0.38 : 1;
-      combatant.morale.pressure = Math.max(0, combatant.morale.pressure - PRESSURE_RECOVERY_PER_SECOND * trenchRecoveryScale * deltaSeconds);
+      recoverSharedSoldierPressure(combatant, PRESSURE_RECOVERY_PER_SECOND * trenchRecoveryScale * deltaSeconds);
     }
   }
 
@@ -5972,8 +5966,7 @@ export class TownWarController {
         continue;
       }
 
-      const ammoAvailable = combatant.ammo.inMag + combatant.ammo.reserve;
-      if (ammoAvailable <= 0) {
+      if (!canSharedSoldierShoot(combatant)) {
         continue;
       }
 
@@ -6051,8 +6044,7 @@ export class TownWarController {
         (extendedRangeShot ? 1.08 : 1);
       const grenadeRead = this.getTrenchGrenadeRead(combatant, target.enemy, targetCover, baseSeed, deltaSeconds);
 
-      target.enemy.health.current = Math.max(0, target.enemy.health.current - damage - grenadeRead.damage);
-      target.enemy.morale.pressure = Math.min(target.enemy.morale.maxPressure, target.enemy.morale.pressure + pressure + grenadeRead.pressure);
+      const incomingFire = applySharedSoldierIncomingFire(target.enemy, damage + grenadeRead.damage, pressure + grenadeRead.pressure);
 
       if (grenadeRead.reason && target.enemy.kind === "soldier") {
         this.pushChatter({
@@ -6092,13 +6084,13 @@ export class TownWarController {
         });
       }
 
-      if (target.enemy.health.current <= 0) {
+      if (incomingFire.died || target.enemy.health.current <= 0) {
         deadIds.add(target.enemy.id);
         continue;
       }
 
-      const suppressed = target.enemy.morale.pressure / Math.max(1, target.enemy.morale.maxPressure);
-      if (suppressed < SUPPRESSION_RETREAT_THRESHOLD) {
+      const suppressed = incomingFire.pressureRatio;
+      if (!shouldSharedSoldierRetreatFromSuppression(target.enemy, SUPPRESSION_RETREAT_THRESHOLD)) {
         continue;
       }
 
