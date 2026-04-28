@@ -36716,6 +36716,7 @@ interface TopDownExtractionAgentApi {
   startRaid: () => ReturnType<typeof getAgentSnapshot>;
   advanceRaid: (payload?: { seconds?: number; tickSeconds?: number; move?: { x: number; y: number } }) => ReturnType<typeof getAgentSnapshot>;
   switchWeaponSlot: (slotId?: "primary" | "secondary") => ReturnType<typeof getAgentSnapshot>;
+  stageRaidWeaponLoot: (payload: { weaponId?: WeaponId }) => ReturnType<typeof getAgentSnapshot>;
   completeOfficerSoloSurvival: () => ReturnType<typeof getAgentSnapshot>;
   rollRecruitCandidates: () => ReturnType<typeof getAgentSnapshot>;
   setMoveInput: (move: { x: number; y: number }) => ReturnType<typeof getAgentSnapshot>;
@@ -41344,6 +41345,13 @@ topDownWindow.__topdownExtractionAgentApi = {
   },
   switchWeaponSlot: (slotId) => {
     raidController.switchPlayerWeaponSlot(slotId);
+    updateUi();
+    return getAgentSnapshot();
+  },
+  stageRaidWeaponLoot: (payload) => {
+    const requestedWeaponId = payload?.weaponId ?? "pkm";
+    const weaponId = requestedWeaponId in WEAPONS && requestedWeaponId !== "none" ? requestedWeaponId : "pkm";
+    raidController.stageFieldWeaponLootForDebug(weaponId);
     updateUi();
     return getAgentSnapshot();
   },

@@ -17595,6 +17595,7 @@ export class RaidController {
     if (activeFrontlineDefinition) {
       this.state.player.medkits += activeFrontlineDefinition.bonusMedkits;
       this.state.player.reserveAmmo += activeFrontlineDefinition.bonusAmmoPacks * weapon.ammoPackAmmo;
+      this.syncActivePlayerWeaponSlot();
     }
     this.state.enemies = this.createRaidEnemies(
       route,
@@ -18044,6 +18045,45 @@ export class RaidController {
     this.state.message = `Swapped to ${WEAPONS[player.weaponId].name} from ${nextSlot.label}.`;
   }
 
+  private syncActivePlayerWeaponSlot(): void {
+    const player = this.state.player;
+    const currentSlot = player.weaponSlots.find((slot) => slot.slotId === player.activeWeaponSlotId) ?? null;
+    if (!currentSlot) {
+      return;
+    }
+
+    currentSlot.weaponId = player.weaponId;
+    currentSlot.ammoInMag = player.ammoInMag;
+    currentSlot.reserveAmmo = player.reserveAmmo;
+  }
+
+  private equipFieldWeaponAsActiveSling2(weapon: WeaponDefinition, ammoInMag: number, reserveAmmo: number): void {
+    const player = this.state.player;
+    this.syncActivePlayerWeaponSlot();
+    const normalizedSlot: PlayerWeaponSlotState = {
+      slotId: "secondary",
+      label: "Sling 2",
+      weaponId: weapon.id,
+      ammoInMag,
+      reserveAmmo
+    };
+    const existingIndex = player.weaponSlots.findIndex((slot) => slot.slotId === "secondary");
+    if (existingIndex >= 0) {
+      player.weaponSlots[existingIndex] = normalizedSlot;
+    } else {
+      player.weaponSlots.push(normalizedSlot);
+    }
+
+    player.activeWeaponSlotId = "secondary";
+    player.weaponId = weapon.id;
+    player.ammoInMag = ammoInMag;
+    player.reserveAmmo = reserveAmmo;
+    player.reloadTimer = 0;
+    player.fireCooldown = 0;
+    player.shotSpreadPenalty = 0;
+    player.currentSpread = weapon.spread;
+  }
+
   public setSelectedTacticalService(tacticalServiceId: TacticalServiceId): void {
     if (this.state.phase !== "stash" || tacticalServiceId === this.state.selectedTacticalService) {
       return;
@@ -18232,6 +18272,29 @@ export class RaidController {
 
   public queueFinish(): void {
     this.finishQueued = true;
+  }
+
+  public stageFieldWeaponLootForDebug(weaponId: WeaponId): LootState | null {
+    if (this.state.phase !== "raid" || weaponId === "none") {
+      return null;
+    }
+
+    const weapon = WEAPONS[weaponId];
+    const loot: LootState = {
+      id: this.lootId++,
+      position: { ...this.state.player.position },
+      label: `${weapon.name} field pickup`,
+      category: "hardware",
+      value: Math.max(20, Math.round(weapon.raidCost * 0.2)),
+      searchDuration: 0.05,
+      stashReward: { ...EMPTY_SUPPLY_STOCK },
+      raidWeaponId: weapon.id,
+      raidAmmoInMag: Math.max(1, Math.min(weapon.magazineSize, Math.ceil(weapon.magazineSize * 0.65))),
+      raidReserveAmmo: Math.max(weapon.magazineSize, Math.round(weapon.ammoPackAmmo * 0.75))
+    };
+    this.state.loot.push(loot);
+    this.state.message = `${weapon.name} field pickup staged for raid pickup verification.`;
+    return loot;
   }
 
   private getNearbyDownedSquadMate(radius = SQUAD_STABILIZE_RADIUS): FriendlyCombatantState | null {
@@ -27724,17 +27787,41 @@ export class RaidController {
     if (battlefieldWeapon) {
       const player = this.state.player;
       const previousWeapon = WEAPONS[player.weaponId];
+      const pickedAmmoInMag = Math.min(battlefieldWeapon.magazineSize, Math.max(1, loot.raidAmmoInMag));
+      const pickedReserveAmmo = Math.max(battlefieldWeapon.magazineSize, loot.raidReserveAmmo);
       if (player.weaponId === loot.raidWeaponId) {
         player.ammoInMag = Math.min(battlefieldWeapon.magazineSize, Math.max(player.ammoInMag, loot.raidAmmoInMag));
         player.reserveAmmo = Math.max(player.reserveAmmo, loot.raidReserveAmmo);
+        this.syncActivePlayerWeaponSlot();
         weaponPickupSummary = ` ${battlefieldWeapon.name} mags were stripped off the body and folded into your current gun.`;
+      } else if (!player.weaponSlots.some((slot) => slot.slotId === "secondary")) {
+        this.equipFieldWeaponAsActiveSling2(battlefieldWeapon, pickedAmmoInMag, pickedReserveAmmo);
+        this.state.currentRaidStats.weaponId = battlefieldWeapon.id;
+        this.state.currentRaidStats.weaponName = battlefieldWeapon.name;
+        this.state.recoveredFieldWeapon = {
+          weaponId: battlefieldWeapon.id,
+          weaponName: battlefieldWeapon.name,
+          sourceLabel: loot.label,
+          ammoInMag: loot.raidAmmoInMag,
+          reserveAmmo: loot.raidReserveAmmo,
+          salvageValue: Math.max(90, Math.round(battlefieldWeapon.raidCost * 0.68))
+        };
+        weaponPickupSummary = ` ${battlefieldWeapon.name} went onto empty Sling 2 and you swapped onto it. ${previousWeapon.name} stays on Sling 1.`;
+        this.pushSquadLog(
+          "Makar",
+          "warning",
+          `Fresh ${battlefieldWeapon.name} off the dead. Sling 2 is live, keep firing.`,
+          "Loot"
+        );
       } else {
         player.weaponId = battlefieldWeapon.id;
-        player.ammoInMag = Math.min(battlefieldWeapon.magazineSize, Math.max(1, loot.raidAmmoInMag));
-        player.reserveAmmo = Math.max(battlefieldWeapon.magazineSize, loot.raidReserveAmmo);
+        player.ammoInMag = pickedAmmoInMag;
+        player.reserveAmmo = pickedReserveAmmo;
         player.reloadTimer = 0;
         player.fireCooldown = 0;
         player.shotSpreadPenalty = 0;
+        player.currentSpread = battlefieldWeapon.spread;
+        this.syncActivePlayerWeaponSlot();
         this.state.currentRaidStats.weaponId = battlefieldWeapon.id;
         this.state.currentRaidStats.weaponName = battlefieldWeapon.name;
         this.state.recoveredFieldWeapon = {
