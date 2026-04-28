@@ -1,0 +1,942 @@
+{
+  "prepOk": true,
+  "prepSummary": "Town war demolition prep: Russian Camp prepared demolition stock: 3 grenades, 1 satchels, 1 demo charges prepared.",
+  "orderOk": true,
+  "orderSummary": "Town war camp breach: 5 Russian soldiers are breaching Ukrainian Enemy Camp Ammo dump with demo-charge.",
+  "targetBefore": {
+    "id": "camp-b-ammo-dump",
+    "campId": "camp-b",
+    "kind": "ammo-dump",
+    "label": "Ammo dump",
+    "position": {
+      "x": 3617.6800000000003,
+      "y": 3239
+    },
+    "health": 180,
+    "maxHealth": 180,
+    "status": "intact",
+    "effects": [
+      "ammo flow",
+      "suppressor endurance"
+    ],
+    "damageMultiplier": 1.18,
+    "lastDamagedAtSeconds": null,
+    "damagedByFaction": null,
+    "readable": "Ammo dump intact: ammo flow, suppressor endurance."
+  },
+  "targetAfter": {
+    "id": "camp-b-ammo-dump",
+    "campId": "camp-b",
+    "kind": "ammo-dump",
+    "label": "Ammo dump",
+    "position": {
+      "x": 3617.6800000000003,
+      "y": 3239
+    },
+    "health": 0,
+    "maxHealth": 180,
+    "status": "destroyed",
+    "effects": [
+      "ammo flow",
+      "suppressor endurance"
+    ],
+    "damageMultiplier": 1.18,
+    "lastDamagedAtSeconds": 56.75,
+    "damagedByFaction": "camp-a",
+    "readable": "Ammo dump destroyed: ammo flow, suppressor endurance heavily degraded."
+  },
+  "campBefore": {
+    "id": "camp-b",
+    "label": "Ukrainian Enemy Camp",
+    "spawn": {
+      "position": {
+        "x": 3687.6800000000003,
+        "y": 3185
+      },
+      "radius": 70,
+      "lastReinforcementAtSeconds": 0,
+      "totalSpawned": 6
+    },
+    "health": {
+      "current": 1000,
+      "max": 1000
+    },
+    "supply": {
+      "ammo": 250,
+      "build": 250,
+      "food": 180,
+      "med": 80
+    },
+    "control": {
+      "morale": 0.59,
+      "readiness": 0.85
+    },
+    "sustainment": {
+      "readiness": 0.85,
+      "fatigueAverage": 0.21,
+      "hungerAverage": 0.14,
+      "moraleAverage": 0.59,
+      "ammoFlow": 1,
+      "cookEffect": 1,
+      "restCycle": 0.66,
+      "logisticsScore": 31.27,
+      "cookingScore": 29.76,
+      "enduranceScore": 23.98,
+      "manpowerAvailable": 6,
+      "bottleneckReason": null,
+      "warnings": [
+        "Rest cycle active"
+      ],
+      "workPriorities": {
+        "Cook": 2,
+        "Resupply": 2,
+        "Rest": 2
+      },
+      "lastUpdatedAtSeconds": 0
+    },
+    "destroyed": false
+  },
+  "campAfter": {
+    "id": "camp-b",
+    "label": "Ukrainian Enemy Camp",
+    "spawn": {
+      "position": {
+        "x": 3687.6800000000003,
+        "y": 3185
+      },
+      "radius": 70,
+      "lastReinforcementAtSeconds": 0,
+      "totalSpawned": 6
+    },
+    "health": {
+      "current": 838,
+      "max": 1000
+    },
+    "supply": {
+      "ammo": 154,
+      "build": 250,
+      "food": 180,
+      "med": 80
+    },
+    "control": {
+      "morale": 0.59,
+      "readiness": 0.6
+    },
+    "sustainment": {
+      "readiness": 0.6,
+      "fatigueAverage": 0.21,
+      "hungerAverage": 0.14,
+      "moraleAverage": 0.59,
+      "ammoFlow": 0.35,
+      "cookEffect": 1,
+      "restCycle": 0.66,
+      "logisticsScore": 31.27,
+      "cookingScore": 29.76,
+      "enduranceScore": 23.98,
+      "manpowerAvailable": 6,
+      "bottleneckReason": null,
+      "warnings": [
+        "No quartermaster: ammo flow slowing",
+        "Rest cycle active",
+        "Suppressor dry",
+        "Ammo dump hit: ammo flow degraded"
+      ],
+      "workPriorities": {
+        "Cook": 2,
+        "Resupply": 2,
+        "Rest": 2
+      },
+      "lastUpdatedAtSeconds": 75
+    },
+    "destroyed": false
+  },
+  "reportBefore": {
+    "ok": true,
+    "reason": null,
+    "campId": "camp-b",
+    "camps": [
+      {
+        "id": "camp-a",
+        "label": "Russian Camp",
+        "spawn": {
+          "position": {
+            "x": 7836.320000000001,
+            "y": 3185
+          },
+          "radius": 70,
+          "lastReinforcementAtSeconds": 0,
+          "totalSpawned": 6
+        },
+        "health": {
+          "current": 1000,
+          "max": 1000
+        },
+        "supply": {
+          "ammo": 250,
+          "build": 250,
+          "food": 180,
+          "med": 80
+        },
+        "control": {
+          "morale": 0.59,
+          "readiness": 0.83
+        },
+        "sustainment": {
+          "readiness": 0.83,
+          "fatigueAverage": 0.22,
+          "hungerAverage": 0.18,
+          "moraleAverage": 0.59,
+          "ammoFlow": 1,
+          "cookEffect": 1,
+          "restCycle": 0.64,
+          "logisticsScore": 30.41,
+          "cookingScore": 33.74,
+          "enduranceScore": 23.29,
+          "manpowerAvailable": 6,
+          "bottleneckReason": null,
+          "warnings": [
+            "Rest cycle active"
+          ],
+          "workPriorities": {
+            "Cook": 2,
+            "Resupply": 2,
+            "Rest": 2
+          },
+          "lastUpdatedAtSeconds": 0
+        },
+        "destroyed": false
+      },
+      {
+        "id": "camp-b",
+        "label": "Ukrainian Enemy Camp",
+        "spawn": {
+          "position": {
+            "x": 3687.6800000000003,
+            "y": 3185
+          },
+          "radius": 70,
+          "lastReinforcementAtSeconds": 0,
+          "totalSpawned": 6
+        },
+        "health": {
+          "current": 1000,
+          "max": 1000
+        },
+        "supply": {
+          "ammo": 250,
+          "build": 250,
+          "food": 180,
+          "med": 80
+        },
+        "control": {
+          "morale": 0.59,
+          "readiness": 0.85
+        },
+        "sustainment": {
+          "readiness": 0.85,
+          "fatigueAverage": 0.21,
+          "hungerAverage": 0.14,
+          "moraleAverage": 0.59,
+          "ammoFlow": 1,
+          "cookEffect": 1,
+          "restCycle": 0.66,
+          "logisticsScore": 31.27,
+          "cookingScore": 29.76,
+          "enduranceScore": 23.98,
+          "manpowerAvailable": 6,
+          "bottleneckReason": null,
+          "warnings": [
+            "Rest cycle active"
+          ],
+          "workPriorities": {
+            "Cook": 2,
+            "Resupply": 2,
+            "Rest": 2
+          },
+          "lastUpdatedAtSeconds": 0
+        },
+        "destroyed": false
+      }
+    ],
+    "weakPoints": [
+      {
+        "id": "camp-b-command-core",
+        "campId": "camp-b",
+        "kind": "command-core",
+        "label": "Command core",
+        "position": {
+          "x": 3687.6800000000003,
+          "y": 3185
+        },
+        "health": 260,
+        "maxHealth": 260,
+        "status": "intact",
+        "effects": [
+          "morale",
+          "readiness"
+        ],
+        "damageMultiplier": 1.05,
+        "lastDamagedAtSeconds": null,
+        "damagedByFaction": null,
+        "readable": "Command core intact: morale, readiness."
+      },
+      {
+        "id": "camp-b-spawn-dugout",
+        "campId": "camp-b",
+        "kind": "spawn-dugout",
+        "label": "Spawn dugout",
+        "position": {
+          "x": 3611.6800000000003,
+          "y": 3137
+        },
+        "health": 220,
+        "maxHealth": 220,
+        "status": "intact",
+        "effects": [
+          "reinforcement rate"
+        ],
+        "damageMultiplier": 1,
+        "lastDamagedAtSeconds": null,
+        "damagedByFaction": null,
+        "readable": "Spawn dugout intact: reinforcement rate."
+      },
+      {
+        "id": "camp-b-ammo-dump",
+        "campId": "camp-b",
+        "kind": "ammo-dump",
+        "label": "Ammo dump",
+        "position": {
+          "x": 3617.6800000000003,
+          "y": 3239
+        },
+        "health": 180,
+        "maxHealth": 180,
+        "status": "intact",
+        "effects": [
+          "ammo flow",
+          "suppressor endurance"
+        ],
+        "damageMultiplier": 1.18,
+        "lastDamagedAtSeconds": null,
+        "damagedByFaction": null,
+        "readable": "Ammo dump intact: ammo flow, suppressor endurance."
+      },
+      {
+        "id": "camp-b-radio-mast",
+        "campId": "camp-b",
+        "kind": "radio-mast",
+        "label": "Radio mast",
+        "position": {
+          "x": 3741.6800000000003,
+          "y": 3107
+        },
+        "health": 160,
+        "maxHealth": 160,
+        "status": "intact",
+        "effects": [
+          "coordination",
+          "counter-order speed"
+        ],
+        "damageMultiplier": 1.1,
+        "lastDamagedAtSeconds": null,
+        "damagedByFaction": null,
+        "readable": "Radio mast intact: coordination, counter-order speed."
+      },
+      {
+        "id": "camp-b-bunker-entrance",
+        "campId": "camp-b",
+        "kind": "bunker-entrance",
+        "label": "Bunker entrance",
+        "position": {
+          "x": 3783.6800000000003,
+          "y": 3229
+        },
+        "health": 210,
+        "maxHealth": 210,
+        "status": "intact",
+        "effects": [
+          "defensive readiness",
+          "build tempo"
+        ],
+        "damageMultiplier": 0.95,
+        "lastDamagedAtSeconds": null,
+        "damagedByFaction": null,
+        "readable": "Bunker entrance intact: defensive readiness, build tempo."
+      }
+    ],
+    "demolitionStock": [
+      {
+        "faction": "camp-a",
+        "grenades": 0,
+        "satchels": 0,
+        "demoCharges": 0,
+        "preparedAtSeconds": null,
+        "lastUsedAtSeconds": null,
+        "readable": "No prepared demolition stock."
+      },
+      {
+        "faction": "camp-b",
+        "grenades": 0,
+        "satchels": 0,
+        "demoCharges": 0,
+        "preparedAtSeconds": null,
+        "lastUsedAtSeconds": null,
+        "readable": "No prepared demolition stock."
+      }
+    ],
+    "activeBreaches": [],
+    "debriefLines": [],
+    "readable": "0/5 weak points damaged. Active breaches 0. No breach has changed camp capacity yet."
+  },
+  "reportAfter": {
+    "ok": true,
+    "reason": null,
+    "campId": "camp-b",
+    "camps": [
+      {
+        "id": "camp-a",
+        "label": "Russian Camp",
+        "spawn": {
+          "position": {
+            "x": 7836.320000000001,
+            "y": 3185
+          },
+          "radius": 70,
+          "lastReinforcementAtSeconds": 0,
+          "totalSpawned": 6
+        },
+        "health": {
+          "current": 1000,
+          "max": 1000
+        },
+        "supply": {
+          "ammo": 180,
+          "build": 188,
+          "food": 180,
+          "med": 80
+        },
+        "control": {
+          "morale": 0.59,
+          "readiness": 0.79
+        },
+        "sustainment": {
+          "readiness": 0.79,
+          "fatigueAverage": 0.22,
+          "hungerAverage": 0.18,
+          "moraleAverage": 0.59,
+          "ammoFlow": 0.86,
+          "cookEffect": 1,
+          "restCycle": 0.64,
+          "logisticsScore": 30.41,
+          "cookingScore": 33.74,
+          "enduranceScore": 23.29,
+          "manpowerAvailable": 6,
+          "bottleneckReason": null,
+          "warnings": [
+            "Rest cycle active"
+          ],
+          "workPriorities": {
+            "Cook": 2,
+            "Resupply": 2,
+            "Rest": 2
+          },
+          "lastUpdatedAtSeconds": 75
+        },
+        "destroyed": false
+      },
+      {
+        "id": "camp-b",
+        "label": "Ukrainian Enemy Camp",
+        "spawn": {
+          "position": {
+            "x": 3687.6800000000003,
+            "y": 3185
+          },
+          "radius": 70,
+          "lastReinforcementAtSeconds": 0,
+          "totalSpawned": 6
+        },
+        "health": {
+          "current": 838,
+          "max": 1000
+        },
+        "supply": {
+          "ammo": 154,
+          "build": 250,
+          "food": 180,
+          "med": 80
+        },
+        "control": {
+          "morale": 0.59,
+          "readiness": 0.6
+        },
+        "sustainment": {
+          "readiness": 0.6,
+          "fatigueAverage": 0.21,
+          "hungerAverage": 0.14,
+          "moraleAverage": 0.59,
+          "ammoFlow": 0.35,
+          "cookEffect": 1,
+          "restCycle": 0.66,
+          "logisticsScore": 31.27,
+          "cookingScore": 29.76,
+          "enduranceScore": 23.98,
+          "manpowerAvailable": 6,
+          "bottleneckReason": null,
+          "warnings": [
+            "No quartermaster: ammo flow slowing",
+            "Rest cycle active",
+            "Suppressor dry",
+            "Ammo dump hit: ammo flow degraded"
+          ],
+          "workPriorities": {
+            "Cook": 2,
+            "Resupply": 2,
+            "Rest": 2
+          },
+          "lastUpdatedAtSeconds": 75
+        },
+        "destroyed": false
+      }
+    ],
+    "weakPoints": [
+      {
+        "id": "camp-b-command-core",
+        "campId": "camp-b",
+        "kind": "command-core",
+        "label": "Command core",
+        "position": {
+          "x": 3687.6800000000003,
+          "y": 3185
+        },
+        "health": 260,
+        "maxHealth": 260,
+        "status": "intact",
+        "effects": [
+          "morale",
+          "readiness"
+        ],
+        "damageMultiplier": 1.05,
+        "lastDamagedAtSeconds": null,
+        "damagedByFaction": null,
+        "readable": "Command core intact: morale, readiness."
+      },
+      {
+        "id": "camp-b-spawn-dugout",
+        "campId": "camp-b",
+        "kind": "spawn-dugout",
+        "label": "Spawn dugout",
+        "position": {
+          "x": 3611.6800000000003,
+          "y": 3137
+        },
+        "health": 220,
+        "maxHealth": 220,
+        "status": "intact",
+        "effects": [
+          "reinforcement rate"
+        ],
+        "damageMultiplier": 1,
+        "lastDamagedAtSeconds": null,
+        "damagedByFaction": null,
+        "readable": "Spawn dugout intact: reinforcement rate."
+      },
+      {
+        "id": "camp-b-ammo-dump",
+        "campId": "camp-b",
+        "kind": "ammo-dump",
+        "label": "Ammo dump",
+        "position": {
+          "x": 3617.6800000000003,
+          "y": 3239
+        },
+        "health": 0,
+        "maxHealth": 180,
+        "status": "destroyed",
+        "effects": [
+          "ammo flow",
+          "suppressor endurance"
+        ],
+        "damageMultiplier": 1.18,
+        "lastDamagedAtSeconds": 56.75,
+        "damagedByFaction": "camp-a",
+        "readable": "Ammo dump destroyed: ammo flow, suppressor endurance heavily degraded."
+      },
+      {
+        "id": "camp-b-radio-mast",
+        "campId": "camp-b",
+        "kind": "radio-mast",
+        "label": "Radio mast",
+        "position": {
+          "x": 3741.6800000000003,
+          "y": 3107
+        },
+        "health": 160,
+        "maxHealth": 160,
+        "status": "intact",
+        "effects": [
+          "coordination",
+          "counter-order speed"
+        ],
+        "damageMultiplier": 1.1,
+        "lastDamagedAtSeconds": null,
+        "damagedByFaction": null,
+        "readable": "Radio mast intact: coordination, counter-order speed."
+      },
+      {
+        "id": "camp-b-bunker-entrance",
+        "campId": "camp-b",
+        "kind": "bunker-entrance",
+        "label": "Bunker entrance",
+        "position": {
+          "x": 3783.6800000000003,
+          "y": 3229
+        },
+        "health": 210,
+        "maxHealth": 210,
+        "status": "intact",
+        "effects": [
+          "defensive readiness",
+          "build tempo"
+        ],
+        "damageMultiplier": 0.95,
+        "lastDamagedAtSeconds": null,
+        "damagedByFaction": null,
+        "readable": "Bunker entrance intact: defensive readiness, build tempo."
+      }
+    ],
+    "demolitionStock": [
+      {
+        "faction": "camp-a",
+        "grenades": 3,
+        "satchels": 1,
+        "demoCharges": 0,
+        "preparedAtSeconds": 0,
+        "lastUsedAtSeconds": 56.75,
+        "readable": "3 grenades, 1 satchels, 0 demo charges prepared."
+      },
+      {
+        "faction": "camp-b",
+        "grenades": 0,
+        "satchels": 0,
+        "demoCharges": 0,
+        "preparedAtSeconds": null,
+        "lastUsedAtSeconds": null,
+        "readable": "No prepared demolition stock."
+      }
+    ],
+    "activeBreaches": [
+      {
+        "id": "town-war-breach-1",
+        "attackerFaction": "camp-a",
+        "targetCampId": "camp-b",
+        "weakPointId": "camp-b-ammo-dump",
+        "status": "retreating",
+        "origin": {
+          "x": 7836.320000000001,
+          "y": 3185
+        },
+        "targetPosition": {
+          "x": 3617.6800000000003,
+          "y": 3239
+        },
+        "rallyPosition": {
+          "x": 7836.320000000001,
+          "y": 3185
+        },
+        "assignedSoldierIds": [
+          "town-war-soldier-3",
+          "town-war-soldier-2",
+          "town-war-soldier-7",
+          "town-war-soldier-1",
+          "town-war-soldier-9"
+        ],
+        "roleBySoldierId": {
+          "town-war-soldier-3": "suppressor",
+          "town-war-soldier-2": "breacher",
+          "town-war-soldier-7": "medic",
+          "town-war-soldier-1": "hauler",
+          "town-war-soldier-9": "hauler"
+        },
+        "tool": "demo-charge",
+        "progress": 0.8928571428571429,
+        "pressure": 0.04,
+        "suppression": 0.33,
+        "damageApplied": 180,
+        "triggeredStages": [
+          "ordered",
+          "spotted",
+          "suppressed",
+          "planted",
+          "detonated"
+        ],
+        "createdAtSeconds": 0,
+        "lastUpdatedAtSeconds": 75,
+        "completedAtSeconds": null,
+        "readable": "Ammo dump hit by demo-charge: Ammo dump destroyed: ammo flow, suppressor endurance heavily degraded."
+      }
+    ],
+    "debriefLines": [
+      "Ammo dump: Ammo dump destroyed: ammo flow, suppressor endurance heavily degraded.",
+      "town-war-breach-1: retreating 89% toward Ammo dump.",
+      "Ammo dump breach team is falling back after the blast.",
+      "Ammo dump detonated for 180 weak-point damage and 162 camp damage.",
+      "Ammo dump on Ukrainian Enemy Camp took 180 demolition damage.",
+      "Ammo dump demolition was planted under pressure.",
+      "Ammo dump breach team took suppression on the final approach.",
+      "Olek Rus-3 was spotted closing on Ammo dump.",
+      "Olek Rus-3 ordered the team onto Ukrainian Enemy Camp Ammo dump.",
+      "Russian Camp prepared demolition stock: 3 grenades, 1 satchels, 1 demo charges prepared."
+    ],
+    "readable": "1/5 weak points damaged. Active breaches 1. Ammo dump: Ammo dump destroyed: ammo flow, suppressor endurance heavily degraded."
+  },
+  "activeBreaches": [
+    {
+      "id": "town-war-breach-1",
+      "attackerFaction": "camp-a",
+      "targetCampId": "camp-b",
+      "weakPointId": "camp-b-ammo-dump",
+      "status": "retreating",
+      "origin": {
+        "x": 7836.320000000001,
+        "y": 3185
+      },
+      "targetPosition": {
+        "x": 3617.6800000000003,
+        "y": 3239
+      },
+      "rallyPosition": {
+        "x": 7836.320000000001,
+        "y": 3185
+      },
+      "assignedSoldierIds": [
+        "town-war-soldier-3",
+        "town-war-soldier-2",
+        "town-war-soldier-7",
+        "town-war-soldier-1",
+        "town-war-soldier-9"
+      ],
+      "roleBySoldierId": {
+        "town-war-soldier-3": "suppressor",
+        "town-war-soldier-2": "breacher",
+        "town-war-soldier-7": "medic",
+        "town-war-soldier-1": "hauler",
+        "town-war-soldier-9": "hauler"
+      },
+      "tool": "demo-charge",
+      "progress": 0.8928571428571429,
+      "pressure": 0.04,
+      "suppression": 0.33,
+      "damageApplied": 180,
+      "triggeredStages": [
+        "ordered",
+        "spotted",
+        "suppressed",
+        "planted",
+        "detonated"
+      ],
+      "createdAtSeconds": 0,
+      "lastUpdatedAtSeconds": 75,
+      "completedAtSeconds": null,
+      "readable": "Ammo dump hit by demo-charge: Ammo dump destroyed: ammo flow, suppressor endurance heavily degraded."
+    }
+  ],
+  "recentBreachEvents": [
+    {
+      "id": "town-war-drama-9",
+      "atSeconds": 56.75,
+      "kind": "camp-breach-retreating",
+      "faction": "camp-a",
+      "campId": "camp-b",
+      "orderId": "town-war-breach-1",
+      "orderKind": null,
+      "soldierId": "town-war-soldier-3",
+      "ammoCrateId": null,
+      "locationLabel": "Ammo dump fallback",
+      "riskTier": "high",
+      "intensity": "high",
+      "summary": "Ammo dump breach team is falling back after the blast.",
+      "tags": [
+        "breach",
+        "retreating",
+        "ammo-dump"
+      ],
+      "speaker": "Olek Rus-3",
+      "channel": "Russian Squad Net",
+      "text": "Kira Rus-9, Ammo dump breach team is falling back after the blast.",
+      "referencedMemoryTag": null
+    },
+    {
+      "id": "town-war-drama-8",
+      "atSeconds": 56.75,
+      "kind": "camp-breach-detonated",
+      "faction": "camp-a",
+      "campId": "camp-b",
+      "orderId": "town-war-breach-1",
+      "orderKind": null,
+      "soldierId": "town-war-soldier-3",
+      "ammoCrateId": null,
+      "locationLabel": "Ammo dump",
+      "riskTier": "high",
+      "intensity": "high",
+      "summary": "Ammo dump detonated for 180 weak-point damage and 162 camp damage.",
+      "tags": [
+        "breach",
+        "detonated",
+        "ammo-dump",
+        "demo-charge"
+      ],
+      "speaker": "Olek Rus-3",
+      "channel": "Russian Squad Net",
+      "text": "Makar Rus-2, Ammo dump detonated for 180 weak-point damage and 162 camp damage.",
+      "referencedMemoryTag": null
+    },
+    {
+      "id": "town-war-drama-6",
+      "atSeconds": 56.75,
+      "kind": "camp-weakpoint-destroyed",
+      "faction": "camp-a",
+      "campId": "camp-b",
+      "orderId": "town-war-breach-1",
+      "orderKind": null,
+      "soldierId": null,
+      "ammoCrateId": null,
+      "locationLabel": "Ammo dump",
+      "riskTier": "high",
+      "intensity": "critical",
+      "summary": "Ammo dump on Ukrainian Enemy Camp took 180 demolition damage.",
+      "tags": [
+        "breach",
+        "weak-point",
+        "ammo-dump",
+        "destroyed"
+      ],
+      "speaker": "Makar Rus-2",
+      "channel": "Russian Squad Net",
+      "text": "Taran Rus-7, Ammo dump on Ukrainian Enemy Camp took 180 demolition damage.",
+      "referencedMemoryTag": null
+    },
+    {
+      "id": "town-war-drama-5",
+      "atSeconds": 46.5,
+      "kind": "camp-breach-planted",
+      "faction": "camp-a",
+      "campId": "camp-b",
+      "orderId": "town-war-breach-1",
+      "orderKind": null,
+      "soldierId": "town-war-soldier-2",
+      "ammoCrateId": null,
+      "locationLabel": "Ammo dump",
+      "riskTier": "high",
+      "intensity": "high",
+      "summary": "Ammo dump demolition was planted under pressure.",
+      "tags": [
+        "breach",
+        "planted",
+        "ammo-dump",
+        "demo-charge"
+      ],
+      "speaker": "Makar Rus-2",
+      "channel": "Russian Squad Net",
+      "text": "Taran Rus-7, Ammo dump demolition was planted under pressure.",
+      "referencedMemoryTag": null
+    },
+    {
+      "id": "town-war-drama-4",
+      "atSeconds": 28.75,
+      "kind": "expedition-pinned",
+      "faction": "camp-a",
+      "campId": "camp-b",
+      "orderId": "town-war-breach-1",
+      "orderKind": null,
+      "soldierId": "town-war-soldier-3",
+      "ammoCrateId": null,
+      "locationLabel": "Ammo dump approach",
+      "riskTier": "high",
+      "intensity": "high",
+      "summary": "Ammo dump breach team took suppression on the final approach.",
+      "tags": [
+        "breach",
+        "suppressed",
+        "ammo-dump"
+      ],
+      "speaker": "Olek Rus-3",
+      "channel": "Russian Squad Net",
+      "text": "Kira Rus-9, Ammo dump breach team took suppression on the final approach.",
+      "referencedMemoryTag": null
+    },
+    {
+      "id": "town-war-drama-3",
+      "atSeconds": 16.5,
+      "kind": "expedition-spotted",
+      "faction": "camp-a",
+      "campId": "camp-b",
+      "orderId": "town-war-breach-1",
+      "orderKind": null,
+      "soldierId": "town-war-soldier-3",
+      "ammoCrateId": null,
+      "locationLabel": "Ammo dump approach",
+      "riskTier": "high",
+      "intensity": "high",
+      "summary": "Olek Rus-3 was spotted closing on Ammo dump.",
+      "tags": [
+        "breach",
+        "spotted",
+        "ammo-dump"
+      ],
+      "speaker": "Olek Rus-3",
+      "channel": "Russian Squad Net",
+      "text": "Taran Rus-7, Olek Rus-3 was spotted closing on Ammo dump.",
+      "referencedMemoryTag": null
+    },
+    {
+      "id": "town-war-drama-2",
+      "atSeconds": 0,
+      "kind": "camp-breach-ordered",
+      "faction": "camp-a",
+      "campId": "camp-b",
+      "orderId": "town-war-breach-1",
+      "orderKind": null,
+      "soldierId": "town-war-soldier-3",
+      "ammoCrateId": null,
+      "locationLabel": "Ammo dump",
+      "riskTier": "high",
+      "intensity": "high",
+      "summary": "Olek Rus-3 ordered the team onto Ukrainian Enemy Camp Ammo dump.",
+      "tags": [
+        "breach",
+        "ordered",
+        "ammo-dump",
+        "demo-charge"
+      ],
+      "speaker": "Olek Rus-3",
+      "channel": "Russian Squad Net",
+      "text": "Makar Rus-2, Olek Rus-3 ordered the team onto Ukrainian Enemy Camp Ammo dump.",
+      "referencedMemoryTag": null
+    },
+    {
+      "id": "town-war-drama-1",
+      "atSeconds": 0,
+      "kind": "demolition-prepared",
+      "faction": "camp-a",
+      "campId": "camp-a",
+      "orderId": null,
+      "orderKind": null,
+      "soldierId": null,
+      "ammoCrateId": null,
+      "locationLabel": "Russian Camp",
+      "riskTier": null,
+      "intensity": "low",
+      "summary": "Russian Camp prepared demolition stock: 3 grenades, 1 satchels, 1 demo charges prepared.",
+      "tags": [
+        "breach",
+        "demolition",
+        "prepared"
+      ],
+      "speaker": "Vira Rus-1",
+      "channel": "Russian Squad Net",
+      "text": "Makar Rus-2, Russian Camp prepared demolition stock: 3 grenades, 1 satchels, 1 demo charges prepared.",
+      "referencedMemoryTag": null
+    }
+  ]
+}

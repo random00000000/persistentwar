@@ -1,0 +1,50 @@
+{
+  "ok": true,
+  "shooterId": "town-war-soldier-7",
+  "shooterName": "Taran Rus-7",
+  "shooterRole": "medic",
+  "shooterTraits": [
+    "steady-hands",
+    "field-cook"
+  ],
+  "shooterTaskBefore": "build",
+  "shooterTaskAfter": "idle",
+  "targetIntentAfter": "soldier",
+  "startAmmo": 29,
+  "endAmmo": 13,
+  "reserveAmmo": 90,
+  "targetHealthAfter": 94.961242385915,
+  "distance": 216.8317319951118,
+  "debug": {
+    "frame": 26,
+    "bursts": 0,
+    "soldierIds": [],
+    "trenchBursts": 0,
+    "openBursts": 0
+  },
+  "pageLabel": "raid",
+  "projectedTownWarCombatants": [
+    {
+      "ownerId": "town-war-soldier-3",
+      "name": "Olek Rus-3",
+      "weaponId": "pkm"
+    },
+    {
+      "ownerId": "town-war-soldier-2",
+      "name": "Makar Rus-2",
+      "weaponId": "worn-ak"
+    },
+    {
+      "ownerId": "town-war-soldier-10",
+      "name": "Lev Rus-10",
+      "weaponId": "worn-ak"
+    },
+    {
+      "ownerId": "town-war-soldier-9",
+      "name": "Kira Rus-9",
+      "weaponId": "short-mosin"
+    }
+  ],
+  "pageErrors": [],
+  "screenshotPath": "C:\\Users\\Javier\\Desktop\\CodexCLI\\2d-game-engine\\projects\\frontline-officer\\artifacts\\town-war-playtest-fire-check\\town-war-fire-check-1920x1080.png"
+}

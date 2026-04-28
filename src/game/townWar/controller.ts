@@ -23,9 +23,14 @@ import {
   type TownWarAmmoCrateState,
   type TownWarBuildOrderState,
   type TownWarBuildExecutionState,
+  type TownWarCampBreachRoleId,
+  type TownWarCampBreachState,
+  type TownWarCampBreachStatus,
   type TownWarCampState,
   type TownWarCampSupplyState,
   type TownWarCampWorkPriorityId,
+  type TownWarCampWeakPointKind,
+  type TownWarCampWeakPointState,
   type TownWarCasualtySeverity,
   type TownWarCasualtyState,
   type TownWarCombatantAmmoState,
@@ -34,6 +39,8 @@ import {
   type TownWarCoverSlotState,
   type TownWarDramaCause,
   type TownWarDebriefEcho,
+  type TownWarDemolitionStockState,
+  type TownWarDemolitionToolId,
   type TownWarDramaBeatEntry,
   type TownWarDramaBeatKind,
   type TownWarDramaEvent,
@@ -41,6 +48,14 @@ import {
   type TownWarDramaMemory,
   type TownWarDramaResponsibility,
   type TownWarDugoutState,
+  type TownWarExpeditionObjectiveId,
+  type TownWarExpeditionRoleId,
+  type TownWarExpeditionRouteBeatKind,
+  type TownWarExpeditionRouteBeatState,
+  type TownWarExpeditionState,
+  type TownWarExpeditionStatus,
+  type TownWarFieldworkUpgradeKind,
+  type TownWarFieldworkUpgradeState,
   type TownWarFlankLaneId,
   type TownWarFlankPressureLevel,
   type TownWarFlankPressureState,
@@ -52,11 +67,13 @@ import {
   type TownWarOperationDebriefState,
   type TownWarOperationState,
   type TownWarPersistentSoldierRecordState,
+  type TownWarPersistentSoldierStatus,
   type TownWarSkillDebriefState,
   type TownWarSkillOutcomeId,
   type TownWarSkillOutcomeState,
   type TownWarSoldierDramaArc,
   type TownWarSoldierIdentitySummary,
+  type TownWarSoldierSquadBridgeState,
   type TownWarSoldierState,
   type TownWarSkillState,
   type TownWarTaskCandidateState,
@@ -64,15 +81,21 @@ import {
   type TownWarTacticalIntentState,
   type TownWarTacticalPairState,
   type TownWarTargetIntentState,
+  type TownWarTrenchJunctionKind,
+  type TownWarTrenchNetworkPlacementKind,
+  type TownWarTrenchNetworkState,
+  type TownWarTrenchRetreatHint,
   type TownWarWorkPriorityState,
   type TownWarThreatContactState,
   type TownWarState,
-  type TownWarTownState
+  type TownWarTownState,
+  type TownWarUnifiedSoldierCommandState,
+  type TownWarUnifiedSoldierState
 } from "./state";
 
 const DEFAULT_MOVEMENT_SPEED = 72;
 const AMMO_SUPPLY_ROUNDS_PER_POINT = 6;
-const AMMO_CRATE_RESUPPLY_DISTANCE = 170;
+const AMMO_CRATE_RESUPPLY_DISTANCE = 240;
 const AMMO_CRATE_RESUPPLY_PER_SECOND = 6;
 const AMMO_CRATE_LOOT_DISTANCE = 54;
 const SUPPRESS_FIRE_ROUNDS_PER_SECOND = 6;
@@ -107,6 +130,17 @@ const COVER_SEEK_PRESSURE_RATIO = 0.025;
 const COVER_FALLBACK_PRESSURE_RATIO = 0.55;
 const TRENCH_PROACTIVE_SEEK_DISTANCE = 620;
 const TRENCH_TASK_ANCHOR_DISTANCE = 320;
+const TRENCH_SEGMENT_HALF_LENGTH = 42;
+const TRENCH_NETWORK_ENDPOINT_SNAP_DISTANCE = 78;
+const TRENCH_NETWORK_BRANCH_SNAP_DISTANCE = 70;
+const TRENCH_NETWORK_CONNECTION_DISTANCE = 84;
+const TRENCH_NETWORK_AMMO_FEED_DISTANCE = 560;
+const TRENCH_NETWORK_DUGOUT_LINK_DISTANCE = 520;
+const SANDBAG_FRONT_PROTECTION_BONUS = 0.12;
+const SANDBAG_FRONT_FIRE_RANGE_BONUS = 0.1;
+const WIRE_SLOW_RADIUS = 150;
+const WIRE_ASSAULT_SPEED_MULTIPLIER = 0.62;
+const WIRE_RETREAT_SPEED_MULTIPLIER = 0.74;
 const AMMO_CRATE_MAX_HEALTH = 25;
 const DUGOUT_MAX_HEALTH = 80;
 const DUGOUT_RALLY_RADIUS = 360;
@@ -164,6 +198,52 @@ const TOWN_WAR_NAMES = [
   "Lev",
   "Nika"
 ];
+
+const TOWN_WAR_EXPEDITION_ROLE_PLAN: Array<{ role: TownWarExpeditionRoleId; work: TownWarWorkPriorityId }> = [
+  { role: "builder", work: "Build" },
+  { role: "suppressor", work: "Suppress" },
+  { role: "rifleman", work: "Assault" },
+  { role: "medic", work: "Medic" },
+  { role: "hauler", work: "Haul" }
+];
+
+const TOWN_WAR_EXPEDITION_OBJECTIVE_LABELS: Record<TownWarExpeditionObjectiveId, string> = {
+  "extend-trench": "Extend trench toward school ruins",
+  "stock-forward-line": "Stock the forward line",
+  "probe-enemy-approach": "Probe the enemy approach"
+};
+
+const TOWN_WAR_BREACH_ROLE_PLAN: Array<{ role: TownWarCampBreachRoleId; work: TownWarWorkPriorityId }> = [
+  { role: "suppressor", work: "Suppress" },
+  { role: "breacher", work: "Assault" },
+  { role: "rifleman", work: "Assault" },
+  { role: "medic", work: "Medic" },
+  { role: "hauler", work: "Haul" }
+];
+
+const TOWN_WAR_WEAK_POINT_LABELS: Record<TownWarCampWeakPointKind, string> = {
+  "command-core": "Command core",
+  "spawn-dugout": "Spawn dugout",
+  "ammo-dump": "Ammo dump",
+  "radio-mast": "Radio mast",
+  "bunker-entrance": "Bunker entrance"
+};
+
+const TOWN_WAR_WEAK_POINT_PRIORITY: TownWarCampWeakPointKind[] = [
+  "ammo-dump",
+  "spawn-dugout",
+  "command-core",
+  "radio-mast",
+  "bunker-entrance"
+];
+
+const TOWN_WAR_DEMOLITION_TOOL_DAMAGE: Record<TownWarDemolitionToolId, { weakPoint: number; camp: number; ammoCost: number; buildCost: number }> = {
+  grenade: { weakPoint: 92, camp: 32, ammoCost: 8, buildCost: 0 },
+  satchel: { weakPoint: 185, camp: 82, ammoCost: 18, buildCost: 24 },
+  "demo-charge": { weakPoint: 270, camp: 135, ammoCost: 28, buildCost: 38 },
+  rpg: { weakPoint: 350, camp: 220, ammoCost: 46, buildCost: 12 }
+};
+const TOWN_WAR_CAMP_BREACH_DETONATION_SECONDS = 84;
 
 const DEBRIEF_AFTER_ACTION_TEMPLATES = [
   "{summary}",
@@ -230,6 +310,7 @@ export interface TownWarOfficerOrderResult {
   travelDistance?: number | null;
   etaSeconds?: number | null;
   riskTier?: TownWarOfficerRiskTier | null;
+  trenchNetwork?: TownWarTrenchNetworkState | null;
 }
 
 export interface TownWarDebugTrenchResult {
@@ -243,9 +324,256 @@ export interface TownWarDebugTrenchResult {
 export interface TownWarBuildPlacementPreviewState {
   kind: TownWarBuildOrderKind | null;
   faction: TownWarFactionId | null;
+  requestedPosition: Vec2 | null;
   position: Vec2 | null;
   facingAngleRadians: number;
   valid: boolean;
+  trenchNetwork: TownWarTrenchNetworkState | null;
+}
+
+export interface TownWarTrenchNetworkSegmentReport {
+  faction: TownWarFactionId;
+  networkId: string;
+  segmentId: string;
+  center: Vec2;
+  nodeA: Vec2;
+  nodeB: Vec2;
+  slotIds: string[];
+  slotCount: number;
+  occupiedCount: number;
+  occupiedBySoldierIds: string[];
+  connectedSegmentIds: string[];
+  junctionKind: TownWarTrenchJunctionKind;
+  placementKind: TownWarTrenchNetworkPlacementKind;
+  retreatHint: TownWarTrenchRetreatHint;
+  readable: string;
+}
+
+export interface TownWarTrenchNetworkReport {
+  ok: boolean;
+  networks: Array<{
+    faction: TownWarFactionId;
+    networkId: string;
+    segmentCount: number;
+    slotCount: number;
+    occupiedCount: number;
+    junctionCount: number;
+    retreatHints: TownWarTrenchRetreatHint[];
+    warnings: string[];
+    segments: TownWarTrenchNetworkSegmentReport[];
+  }>;
+  totals: {
+    networks: number;
+    segments: number;
+    trenchSlots: number;
+    occupiedSlots: number;
+  };
+  readable: string;
+}
+
+export interface TownWarFieldworkUpgradeTarget {
+  coverSlotId?: string | null;
+  networkId?: string | null;
+  segmentId?: string | null;
+  position?: Vec2 | null;
+}
+
+export interface TownWarFieldworkUpgradeResult {
+  ok: boolean;
+  reason?: string | null;
+  campId: TownWarFactionId;
+  kind: TownWarFieldworkUpgradeKind;
+  campSupply?: { ammo: number; build: number } | null;
+  upgrade: TownWarFieldworkUpgradeState | null;
+  coverSlot: TownWarCoverSlotState | null;
+  readable: string;
+}
+
+export interface TownWarBuildingComboNetworkReport {
+  faction: TownWarFactionId;
+  networkId: string;
+  segmentCount: number;
+  slotCount: number;
+  occupiedCount: number;
+  ammo: {
+    linked: boolean;
+    crateIds: string[];
+    networkFedSlotIds: string[];
+    localFedSlotIds: string[];
+    warning: string | null;
+    networkFeedDistance: number;
+  };
+  dugout: {
+    linked: boolean;
+    dugoutIds: string[];
+    connectedSlotIds: string[];
+    shelteringSoldierIds: string[];
+    warning: string | null;
+  };
+  sandbags: {
+    count: number;
+    upgradeIds: string[];
+    frontProtectionBonus: number;
+    flankProtectionBonus: number;
+    fireRangeBonus: number;
+  };
+  wire: {
+    count: number;
+    upgradeIds: string[];
+    enemySpeedMultiplier: number;
+    friendlyRetreatSpeedMultiplier: number;
+    wireBlocksRetreat: boolean;
+  };
+  warnings: string[];
+  readable: string;
+}
+
+export interface TownWarBuildingComboReport {
+  ok: boolean;
+  networks: TownWarBuildingComboNetworkReport[];
+  totals: {
+    networks: number;
+    ammoLinked: number;
+    dugoutLinked: number;
+    sandbags: number;
+    wire: number;
+    warnings: number;
+  };
+  readable: string;
+}
+
+export type TownWarWorkQueueEntryState =
+  | "assigned"
+  | "moving"
+  | "working"
+  | "blocked"
+  | "recovering"
+  | "idle";
+
+export interface TownWarWorkQueueEntry {
+  soldierId: string;
+  soldierName: string;
+  role: TownWarRoleId;
+  work: TownWarWorkPriorityId | null;
+  taskKind: TownWarTask["kind"];
+  taskLabel: string;
+  targetId: string | null;
+  targetPosition: Vec2 | null;
+  state: TownWarWorkQueueEntryState;
+  priority: number;
+  skill: number;
+  score: number;
+  fatigue: number;
+  hunger: number;
+  morale: number;
+  riskTier: TownWarOfficerRiskTier | null;
+  warning: string | null;
+  ownerRead: string;
+  consequenceRead: string;
+}
+
+export interface TownWarWorkQueueReport {
+  ok: boolean;
+  reason?: string | null;
+  campId: TownWarFactionId | null;
+  entries: TownWarWorkQueueEntry[];
+  activeCount: number;
+  warnings: string[];
+  namedConsequences: string[];
+  debriefLines: string[];
+  readable: string;
+}
+
+export interface TownWarExpeditionOrderResult {
+  ok: boolean;
+  reason?: string | null;
+  campId: TownWarFactionId;
+  expedition: TownWarExpeditionState | null;
+  assignedSoldiers: TownWarSoldierState[];
+  readable: string;
+}
+
+export interface TownWarExpeditionReport {
+  ok: boolean;
+  reason?: string | null;
+  campId: TownWarFactionId | null;
+  activeExpeditions: TownWarExpeditionState[];
+  latestExpedition: TownWarExpeditionState | null;
+  routeScars: TownWarLocationScar[];
+  routeEvents: TownWarDramaEvent[];
+  readable: string;
+}
+
+export interface TownWarDemolitionPrepResult {
+  ok: boolean;
+  reason?: string | null;
+  campId: TownWarFactionId;
+  stock: TownWarDemolitionStockState | null;
+  campSupply: TownWarCampSupplyState | null;
+  readable: string;
+}
+
+export interface TownWarCampBreachOrderResult {
+  ok: boolean;
+  reason?: string | null;
+  campId: TownWarFactionId;
+  targetCampId: TownWarFactionId;
+  breach: TownWarCampBreachState | null;
+  weakPoint: TownWarCampWeakPointState | null;
+  stock: TownWarDemolitionStockState | null;
+  assignedSoldiers: TownWarSoldierState[];
+  readable: string;
+}
+
+export interface TownWarCampDamageReport {
+  ok: boolean;
+  reason?: string | null;
+  campId: TownWarFactionId | null;
+  camps: TownWarCampState[];
+  weakPoints: TownWarCampWeakPointState[];
+  demolitionStock: TownWarDemolitionStockState[];
+  activeBreaches: TownWarCampBreachState[];
+  debriefLines: string[];
+  readable: string;
+}
+
+export type TownWarReadabilityIconTone = "ok" | "working" | "warn" | "danger" | "disabled" | "info";
+
+export type TownWarReadabilityTargetType = "trench" | "ammo-crate" | "dugout" | "soldier" | "camp";
+
+export type TownWarReadabilityVisibility = "normal" | "inspect" | "build-preview";
+
+export type TownWarReadabilityPulse = "none" | "slow" | "shot" | "danger";
+
+export interface TownWarReadabilityIcon {
+  id: string;
+  targetType: TownWarReadabilityTargetType;
+  targetId: string;
+  icon: string;
+  tone: TownWarReadabilityIconTone;
+  priority: number;
+  label: string;
+  shortReason: string;
+  detailLines: string[];
+  worldX: number;
+  worldY: number;
+  visibility: TownWarReadabilityVisibility;
+  pulse?: TownWarReadabilityPulse;
+}
+
+export interface TownWarReadabilityOverlay {
+  ok: boolean;
+  icons: TownWarReadabilityIcon[];
+  totals: {
+    icons: number;
+    normal: number;
+    inspect: number;
+    buildPreview: number;
+    blockers: number;
+    byTargetType: Record<TownWarReadabilityTargetType, number>;
+    byTone: Record<TownWarReadabilityIconTone, number>;
+  };
+  readable: string;
 }
 
 export interface TownWarOfficerFocusResult {
@@ -414,6 +742,37 @@ function cloneSupply(supply: TownWarCampSupplyState): TownWarCampSupplyState {
   return { ...supply };
 }
 
+function addSupply(left: TownWarCampSupplyState, right: TownWarCampSupplyState): TownWarCampSupplyState {
+  return {
+    ammo: Math.max(0, Math.round(left.ammo + right.ammo)),
+    build: Math.max(0, Math.round(left.build + right.build)),
+    food: Math.max(0, Math.round(left.food + right.food)),
+    med: Math.max(0, Math.round(left.med + right.med))
+  };
+}
+
+function subtractSupply(left: TownWarCampSupplyState, right: TownWarCampSupplyState): TownWarCampSupplyState {
+  return {
+    ammo: Math.max(0, Math.round(left.ammo - right.ammo)),
+    build: Math.max(0, Math.round(left.build - right.build)),
+    food: Math.max(0, Math.round(left.food - right.food)),
+    med: Math.max(0, Math.round(left.med - right.med))
+  };
+}
+
+function clampSupplyToAvailable(requested: TownWarCampSupplyState, available: TownWarCampSupplyState): TownWarCampSupplyState {
+  return {
+    ammo: Math.min(requested.ammo, available.ammo),
+    build: Math.min(requested.build, available.build),
+    food: Math.min(requested.food, available.food),
+    med: Math.min(requested.med, available.med)
+  };
+}
+
+function formatSupplyBundle(supply: TownWarCampSupplyState): string {
+  return `ammo ${supply.ammo}, build ${supply.build}, food ${supply.food}, med ${supply.med}`;
+}
+
 function clonePersistentSoldierRecord(record: TownWarPersistentSoldierRecordState): TownWarPersistentSoldierRecordState {
   return {
     ...record,
@@ -426,7 +785,14 @@ function cloneOperationDebrief(debrief: TownWarOperationDebriefState): TownWarOp
     ...debrief,
     recommendations: [...debrief.recommendations],
     supplyRemaining: cloneSupply(debrief.supplyRemaining),
+    bankedSupply: cloneSupply(debrief.bankedSupply),
+    lostSupply: cloneSupply(debrief.lostSupply),
     carriedSoldiers: debrief.carriedSoldiers.map((record) => clonePersistentSoldierRecord(record)),
+    soldierLines: [...debrief.soldierLines],
+    buildingComboLines: [...debrief.buildingComboLines],
+    workLines: [...debrief.workLines],
+    routeLines: [...debrief.routeLines],
+    campDamageLines: [...debrief.campDamageLines],
     warnings: [...debrief.warnings]
   };
 }
@@ -487,6 +853,53 @@ function cloneFrontlineStory(story: TownWarFrontlineStoryState): TownWarFrontlin
   };
 }
 
+function cloneExpeditionBeat(beat: TownWarExpeditionRouteBeatState): TownWarExpeditionRouteBeatState {
+  return {
+    ...beat,
+    position: cloneVec2(beat.position),
+    soldierIds: [...beat.soldierIds]
+  };
+}
+
+function cloneExpedition(expedition: TownWarExpeditionState): TownWarExpeditionState {
+  return {
+    ...expedition,
+    origin: cloneVec2(expedition.origin),
+    objectivePosition: cloneVec2(expedition.objectivePosition),
+    rallyPosition: cloneVec2(expedition.rallyPosition),
+    assignedSoldierIds: [...expedition.assignedSoldierIds],
+    roleBySoldierId: { ...expedition.roleBySoldierId },
+    beats: expedition.beats.map((beat) => cloneExpeditionBeat(beat)),
+    triggeredBeatKinds: [...expedition.triggeredBeatKinds]
+  };
+}
+
+function cloneCampWeakPoint(weakPoint: TownWarCampWeakPointState): TownWarCampWeakPointState {
+  return {
+    ...weakPoint,
+    position: cloneVec2(weakPoint.position),
+    effects: [...weakPoint.effects]
+  };
+}
+
+function cloneDemolitionStock(stock: TownWarDemolitionStockState): TownWarDemolitionStockState {
+  return {
+    ...stock
+  };
+}
+
+function cloneCampBreach(breach: TownWarCampBreachState): TownWarCampBreachState {
+  return {
+    ...breach,
+    origin: cloneVec2(breach.origin),
+    targetPosition: cloneVec2(breach.targetPosition),
+    rallyPosition: cloneVec2(breach.rallyPosition),
+    assignedSoldierIds: [...breach.assignedSoldierIds],
+    roleBySoldierId: { ...breach.roleBySoldierId },
+    triggeredStages: [...breach.triggeredStages]
+  };
+}
+
 function cloneFlankPressure(flank: TownWarFlankPressureState): TownWarFlankPressureState {
   return {
     ...flank,
@@ -543,7 +956,17 @@ function cloneCoverIntent(intent: TownWarCoverIntentState): TownWarCoverIntentSt
 function cloneCoverSlot(slot: TownWarCoverSlotState): TownWarCoverSlotState {
   return {
     ...slot,
-    position: cloneVec2(slot.position)
+    position: cloneVec2(slot.position),
+    trenchNetwork: slot.trenchNetwork ? cloneTrenchNetwork(slot.trenchNetwork) : null
+  };
+}
+
+function cloneTrenchNetwork(network: TownWarTrenchNetworkState): TownWarTrenchNetworkState {
+  return {
+    ...network,
+    nodeA: cloneVec2(network.nodeA),
+    nodeB: cloneVec2(network.nodeB),
+    connectedSegmentIds: [...network.connectedSegmentIds]
   };
 }
 
@@ -554,6 +977,13 @@ function cloneDugout(dugout: TownWarDugoutState): TownWarDugoutState {
     connectedTrenchSlotIds: [...dugout.connectedTrenchSlotIds],
     shelteringSoldierIds: [...dugout.shelteringSoldierIds],
     contestedBySoldierIds: [...dugout.contestedBySoldierIds]
+  };
+}
+
+function cloneFieldworkUpgrade(upgrade: TownWarFieldworkUpgradeState): TownWarFieldworkUpgradeState {
+  return {
+    ...upgrade,
+    position: cloneVec2(upgrade.position)
   };
 }
 
@@ -835,6 +1265,41 @@ function getDistance(a: Vec2, b: Vec2): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
+function getClosestPointOnSegment(point: Vec2, nodeA: Vec2, nodeB: Vec2): { point: Vec2; t: number; distance: number } {
+  const vx = nodeB.x - nodeA.x;
+  const vy = nodeB.y - nodeA.y;
+  const lengthSquared = vx * vx + vy * vy;
+  if (lengthSquared <= 0.001) {
+    return { point: cloneVec2(nodeA), t: 0, distance: getDistance(point, nodeA) };
+  }
+  const t = clamp(((point.x - nodeA.x) * vx + (point.y - nodeA.y) * vy) / lengthSquared, 0, 1);
+  const projected = {
+    x: nodeA.x + vx * t,
+    y: nodeA.y + vy * t
+  };
+  return { point: projected, t, distance: getDistance(point, projected) };
+}
+
+function getSegmentCenter(nodeA: Vec2, nodeB: Vec2): Vec2 {
+  return {
+    x: (nodeA.x + nodeB.x) * 0.5,
+    y: (nodeA.y + nodeB.y) * 0.5
+  };
+}
+
+function getOrientationDeltaRadians(left: number, right: number): number {
+  const fullTurn = Math.PI * 2;
+  const rawDelta = Math.abs(((left - right) % fullTurn + fullTurn) % fullTurn);
+  const delta = rawDelta > Math.PI ? fullTurn - rawDelta : rawDelta;
+  return Math.min(delta, Math.abs(Math.PI - delta));
+}
+
+function getFacingDeltaRadians(left: number, right: number): number {
+  const fullTurn = Math.PI * 2;
+  const rawDelta = Math.abs(((left - right) % fullTurn + fullTurn) % fullTurn);
+  return rawDelta > Math.PI ? fullTurn - rawDelta : rawDelta;
+}
+
 function getDeterministicUnit(seed: number): number {
   const value = Math.sin(seed) * 10000;
   return value - Math.floor(value);
@@ -891,10 +1356,111 @@ function buildDugoutId(state: TownWarState): string {
   return id;
 }
 
+function buildFieldworkUpgradeId(state: TownWarState): string {
+  const id = `town-war-fieldwork-${state.nextFieldworkUpgradeId}`;
+  state.nextFieldworkUpgradeId += 1;
+  return id;
+}
+
 function buildCasualtyId(state: TownWarState): string {
   const id = `town-war-casualty-${state.nextCasualtyId}`;
   state.nextCasualtyId += 1;
   return id;
+}
+
+function getDefaultUnifiedSoldierWeaponId(soldier: TownWarSoldierState): TownWarUnifiedSoldierState["combat"]["weaponId"] {
+  if (soldier.role === "suppressor") {
+    return "pkm";
+  }
+  if (soldier.role === "medic") {
+    return "smg";
+  }
+  if (soldier.role === "defender" || soldier.role === "rifleman") {
+    return "rifle";
+  }
+  if (soldier.skills.shooting >= 12) {
+    return "worn-ak";
+  }
+  return "rifle";
+}
+
+function createDefaultUnifiedSoldierCommand(seconds: number): TownWarUnifiedSoldierCommandState {
+  return {
+    orderId: "follow",
+    anchor: null,
+    anchorLabel: null,
+    holdRadius: 96,
+    watchTarget: null,
+    watchLabel: null,
+    watchDirection: null,
+    watchArcDegrees: null,
+    issuedAtSeconds: seconds
+  };
+}
+
+function buildUnifiedSoldierCommand(
+  soldier: TownWarSoldierState,
+  occupiedSlot: TownWarCoverSlotState | null,
+  seconds: number
+): TownWarUnifiedSoldierCommandState {
+  const command = createDefaultUnifiedSoldierCommand(seconds);
+  if (occupiedSlot) {
+    command.orderId = "brace-watch";
+    command.anchor = cloneVec2(occupiedSlot.position);
+    command.anchorLabel = occupiedSlot.label;
+    command.watchTarget = soldier.task.targetPosition ? cloneVec2(soldier.task.targetPosition) : null;
+    command.watchLabel = soldier.targetIntent.targetKind !== "none" ? soldier.targetIntent.reason : "watching trench approach";
+    command.watchArcDegrees = 92;
+    return command;
+  }
+
+  if (soldier.task.kind === "defend" || soldier.task.kind === "suppress" || soldier.task.kind === "attack") {
+    command.orderId = soldier.task.kind === "suppress" ? "brace-watch" : soldier.task.kind;
+    command.anchor = soldier.task.targetPosition ? cloneVec2(soldier.task.targetPosition) : null;
+    command.anchorLabel = soldier.task.label ?? soldier.task.kind;
+    command.watchTarget = soldier.task.targetPosition ? cloneVec2(soldier.task.targetPosition) : null;
+    command.watchLabel = soldier.targetIntent.targetKind !== "none" ? soldier.targetIntent.reason : soldier.task.label ?? soldier.task.kind;
+    command.watchArcDegrees = soldier.task.kind === "suppress" ? 120 : 80;
+    return command;
+  }
+
+  if (soldier.task.kind === "move") {
+    command.orderId = "move-watch";
+    command.anchor = soldier.task.targetPosition ? cloneVec2(soldier.task.targetPosition) : null;
+    command.anchorLabel = soldier.task.label ?? "moving";
+  }
+
+  return command;
+}
+
+function buildUnifiedSoldierTacticalAction(
+  soldier: TownWarSoldierState,
+  occupiedSlot: TownWarCoverSlotState | null,
+  seconds: number
+): TownWarUnifiedSoldierState["combat"]["tacticalAction"] {
+  if (soldier.targetIntent.targetKind === "none" || soldier.targetIntent.targetId === null || soldier.ammo.inMag + soldier.ammo.reserve <= 0) {
+    return null;
+  }
+
+  return {
+    actionId: "suppress",
+    status: "executing",
+    targetPosition: soldier.task.targetPosition ? cloneVec2(soldier.task.targetPosition) : cloneVec2(soldier.position),
+    targetLabel: soldier.targetIntent.reason,
+    targetRadius: occupiedSlot ? 420 : null,
+    durationSeconds: null,
+    shotsPlanned: null,
+    shotsFired: 0,
+    burstShotsRemaining: null,
+    requiresLineOfSight: true,
+    suppressionProfile: soldier.task.kind === "suppress" ? "area-suppression" : "trench-watch-fire",
+    source: occupiedSlot ? `trench:${occupiedSlot.id}` : `soldier:${soldier.id}`,
+    issuedAtSeconds: seconds,
+    startedAtSeconds: seconds,
+    completedAtSeconds: null,
+    resumeOrderId: occupiedSlot ? "brace-watch" : soldier.task.kind === "attack" ? "attack" : soldier.task.kind === "defend" ? "defend" : "brace-watch",
+    failureReason: null
+  };
 }
 
 function buildCoverSlotId(state: TownWarState, sourceKind: TownWarCoverSlotState["sourceKind"]): string {
@@ -939,6 +1505,24 @@ function buildDebriefEchoId(state: TownWarState): string {
   return id;
 }
 
+function buildExpeditionId(state: TownWarState): string {
+  const id = `town-war-expedition-${state.nextExpeditionId}`;
+  state.nextExpeditionId += 1;
+  return id;
+}
+
+function buildExpeditionBeatId(state: TownWarState): string {
+  const id = `town-war-expedition-beat-${state.nextExpeditionBeatId}`;
+  state.nextExpeditionBeatId += 1;
+  return id;
+}
+
+function buildCampBreachId(state: TownWarState): string {
+  const id = `town-war-breach-${state.nextCampBreachId}`;
+  state.nextCampBreachId += 1;
+  return id;
+}
+
 function buildFlankId(state: TownWarState): string {
   const id = `town-war-flank-${state.nextFlankId}`;
   state.nextFlankId += 1;
@@ -958,13 +1542,65 @@ export class TownWarController {
   private buildPlacementPreview: TownWarBuildPlacementPreviewState = {
     kind: null,
     faction: null,
+    requestedPosition: null,
     position: null,
     facingAngleRadians: 0,
-    valid: false
+    valid: false,
+    trenchNetwork: null
   };
 
   private getCamp(campId: TownWarFactionId): TownWarCampState | null {
     return this.state.camps.find((camp) => camp.id === campId) ?? null;
+  }
+
+  private getDemolitionStock(faction: TownWarFactionId): TownWarDemolitionStockState {
+    let stock = this.state.demolitionStock.find((entry) => entry.faction === faction) ?? null;
+    if (!stock) {
+      stock = {
+        faction,
+        grenades: 0,
+        satchels: 0,
+        demoCharges: 0,
+        rpgRounds: 0,
+        preparedAtSeconds: null,
+        lastUsedAtSeconds: null,
+        readable: "No prepared demolition stock."
+      };
+      this.state.demolitionStock.push(stock);
+    }
+    stock.rpgRounds ??= 0;
+    return stock;
+  }
+
+  private getCampWeakPoints(campId: TownWarFactionId): TownWarCampWeakPointState[] {
+    return this.state.campWeakPoints.filter((weakPoint) => weakPoint.campId === campId);
+  }
+
+  private getCampWeakPoint(weakPointId: string): TownWarCampWeakPointState | null {
+    return this.state.campWeakPoints.find((weakPoint) => weakPoint.id === weakPointId) ?? null;
+  }
+
+  private chooseCampWeakPoint(targetCampId: TownWarFactionId, preferredWeakPointId?: string | null, preferredKind?: TownWarCampWeakPointKind | null): TownWarCampWeakPointState | null {
+    const weakPoints = this.getCampWeakPoints(targetCampId).filter((weakPoint) => weakPoint.status !== "destroyed");
+    if (preferredWeakPointId) {
+      const match = weakPoints.find((weakPoint) => weakPoint.id === preferredWeakPointId) ?? null;
+      if (match) {
+        return match;
+      }
+    }
+    if (preferredKind) {
+      const match = weakPoints.find((weakPoint) => weakPoint.kind === preferredKind) ?? null;
+      if (match) {
+        return match;
+      }
+    }
+    for (const kind of TOWN_WAR_WEAK_POINT_PRIORITY) {
+      const match = weakPoints.find((weakPoint) => weakPoint.kind === kind) ?? null;
+      if (match) {
+        return match;
+      }
+    }
+    return weakPoints[0] ?? null;
   }
 
   private getCampSpawn(campId: TownWarFactionId): TownWarCampState["spawn"] {
@@ -1115,7 +1751,8 @@ export class TownWarController {
   }
 
   private findSoldierById(soldierId: string): TownWarSoldierState | null {
-    return this.state.soldiers.find((soldier) => soldier.id === soldierId || soldier.displayName === soldierId) ?? null;
+    const normalizedSoldierId = soldierId.startsWith("unified-") ? soldierId.slice("unified-".length) : soldierId;
+    return this.state.soldiers.find((soldier) => soldier.id === normalizedSoldierId || soldier.displayName === soldierId) ?? null;
   }
 
   private isPriorityWork(work: string): work is TownWarWorkPriorityId {
@@ -1257,7 +1894,15 @@ export class TownWarController {
     const priority = clamp(soldier.workPriorities[work] ?? 0, 0, 5) * 10;
     const skillFit = this.getSkillFitForWork(soldier, work);
     const riskPenalty = input.riskTier === "high" ? 7 : input.riskTier === "medium" ? 3 : 0;
-    const fatiguePenalty = work === "Rest" ? 0 : soldier.needs.fatigue * 9;
+    const fatigueScale =
+      work === "Assault"
+        ? 18
+        : work === "Build" || work === "Rescue" || work === "Medic"
+          ? 12
+          : work === "Suppress"
+            ? 10
+            : 8;
+    const fatiguePenalty = work === "Rest" ? 0 : soldier.needs.fatigue * fatigueScale;
     const safety = -(riskPenalty * clamp((6 - soldier.skills.nerve) / 5, 0, 1)) - fatiguePenalty;
     const morale =
       work === "Rest"
@@ -1279,6 +1924,8 @@ export class TownWarController {
     let blockedReason: string | null = null;
     if (soldier.health.current <= 0) {
       blockedReason = "soldier down";
+    } else if (work === "Assault" && soldier.needs.fatigue >= 0.82) {
+      blockedReason = "exhausted, assault unreliable";
     } else if (work !== "Rest" && soldier.needs.fatigue >= 0.72 && soldier.workPriorities.Rest >= 4) {
       blockedReason = "rest priority overrides noncritical work";
     } else if (input.riskTier === "high" && soldier.skills.nerve <= 3 && (work === "Build" || work === "Resupply" || work === "Rescue")) {
@@ -1327,7 +1974,7 @@ export class TownWarController {
     const ammoFlowNeed = sustainment ? clamp((1 - sustainment.ammoFlow) * 3, 0, 3) : 0;
     const cookNeed = sustainment ? clamp((1 - sustainment.cookEffect) * 3 + sustainment.hungerAverage * 2, 0, 5) : 0;
 
-    return (["Build", "Rescue", "Medic", "Resupply", "Haul", "Defend", "Suppress", "Rest", "Cook", "Scout"] as TownWarWorkPriorityId[])
+    return (["Build", "Rescue", "Medic", "Resupply", "Haul", "Defend", "Suppress", "Rest", "Cook", "Scout", "Assault"] as TownWarWorkPriorityId[])
       .map((work) =>
         this.scoreTaskCandidate({
           soldier,
@@ -1358,7 +2005,11 @@ export class TownWarController {
                     ? cookNeed * 4 + (sustainment?.workPriorities.Cook ?? 0) * 2
                     : work === "Scout"
                       ? 5
-                      : 4,
+                      : work === "Assault"
+                        ? soldier.needs.fatigue >= 0.68
+                          ? 1
+                          : 7
+                        : 4,
           supplyNeed:
             work === "Resupply" || work === "Haul"
               ? ammoNeed * 8 + campAmmoNeed + ammoFlowNeed * 4 + (hasSupplyCrate ? 2 : 0)
@@ -1386,7 +2037,9 @@ export class TownWarController {
                         ? "camp cooking improves fatigue recovery, morale, and readiness"
                         : work === "Scout"
                           ? "perception and stealth watch flanks before contact"
-                          : "rifle skill, nerve, and morale hold the line"
+                          : work === "Assault"
+                            ? "assaults need shooting, nerve, endurance, and enough rest to press"
+                            : "rifle skill, nerve, and morale hold the line"
         })
       )
       .sort((left, right) => right.score - left.score);
@@ -1473,6 +2126,542 @@ export class TownWarController {
     this.refreshTaskDecisionForSoldier(soldier, targetPosition, riskTier, work);
   }
 
+  private getExpeditionObjectivePosition(campId: TownWarFactionId, objective: TownWarExpeditionObjectiveId): Vec2 {
+    const laneY = this.getFrontlineLaneY(this.state.officer.focusedLane);
+    const forwardOffset =
+      objective === "probe-enemy-approach" ? 480 : objective === "extend-trench" ? 360 : 300;
+    const yOffset = objective === "extend-trench" ? -118 : objective === "stock-forward-line" ? 72 : 0;
+    return {
+      x: clamp(this.getCampFrontlineX(campId, forwardOffset), 110, WORLD_WIDTH - 110),
+      y: clamp(laneY + yOffset, 120, WORLD_HEIGHT - 120)
+    };
+  }
+
+  private getExpeditionSlotPosition(expedition: TownWarExpeditionState, index: number): Vec2 {
+    const angle = Math.atan2(
+      expedition.objectivePosition.y - expedition.origin.y,
+      expedition.objectivePosition.x - expedition.origin.x
+    );
+    const forwardX = Math.cos(angle);
+    const forwardY = Math.sin(angle);
+    const sideX = -forwardY;
+    const sideY = forwardX;
+    const row = Math.floor(index / 3);
+    const column = index % 3;
+    const sideOffset = (column - 1) * 32;
+    const depthOffset = row * -28;
+    return {
+      x: clamp(expedition.objectivePosition.x + sideX * sideOffset + forwardX * depthOffset, 80, WORLD_WIDTH - 80),
+      y: clamp(expedition.objectivePosition.y + sideY * sideOffset + forwardY * depthOffset, 80, WORLD_HEIGHT - 80)
+    };
+  }
+
+  private getExpeditionRoleTaskKind(role: TownWarExpeditionRoleId): TownWarTask["kind"] {
+    if (role === "suppressor") {
+      return "suppress";
+    }
+    if (role === "rifleman") {
+      return "attack";
+    }
+    return "defend";
+  }
+
+  private getExpeditionRoleWork(role: TownWarExpeditionRoleId): TownWarWorkPriorityId {
+    return TOWN_WAR_EXPEDITION_ROLE_PLAN.find((entry) => entry.role === role)?.work ?? "Defend";
+  }
+
+  private getExpeditionDramaKind(kind: TownWarExpeditionRouteBeatKind): TownWarDramaEventKind {
+    switch (kind) {
+      case "ordered":
+        return "expedition-ordered";
+      case "spotted":
+        return "expedition-spotted";
+      case "pinned":
+        return "expedition-pinned";
+      case "separated":
+        return "expedition-separated";
+      case "wounded":
+        return "expedition-wounded";
+      case "low-ammo":
+        return "expedition-low-ammo";
+      case "retreating":
+        return "expedition-retreating";
+      case "reached-line":
+        return "expedition-reached-line";
+    }
+  }
+
+  private getExpeditionBeatScarTag(kind: TownWarExpeditionRouteBeatKind, objective: TownWarExpeditionObjectiveId): string | null {
+    if (kind === "spotted" || kind === "pinned") {
+      return "road-crossing-hot";
+    }
+    if (kind === "separated") {
+      return "tree-line-split";
+    }
+    if (kind === "retreating") {
+      return "fallback-route-marked";
+    }
+    if (kind === "reached-line") {
+      return objective === "probe-enemy-approach" ? "enemy-approach-contested" : objective === "extend-trench" ? "school-ruins-contested" : "forward-line-stocked";
+    }
+    return null;
+  }
+
+  private getExpeditionBeatText(
+    expedition: TownWarExpeditionState,
+    kind: TownWarExpeditionRouteBeatKind,
+    soldiers: TownWarSoldierState[]
+  ): { summary: string; consequence: string; locationLabel: string } {
+    const names = soldiers.slice(0, 3).map((soldier) => soldier.displayName).join(", ");
+    const groupRead = names ? `${names}${soldiers.length > 3 ? ` +${soldiers.length - 3}` : ""}` : "Expedition";
+    if (kind === "ordered") {
+      return {
+        summary: `${groupRead} stepped off from the Russian camp toward ${expedition.label}.`,
+        consequence: "A named push group is now carrying the officer order across open ground.",
+        locationLabel: "Russian camp push line"
+      };
+    }
+    if (kind === "spotted") {
+      return {
+        summary: `${groupRead} was spotted crossing the road toward ${expedition.label}.`,
+        consequence: "The route is now remembered as exposed, so future pushes should use trenches or smoke-like cover.",
+        locationLabel: "road crossing"
+      };
+    }
+    if (kind === "pinned") {
+      return {
+        summary: `${groupRead} got pinned near the road crossing and slowed the push.`,
+        consequence: "Suppression and ammo now decide whether the group keeps moving or breaks back.",
+        locationLabel: "hot road crossing"
+      };
+    }
+    if (kind === "separated") {
+      return {
+        summary: `${groupRead} stretched apart in the tree line while trying to keep formation.`,
+        consequence: "The group is readable, but scattered soldiers are easier to isolate.",
+        locationLabel: "tree line gap"
+      };
+    }
+    if (kind === "wounded") {
+      return {
+        summary: `${groupRead} took a wound on the route and the medic had to keep moving.`,
+        consequence: "The expedition stayed alive, but the next push starts with a body-cost memory.",
+        locationLabel: "casualty bend"
+      };
+    }
+    if (kind === "low-ammo") {
+      return {
+        summary: `${groupRead} reported low ammo before the objective was secure.`,
+        consequence: "Haulers and forward ammo crates now matter to the push.",
+        locationLabel: "forward ammo check"
+      };
+    }
+    if (kind === "retreating") {
+      return {
+        summary: `${groupRead} broke contact and started falling back to the Russian camp.`,
+        consequence: "The route scar remains, but the soldiers are trying to preserve the section.",
+        locationLabel: "fallback route"
+      };
+    }
+    return {
+      summary: `${groupRead} reached the line at ${expedition.label}.`,
+      consequence: "The route produced a usable story and a forward objective instead of a silent walk.",
+      locationLabel: expedition.label
+    };
+  }
+
+  private recordExpeditionBeat(
+    expedition: TownWarExpeditionState,
+    kind: TownWarExpeditionRouteBeatKind,
+    position: Vec2,
+    soldiers: TownWarSoldierState[]
+  ): TownWarExpeditionRouteBeatState | null {
+    if (expedition.triggeredBeatKinds.includes(kind)) {
+      return null;
+    }
+    const beatText = this.getExpeditionBeatText(expedition, kind, soldiers);
+    const scarTag = this.getExpeditionBeatScarTag(kind, expedition.objective);
+    const beat: TownWarExpeditionRouteBeatState = {
+      id: buildExpeditionBeatId(this.state),
+      expeditionId: expedition.id,
+      kind,
+      atSeconds: this.state.clock.seconds,
+      position: cloneVec2(position),
+      soldierIds: soldiers.map((soldier) => soldier.id),
+      summary: beatText.summary,
+      consequence: beatText.consequence,
+      scarTag
+    };
+    expedition.beats = [...expedition.beats, beat].slice(-12);
+    expedition.triggeredBeatKinds = uniqueLimited([...expedition.triggeredBeatKinds, kind], 12);
+    expedition.lastUpdatedAtSeconds = this.state.clock.seconds;
+    expedition.readable = `${beat.summary} ${beat.consequence}`;
+
+    const leadSoldier = soldiers[0] ?? null;
+    if (leadSoldier) {
+      this.pushFrontlineStory({
+        kind: "expedition",
+        faction: expedition.faction,
+        soldier: leadSoldier,
+        work: this.getExpeditionRoleWork(expedition.roleBySoldierId[leadSoldier.id] ?? "rifleman"),
+        orderId: expedition.id,
+        relatedId: scarTag,
+        position,
+        summary: beat.summary,
+        consequence: beat.consequence,
+        memoryTag: scarTag ?? `expedition-${kind}`
+      });
+    }
+
+    this.emitDramaEvent({
+      kind: this.getExpeditionDramaKind(kind),
+      faction: expedition.faction,
+      campId: expedition.faction,
+      orderId: expedition.id,
+      soldierId: leadSoldier?.id ?? null,
+      position,
+      locationLabel: beatText.locationLabel,
+      riskTier: this.computeRiskTier(expedition.faction, position),
+      summary: beat.summary,
+      tags: uniqueLimited(["expedition", kind, expedition.objective, scarTag ?? "", expedition.status], 12).filter(Boolean)
+    });
+
+    return cloneExpeditionBeat(beat);
+  }
+
+  private assignExpeditionSoldierTask(expedition: TownWarExpeditionState, soldier: TownWarSoldierState, index: number): void {
+    const role = expedition.roleBySoldierId[soldier.id] ?? "rifleman";
+    const targetPosition = this.getExpeditionSlotPosition(expedition, index);
+    const work = this.getExpeditionRoleWork(role);
+    soldier.task = {
+      kind: this.getExpeditionRoleTaskKind(role),
+      label: `Expedition: ${role} to ${expedition.label}`,
+      targetPosition,
+      targetEntityId: expedition.id
+    };
+    this.recordSelectedWork(soldier, work, targetPosition, this.computeRiskTier(expedition.faction, targetPosition));
+  }
+
+  private assignExpeditionRetreatTask(expedition: TownWarExpeditionState, soldier: TownWarSoldierState, index: number): void {
+    const sideOffset = (index - Math.floor(expedition.assignedSoldierIds.length / 2)) * 24;
+    const targetPosition = {
+      x: expedition.rallyPosition.x,
+      y: clamp(expedition.rallyPosition.y + sideOffset, 80, WORLD_HEIGHT - 80)
+    };
+    soldier.task = {
+      kind: "defend",
+      label: `Expedition retreat: ${expedition.label}`,
+      targetPosition,
+      targetEntityId: expedition.id
+    };
+    this.recordSelectedWork(soldier, "Defend", targetPosition, this.computeRiskTier(expedition.faction, soldier.position));
+  }
+
+  private isFinalExpeditionStatus(status: TownWarExpeditionStatus): boolean {
+    return status === "completed" || status === "failed";
+  }
+
+  private getLiveExpeditionSoldiers(expedition: TownWarExpeditionState): TownWarSoldierState[] {
+    return expedition.assignedSoldierIds
+      .map((soldierId) => this.findSoldierById(soldierId))
+      .filter((soldier): soldier is TownWarSoldierState => soldier !== null && soldier.health.current > 0);
+  }
+
+  private getExpeditionGroupCenter(soldiers: TownWarSoldierState[], fallback: Vec2): Vec2 {
+    if (soldiers.length === 0) {
+      return cloneVec2(fallback);
+    }
+    return {
+      x: soldiers.reduce((total, soldier) => total + soldier.position.x, 0) / soldiers.length,
+      y: soldiers.reduce((total, soldier) => total + soldier.position.y, 0) / soldiers.length
+    };
+  }
+
+  private selectExpeditionSoldiers(
+    campId: TownWarFactionId,
+    objectivePosition: Vec2,
+    explicitSoldierIds?: string[] | null
+  ): { soldiers: TownWarSoldierState[]; roleBySoldierId: Record<string, TownWarExpeditionRoleId> } {
+    const roleBySoldierId: Record<string, TownWarExpeditionRoleId> = {};
+    const selected: TownWarSoldierState[] = [];
+    const excludedIds = new Set<string>();
+    const riskTier = this.computeRiskTier(campId, objectivePosition);
+
+    if (explicitSoldierIds && explicitSoldierIds.length > 0) {
+      for (const soldierId of explicitSoldierIds) {
+        const soldier = this.findSoldierById(soldierId);
+        if (!soldier || soldier.faction !== campId || soldier.health.current <= 0 || selected.some((entry) => entry.id === soldier.id)) {
+          continue;
+        }
+        selected.push(soldier);
+        excludedIds.add(soldier.id);
+      }
+    }
+
+    for (const plan of TOWN_WAR_EXPEDITION_ROLE_PLAN) {
+      if (selected.length >= 5) {
+        break;
+      }
+      const pick = this.pickAvailableSoldierForColonyWork(campId, plan.work, objectivePosition, riskTier, excludedIds);
+      if (!pick) {
+        continue;
+      }
+      selected.push(pick.soldier);
+      excludedIds.add(pick.soldier.id);
+      roleBySoldierId[pick.soldier.id] = plan.role;
+    }
+
+    for (const soldier of this.state.soldiers) {
+      if (selected.length >= 5) {
+        break;
+      }
+      if (soldier.faction !== campId || soldier.health.current <= 0 || excludedIds.has(soldier.id) || soldier.currentNeed === "wounded") {
+        continue;
+      }
+      selected.push(soldier);
+      excludedIds.add(soldier.id);
+    }
+
+    const fallbackRoles: TownWarExpeditionRoleId[] = ["builder", "suppressor", "rifleman", "medic", "hauler"];
+    for (const [index, soldier] of selected.entries()) {
+      if (!roleBySoldierId[soldier.id]) {
+        roleBySoldierId[soldier.id] = fallbackRoles[index] ?? "rifleman";
+      }
+    }
+
+    return { soldiers: selected.slice(0, 5), roleBySoldierId };
+  }
+
+  private getCampBreachRoleWork(role: TownWarCampBreachRoleId): TownWarWorkPriorityId {
+    return TOWN_WAR_BREACH_ROLE_PLAN.find((entry) => entry.role === role)?.work ?? "Assault";
+  }
+
+  private getCampBreachRoleTaskKind(role: TownWarCampBreachRoleId): TownWarTask["kind"] {
+    if (role === "suppressor") {
+      return "suppress";
+    }
+    return "attack";
+  }
+
+  private getCampBreachSlotPosition(breach: TownWarCampBreachState, index: number): Vec2 {
+    const angle = Math.atan2(breach.targetPosition.y - breach.origin.y, breach.targetPosition.x - breach.origin.x);
+    const forwardX = Math.cos(angle);
+    const forwardY = Math.sin(angle);
+    const sideX = -forwardY;
+    const sideY = forwardX;
+    const sideOffset = (index - 2) * 30;
+    const depthOffset = index === 1 ? 8 : index === 0 ? -42 : -22;
+    return {
+      x: clamp(breach.targetPosition.x + sideX * sideOffset + forwardX * depthOffset, 80, WORLD_WIDTH - 80),
+      y: clamp(breach.targetPosition.y + sideY * sideOffset + forwardY * depthOffset, 80, WORLD_HEIGHT - 80)
+    };
+  }
+
+  private assignCampBreachSoldierTask(breach: TownWarCampBreachState, soldier: TownWarSoldierState, index: number): void {
+    const role = breach.roleBySoldierId[soldier.id] ?? "rifleman";
+    const targetPosition = this.getCampBreachSlotPosition(breach, index);
+    const work = this.getCampBreachRoleWork(role);
+    soldier.task = {
+      kind: this.getCampBreachRoleTaskKind(role),
+      label: `Breach: ${role} to ${TOWN_WAR_WEAK_POINT_LABELS[this.getCampWeakPoint(breach.weakPointId)?.kind ?? "command-core"]}`,
+      targetPosition,
+      targetEntityId: breach.id
+    };
+    this.recordSelectedWork(soldier, work, targetPosition, this.computeRiskTier(breach.attackerFaction, targetPosition));
+  }
+
+  private assignCampBreachRetreatTask(breach: TownWarCampBreachState, soldier: TownWarSoldierState, index: number): void {
+    const sideOffset = (index - Math.floor(breach.assignedSoldierIds.length / 2)) * 24;
+    const targetPosition = {
+      x: breach.rallyPosition.x,
+      y: clamp(breach.rallyPosition.y + sideOffset, 80, WORLD_HEIGHT - 80)
+    };
+    soldier.task = {
+      kind: "defend",
+      label: "Breach fallback: return to Russian camp",
+      targetPosition,
+      targetEntityId: breach.id
+    };
+    this.recordSelectedWork(soldier, "Defend", targetPosition, this.computeRiskTier(breach.attackerFaction, soldier.position));
+  }
+
+  private isFinalCampBreachStatus(status: TownWarCampBreachStatus): boolean {
+    return status === "completed" || status === "failed";
+  }
+
+  private getLiveCampBreachSoldiers(breach: TownWarCampBreachState): TownWarSoldierState[] {
+    return breach.assignedSoldierIds
+      .map((soldierId) => this.findSoldierById(soldierId))
+      .filter((soldier): soldier is TownWarSoldierState => soldier !== null && soldier.health.current > 0);
+  }
+
+  private selectCampBreachSoldiers(
+    campId: TownWarFactionId,
+    targetPosition: Vec2,
+    explicitSoldierIds?: string[] | null
+  ): { soldiers: TownWarSoldierState[]; roleBySoldierId: Record<string, TownWarCampBreachRoleId> } {
+    const roleBySoldierId: Record<string, TownWarCampBreachRoleId> = {};
+    const selected: TownWarSoldierState[] = [];
+    const excludedIds = new Set<string>();
+    const riskTier = this.computeRiskTier(campId, targetPosition);
+
+    if (explicitSoldierIds && explicitSoldierIds.length > 0) {
+      for (const soldierId of explicitSoldierIds) {
+        const soldier = this.findSoldierById(soldierId);
+        if (!soldier || soldier.faction !== campId || soldier.health.current <= 0 || selected.some((entry) => entry.id === soldier.id)) {
+          continue;
+        }
+        selected.push(soldier);
+        excludedIds.add(soldier.id);
+      }
+    }
+
+    for (const plan of TOWN_WAR_BREACH_ROLE_PLAN) {
+      if (selected.length >= 5) {
+        break;
+      }
+      const pick = this.pickAvailableSoldierForColonyWork(campId, plan.work, targetPosition, riskTier, excludedIds);
+      if (!pick) {
+        continue;
+      }
+      selected.push(pick.soldier);
+      excludedIds.add(pick.soldier.id);
+      roleBySoldierId[pick.soldier.id] = plan.role;
+    }
+
+    for (const soldier of this.state.soldiers) {
+      if (selected.length >= 5) {
+        break;
+      }
+      if (soldier.faction !== campId || soldier.health.current <= 0 || excludedIds.has(soldier.id) || soldier.currentNeed === "wounded") {
+        continue;
+      }
+      selected.push(soldier);
+      excludedIds.add(soldier.id);
+    }
+
+    const fallbackRoles: TownWarCampBreachRoleId[] = ["suppressor", "breacher", "rifleman", "medic", "hauler"];
+    for (const [index, soldier] of selected.entries()) {
+      if (!roleBySoldierId[soldier.id]) {
+        roleBySoldierId[soldier.id] = fallbackRoles[index] ?? "rifleman";
+      }
+    }
+
+    return { soldiers: selected.slice(0, 5), roleBySoldierId };
+  }
+
+  private chooseDemolitionTool(stock: TownWarDemolitionStockState): TownWarDemolitionToolId | null {
+    if (stock.rpgRounds > 0) {
+      return "rpg";
+    }
+    if (stock.demoCharges > 0) {
+      return "demo-charge";
+    }
+    if (stock.satchels > 0) {
+      return "satchel";
+    }
+    if (stock.grenades > 0) {
+      return "grenade";
+    }
+    return null;
+  }
+
+  private updateDemolitionStockRead(stock: TownWarDemolitionStockState): void {
+    stock.readable = `${stock.grenades} grenades, ${stock.satchels} satchels, ${stock.demoCharges} demo charges, ${stock.rpgRounds} RPG rounds prepared.`;
+  }
+
+  private consumeDemolitionTool(stock: TownWarDemolitionStockState, tool: TownWarDemolitionToolId): boolean {
+    if (tool === "rpg" && stock.rpgRounds > 0) {
+      stock.rpgRounds -= 1;
+    } else if (tool === "demo-charge" && stock.demoCharges > 0) {
+      stock.demoCharges -= 1;
+    } else if (tool === "satchel" && stock.satchels > 0) {
+      stock.satchels -= 1;
+    } else if (tool === "grenade" && stock.grenades > 0) {
+      stock.grenades -= 1;
+    } else {
+      return false;
+    }
+    stock.lastUsedAtSeconds = this.state.clock.seconds;
+    this.updateDemolitionStockRead(stock);
+    return true;
+  }
+
+  private getWeakPointPenalty(campId: TownWarFactionId): { readiness: number; ammoFlow: number; morale: number; warnings: string[] } {
+    const penalty = { readiness: 0, ammoFlow: 0, morale: 0, warnings: [] as string[] };
+    for (const weakPoint of this.getCampWeakPoints(campId)) {
+      const scale = weakPoint.status === "destroyed" ? 1 : weakPoint.status === "damaged" ? 0.55 : 0;
+      if (scale <= 0) {
+        continue;
+      }
+      if (weakPoint.kind === "ammo-dump") {
+        penalty.ammoFlow += 0.28 * scale;
+        penalty.readiness += 0.08 * scale;
+        penalty.warnings.push(`${weakPoint.label} hit: ammo flow degraded`);
+      } else if (weakPoint.kind === "spawn-dugout") {
+        penalty.readiness += 0.14 * scale;
+        penalty.morale += 0.05 * scale;
+        penalty.warnings.push(`${weakPoint.label} hit: reinforcements delayed`);
+      } else if (weakPoint.kind === "command-core") {
+        penalty.readiness += 0.22 * scale;
+        penalty.morale += 0.16 * scale;
+        penalty.warnings.push(`${weakPoint.label} hit: command shaken`);
+      } else if (weakPoint.kind === "radio-mast") {
+        penalty.readiness += 0.12 * scale;
+        penalty.morale += 0.06 * scale;
+        penalty.warnings.push(`${weakPoint.label} hit: coordination degraded`);
+      } else {
+        penalty.readiness += 0.1 * scale;
+        penalty.warnings.push(`${weakPoint.label} hit: bunker defense weaker`);
+      }
+    }
+    return penalty;
+  }
+
+  private applyWeakPointDamage(weakPoint: TownWarCampWeakPointState, attackerFaction: TownWarFactionId, amount: number, breachId: string): number {
+    const beforeHealth = weakPoint.health;
+    const damage = Math.max(0, amount * weakPoint.damageMultiplier);
+    weakPoint.health = Math.max(0, weakPoint.health - damage);
+    weakPoint.status = weakPoint.health <= 0 ? "destroyed" : weakPoint.health < weakPoint.maxHealth * 0.64 ? "damaged" : "intact";
+    weakPoint.lastDamagedAtSeconds = this.state.clock.seconds;
+    weakPoint.damagedByFaction = attackerFaction;
+    weakPoint.readable =
+      weakPoint.status === "destroyed"
+        ? `${weakPoint.label} destroyed: ${weakPoint.effects.join(", ")} heavily degraded.`
+        : `${weakPoint.label} damaged to ${Math.round(weakPoint.health)}/${weakPoint.maxHealth}: ${weakPoint.effects.join(", ")} degraded.`;
+
+    const camp = this.getCamp(weakPoint.campId);
+    if (camp) {
+      if (weakPoint.kind === "ammo-dump") {
+        camp.supply.ammo = Number(Math.max(0, camp.supply.ammo - (weakPoint.status === "destroyed" ? 96 : 54)).toFixed(2));
+      } else if (weakPoint.kind === "spawn-dugout") {
+        camp.spawn.lastReinforcementAtSeconds = Math.max(camp.spawn.lastReinforcementAtSeconds, this.state.clock.seconds + (weakPoint.status === "destroyed" ? 24 : 12));
+      } else if (weakPoint.kind === "command-core") {
+        camp.control.morale = Number(clamp(camp.control.morale - (weakPoint.status === "destroyed" ? 0.24 : 0.12), 0, 1).toFixed(2));
+        camp.control.readiness = Number(clamp(camp.control.readiness - (weakPoint.status === "destroyed" ? 0.2 : 0.1), 0, 1).toFixed(2));
+      } else if (weakPoint.kind === "radio-mast") {
+        camp.control.readiness = Number(clamp(camp.control.readiness - (weakPoint.status === "destroyed" ? 0.16 : 0.08), 0, 1).toFixed(2));
+      } else {
+        camp.supply.build = Number(Math.max(0, camp.supply.build - (weakPoint.status === "destroyed" ? 48 : 24)).toFixed(2));
+      }
+    }
+
+    const applied = Math.max(0, beforeHealth - weakPoint.health);
+    this.emitDramaEvent({
+      kind: weakPoint.status === "destroyed" ? "camp-weakpoint-destroyed" : "camp-weakpoint-damaged",
+      faction: attackerFaction,
+      campId: weakPoint.campId,
+      orderId: breachId,
+      position: weakPoint.position,
+      locationLabel: weakPoint.label,
+      riskTier: this.computeRiskTier(attackerFaction, weakPoint.position),
+      summary: `${weakPoint.label} on ${camp?.label ?? weakPoint.campId} took ${Math.round(applied)} demolition damage.`,
+      tags: ["breach", "weak-point", weakPoint.kind, weakPoint.status]
+    });
+
+    return applied;
+  }
+
   private findAmmoCrate(id: string): TownWarAmmoCrateState | null {
     return this.state.ammoCrates.find((crate) => crate.id === id) ?? null;
   }
@@ -1523,6 +2712,113 @@ export class TownWarController {
     return this.state.aiTactics.coverSlots.find((slot) => slot.id === id) ?? null;
   }
 
+  private getTrenchNetworkSlots(faction: TownWarFactionId, networkId: string | null | undefined): TownWarCoverSlotState[] {
+    if (!networkId) {
+      return [];
+    }
+    return this.state.aiTactics.coverSlots.filter(
+      (slot) => slot.sourceKind === "trench" && slot.faction === faction && slot.trenchNetwork?.networkId === networkId
+    );
+  }
+
+  private getTrenchForwardNormal(slot: TownWarCoverSlotState): Vec2 {
+    const angle = Number.isFinite(slot.facingAngleRadians) ? slot.facingAngleRadians : slot.facing === "camp-a" ? Math.PI : 0;
+    const nx = -Math.sin(angle);
+    const ny = Math.cos(angle);
+    const threat = this.getCampSpawn(this.getOpposingCampId(slot.faction ?? this.state.officer.faction)).position;
+    const dot = (threat.x - slot.position.x) * nx + (threat.y - slot.position.y) * ny;
+    return dot >= 0 ? { x: nx, y: ny } : { x: -nx, y: -ny };
+  }
+
+  private fieldworkUpgradeAppliesToSlot(upgrade: TownWarFieldworkUpgradeState, slot: TownWarCoverSlotState): boolean {
+    if (upgrade.faction !== slot.faction || slot.sourceKind !== "trench") {
+      return false;
+    }
+    return (
+      upgrade.coverSlotId === slot.id ||
+      (upgrade.segmentId !== null && upgrade.segmentId === slot.trenchNetwork?.segmentId) ||
+      (upgrade.networkId !== null && upgrade.networkId === slot.trenchNetwork?.networkId && upgrade.segmentId === null && upgrade.coverSlotId === null)
+    );
+  }
+
+  private getFieldworkUpgradesForSlot(slot: TownWarCoverSlotState, kind?: TownWarFieldworkUpgradeKind): TownWarFieldworkUpgradeState[] {
+    return this.state.fieldworkUpgrades.filter(
+      (upgrade) => (kind === undefined || upgrade.kind === kind) && this.fieldworkUpgradeAppliesToSlot(upgrade, slot)
+    );
+  }
+
+  private hasFieldworkUpgradeForSlot(slot: TownWarCoverSlotState, kind: TownWarFieldworkUpgradeKind): boolean {
+    return this.getFieldworkUpgradesForSlot(slot, kind).length > 0;
+  }
+
+  private isAmmoCrateLinkedToNetwork(crate: TownWarAmmoCrateState, faction: TownWarFactionId, networkId: string | null | undefined): boolean {
+    if (!networkId || crate.faction !== faction || crate.destroyedAtSeconds !== null || crate.ammo <= 0) {
+      return false;
+    }
+    return this.getTrenchNetworkSlots(faction, networkId).some((slot) => getDistance(crate.position, slot.position) <= TRENCH_NETWORK_AMMO_FEED_DISTANCE);
+  }
+
+  private getAmmoSupportForTrenchSlot(
+    slot: TownWarCoverSlotState
+  ): { crate: TownWarAmmoCrateState; distance: number; mode: "local" | "network" } | null {
+    if (slot.sourceKind !== "trench" || !slot.faction) {
+      return null;
+    }
+
+    const activeCrates = this.state.ammoCrates.filter((crate) => crate.destroyedAtSeconds === null && crate.faction === slot.faction && crate.ammo > 0);
+    const local = activeCrates.reduce<{ crate: TownWarAmmoCrateState; distance: number; mode: "local" } | null>((best, crate) => {
+      const distance = getDistance(crate.position, slot.position);
+      if (distance > AMMO_CRATE_RESUPPLY_DISTANCE) {
+        return best;
+      }
+      if (!best || distance < best.distance) {
+        return { crate, distance, mode: "local" };
+      }
+      return best;
+    }, null);
+
+    if (local) {
+      return local;
+    }
+
+    const networkId = slot.trenchNetwork?.networkId ?? null;
+    if (!networkId) {
+      return null;
+    }
+
+    return activeCrates.reduce<{ crate: TownWarAmmoCrateState; distance: number; mode: "network" } | null>((best, crate) => {
+      if (!this.isAmmoCrateLinkedToNetwork(crate, slot.faction!, networkId)) {
+        return best;
+      }
+      const distance = getDistance(crate.position, slot.position);
+      if (!best || distance < best.distance) {
+        return { crate, distance, mode: "network" };
+      }
+      return best;
+    }, null);
+  }
+
+  private getWireMovementSpeedMultiplier(combatant: TownWarCombatantState): number {
+    const nearbyWire = this.state.fieldworkUpgrades.filter(
+      (upgrade) => upgrade.kind === "wire" && getDistance(upgrade.position, combatant.position) <= WIRE_SLOW_RADIUS
+    );
+    if (nearbyWire.length <= 0) {
+      return 1;
+    }
+
+    let multiplier = 1;
+    for (const wire of nearbyWire) {
+      if (wire.faction !== combatant.faction) {
+        multiplier = Math.min(multiplier, WIRE_ASSAULT_SPEED_MULTIPLIER);
+        continue;
+      }
+      if (combatant.task.kind === "move" && /retreat|falling back|fallback/i.test(combatant.task.label ?? "")) {
+        multiplier = Math.min(multiplier, WIRE_RETREAT_SPEED_MULTIPLIER);
+      }
+    }
+    return multiplier;
+  }
+
   private findOrder(orderId: string | null | undefined): TownWarBuildOrderState | null {
     if (!orderId) {
       return null;
@@ -1541,6 +2837,334 @@ export class TownWarController {
     if (!order.build.causeChain.includes(cause)) {
       order.build.causeChain.push(cause);
     }
+  }
+
+  private buildTrenchNetworkId(campId: TownWarFactionId, segmentId: string): string {
+    return `${campId}-trench-network-${segmentId}`;
+  }
+
+  private getTrenchSegmentEndpoints(position: Vec2, facingAngleRadians: number): { nodeA: Vec2; nodeB: Vec2 } {
+    const dx = Math.cos(facingAngleRadians);
+    const dy = Math.sin(facingAngleRadians);
+    return {
+      nodeA: {
+        x: position.x - dx * TRENCH_SEGMENT_HALF_LENGTH,
+        y: position.y - dy * TRENCH_SEGMENT_HALF_LENGTH
+      },
+      nodeB: {
+        x: position.x + dx * TRENCH_SEGMENT_HALF_LENGTH,
+        y: position.y + dy * TRENCH_SEGMENT_HALF_LENGTH
+      }
+    };
+  }
+
+  private getTrenchNetworkSegments(faction?: TownWarFactionId): Array<{
+    faction: TownWarFactionId;
+    networkId: string;
+    segmentId: string;
+    nodeA: Vec2;
+    nodeB: Vec2;
+    angle: number;
+    slots: TownWarCoverSlotState[];
+    trenchNetwork: TownWarTrenchNetworkState;
+  }> {
+    const segments = new Map<
+      string,
+      {
+        faction: TownWarFactionId;
+        networkId: string;
+        segmentId: string;
+        nodeA: Vec2;
+        nodeB: Vec2;
+        angle: number;
+        slots: TownWarCoverSlotState[];
+        trenchNetwork: TownWarTrenchNetworkState;
+      }
+    >();
+
+    for (const slot of this.state.aiTactics.coverSlots) {
+      if (slot.sourceKind !== "trench" || !slot.trenchNetwork || slot.faction === null) {
+        continue;
+      }
+      if (faction && slot.faction !== faction) {
+        continue;
+      }
+
+      const key = `${slot.faction}:${slot.trenchNetwork.networkId}:${slot.trenchNetwork.segmentId}`;
+      const existing = segments.get(key);
+      if (existing) {
+        existing.slots.push(slot);
+        continue;
+      }
+
+      segments.set(key, {
+        faction: slot.faction,
+        networkId: slot.trenchNetwork.networkId,
+        segmentId: slot.trenchNetwork.segmentId,
+        nodeA: cloneVec2(slot.trenchNetwork.nodeA),
+        nodeB: cloneVec2(slot.trenchNetwork.nodeB),
+        angle: Math.atan2(slot.trenchNetwork.nodeB.y - slot.trenchNetwork.nodeA.y, slot.trenchNetwork.nodeB.x - slot.trenchNetwork.nodeA.x),
+        slots: [slot],
+        trenchNetwork: cloneTrenchNetwork(slot.trenchNetwork)
+      });
+    }
+
+    return [...segments.values()];
+  }
+
+  private resolveTrenchRetreatHint(
+    campId: TownWarFactionId,
+    position: Vec2,
+    placementKind: TownWarTrenchNetworkPlacementKind,
+    networkId: string
+  ): TownWarTrenchRetreatHint {
+    const campSpawn = this.getCampSpawn(campId).position;
+    if (placementKind === "free") {
+      return getDistance(position, campSpawn) > 620 ? "bad-retreat-path" : "open-line";
+    }
+
+    const existingNetworkSegments = this.getTrenchNetworkSegments(campId).filter((segment) => segment.networkId === networkId);
+    const hasFallbackTowardCamp = existingNetworkSegments.some((segment) => {
+      const center = getSegmentCenter(segment.nodeA, segment.nodeB);
+      return getDistance(center, campSpawn) <= getDistance(position, campSpawn) + 24;
+    });
+    return hasFallbackTowardCamp ? "fallback-path" : "open-line";
+  }
+
+  private getTrenchNetworkReadable(placement: {
+    networkId: string;
+    segmentId: string;
+    placementKind: TownWarTrenchNetworkPlacementKind;
+    connectedSegmentIds: string[];
+    retreatHint: TownWarTrenchRetreatHint;
+  }): string {
+    const retreatRead =
+      placement.retreatHint === "fallback-path"
+        ? "Fallback path"
+        : placement.retreatHint === "bad-retreat-path"
+          ? "Bad retreat path"
+          : "Open line";
+    if (placement.placementKind === "branch") {
+      return `New branch in connected trench network ${placement.networkId}; ${retreatRead}.`;
+    }
+    if (placement.placementKind === "extend") {
+      return `Connected trench network ${placement.networkId} extended by ${placement.segmentId}; ${retreatRead}.`;
+    }
+    return `New trench network ${placement.networkId} started by ${placement.segmentId}; ${retreatRead}.`;
+  }
+
+  private resolveTrenchNetworkPlacement(
+    campId: TownWarFactionId,
+    requestedPosition: Vec2,
+    facingAngleRadians: number,
+    segmentId: string
+  ): { position: Vec2; requestedPosition: Vec2; trenchNetwork: TownWarTrenchNetworkState } {
+    const facingAngle = normalizeAngleRadians(facingAngleRadians);
+    const requested = cloneVec2(requestedPosition);
+    const endpoints = this.getTrenchSegmentEndpoints(requested, facingAngle);
+    const existingSegments = this.getTrenchNetworkSegments(campId);
+
+    const newEndpoints = [
+      { key: "nodeA", point: endpoints.nodeA },
+      { key: "nodeB", point: endpoints.nodeB }
+    ] as const;
+    let endpointSnap:
+      | {
+          distance: number;
+          delta: Vec2;
+          targetSegmentId: string;
+          networkId: string;
+        }
+      | null = null;
+
+    for (const segment of existingSegments) {
+      if (getOrientationDeltaRadians(facingAngle, segment.angle) >= Math.PI / 5) {
+        continue;
+      }
+      const existingEndpoints = [segment.nodeA, segment.nodeB];
+      for (const newEndpoint of newEndpoints) {
+        for (const existingEndpoint of existingEndpoints) {
+          const distance = getDistance(newEndpoint.point, existingEndpoint);
+          if (distance > TRENCH_NETWORK_ENDPOINT_SNAP_DISTANCE) {
+            continue;
+          }
+          if (!endpointSnap || distance < endpointSnap.distance) {
+            endpointSnap = {
+              distance,
+              delta: {
+                x: existingEndpoint.x - newEndpoint.point.x,
+                y: existingEndpoint.y - newEndpoint.point.y
+              },
+              targetSegmentId: segment.segmentId,
+              networkId: segment.networkId
+            };
+          }
+        }
+      }
+    }
+
+    if (endpointSnap) {
+      const position = { x: requested.x + endpointSnap.delta.x, y: requested.y + endpointSnap.delta.y };
+      const snappedEndpoints = this.getTrenchSegmentEndpoints(position, facingAngle);
+      const retreatHint = this.resolveTrenchRetreatHint(campId, position, "extend", endpointSnap.networkId);
+      const trenchNetwork: TownWarTrenchNetworkState = {
+        networkId: endpointSnap.networkId,
+        segmentId,
+        nodeA: snappedEndpoints.nodeA,
+        nodeB: snappedEndpoints.nodeB,
+        connectedSegmentIds: [endpointSnap.targetSegmentId],
+        junctionKind: "extend",
+        placementKind: "extend",
+        retreatHint,
+        snapTargetSegmentId: endpointSnap.targetSegmentId,
+        snapDistance: Number(endpointSnap.distance.toFixed(2)),
+        readable: ""
+      };
+      trenchNetwork.readable = this.getTrenchNetworkReadable(trenchNetwork);
+      return { position, requestedPosition: requested, trenchNetwork };
+    }
+
+    let branchSnap:
+      | {
+          distance: number;
+          delta: Vec2;
+          targetSegmentId: string;
+          networkId: string;
+        }
+      | null = null;
+
+    for (const segment of existingSegments) {
+      if (getOrientationDeltaRadians(facingAngle, segment.angle) < Math.PI / 5) {
+        continue;
+      }
+      for (const newEndpoint of newEndpoints) {
+        const projection = getClosestPointOnSegment(newEndpoint.point, segment.nodeA, segment.nodeB);
+        if (projection.distance > TRENCH_NETWORK_BRANCH_SNAP_DISTANCE || projection.t <= 0.12 || projection.t >= 0.88) {
+          continue;
+        }
+        if (!branchSnap || projection.distance < branchSnap.distance) {
+          branchSnap = {
+            distance: projection.distance,
+            delta: {
+              x: projection.point.x - newEndpoint.point.x,
+              y: projection.point.y - newEndpoint.point.y
+            },
+            targetSegmentId: segment.segmentId,
+            networkId: segment.networkId
+          };
+        }
+      }
+    }
+
+    if (branchSnap) {
+      const position = { x: requested.x + branchSnap.delta.x, y: requested.y + branchSnap.delta.y };
+      const snappedEndpoints = this.getTrenchSegmentEndpoints(position, facingAngle);
+      const retreatHint = this.resolveTrenchRetreatHint(campId, position, "branch", branchSnap.networkId);
+      const trenchNetwork: TownWarTrenchNetworkState = {
+        networkId: branchSnap.networkId,
+        segmentId,
+        nodeA: snappedEndpoints.nodeA,
+        nodeB: snappedEndpoints.nodeB,
+        connectedSegmentIds: [branchSnap.targetSegmentId],
+        junctionKind: "branch",
+        placementKind: "branch",
+        retreatHint,
+        snapTargetSegmentId: branchSnap.targetSegmentId,
+        snapDistance: Number(branchSnap.distance.toFixed(2)),
+        readable: ""
+      };
+      trenchNetwork.readable = this.getTrenchNetworkReadable(trenchNetwork);
+      return { position, requestedPosition: requested, trenchNetwork };
+    }
+
+    const networkId = this.buildTrenchNetworkId(campId, segmentId);
+    const retreatHint = this.resolveTrenchRetreatHint(campId, requested, "free", networkId);
+    const trenchNetwork: TownWarTrenchNetworkState = {
+      networkId,
+      segmentId,
+      nodeA: endpoints.nodeA,
+      nodeB: endpoints.nodeB,
+      connectedSegmentIds: [],
+      junctionKind: "none",
+      placementKind: "free",
+      retreatHint,
+      snapTargetSegmentId: null,
+      snapDistance: null,
+      readable: ""
+    };
+    trenchNetwork.readable = this.getTrenchNetworkReadable(trenchNetwork);
+    return { position: requested, requestedPosition: requested, trenchNetwork };
+  }
+
+  private refreshTrenchNetworkConnections(): void {
+    const segments = this.getTrenchNetworkSegments();
+    const connectionsBySegmentId = new Map<string, Set<string>>();
+
+    for (const segment of segments) {
+      connectionsBySegmentId.set(segment.segmentId, new Set(segment.trenchNetwork.connectedSegmentIds));
+    }
+
+    for (let leftIndex = 0; leftIndex < segments.length; leftIndex += 1) {
+      for (let rightIndex = leftIndex + 1; rightIndex < segments.length; rightIndex += 1) {
+        const left = segments[leftIndex];
+        const right = segments[rightIndex];
+        if (left.faction !== right.faction || left.networkId !== right.networkId) {
+          continue;
+        }
+
+        const endpointDistance = Math.min(
+          getDistance(left.nodeA, right.nodeA),
+          getDistance(left.nodeA, right.nodeB),
+          getDistance(left.nodeB, right.nodeA),
+          getDistance(left.nodeB, right.nodeB)
+        );
+        const branchDistance = Math.min(
+          getClosestPointOnSegment(left.nodeA, right.nodeA, right.nodeB).distance,
+          getClosestPointOnSegment(left.nodeB, right.nodeA, right.nodeB).distance,
+          getClosestPointOnSegment(right.nodeA, left.nodeA, left.nodeB).distance,
+          getClosestPointOnSegment(right.nodeB, left.nodeA, left.nodeB).distance
+        );
+        if (endpointDistance <= TRENCH_NETWORK_CONNECTION_DISTANCE || branchDistance <= TRENCH_NETWORK_BRANCH_SNAP_DISTANCE) {
+          connectionsBySegmentId.get(left.segmentId)?.add(right.segmentId);
+          connectionsBySegmentId.get(right.segmentId)?.add(left.segmentId);
+        }
+      }
+    }
+
+    for (const segment of segments) {
+      const connectedSegmentIds = [...(connectionsBySegmentId.get(segment.segmentId) ?? new Set<string>())]
+        .filter((connectedId) => connectedId !== segment.segmentId)
+        .sort();
+      const junctionKind: TownWarTrenchJunctionKind =
+        connectedSegmentIds.length >= 2
+          ? "junction"
+          : segment.trenchNetwork.placementKind === "branch"
+            ? "branch"
+            : segment.trenchNetwork.placementKind === "extend"
+              ? "extend"
+              : "none";
+      for (const slot of segment.slots) {
+        if (!slot.trenchNetwork) {
+          continue;
+        }
+        slot.trenchNetwork.connectedSegmentIds = connectedSegmentIds;
+        slot.trenchNetwork.junctionKind = junctionKind;
+        slot.trenchNetwork.readable = this.getTrenchNetworkReadable(slot.trenchNetwork);
+      }
+    }
+  }
+
+  private getTrenchNetworkImpactRead(network: TownWarTrenchNetworkState | null | undefined): string {
+    if (!network) {
+      return "occupiable trench firing bay";
+    }
+    if (network.placementKind === "branch") {
+      return "New branch creates a connected trench firing bay";
+    }
+    if (network.connectedSegmentIds.length > 0 || network.placementKind === "extend") {
+      return "Connected trench network adds an occupiable firing bay";
+    }
+    return "New trench network adds an occupiable firing bay";
   }
 
   private getBuildFeedbackStage(order: TownWarBuildOrderState): string {
@@ -1575,6 +3199,7 @@ export class TownWarController {
     facingAngleRadians?: number;
     exposure: number;
     protection: number;
+    trenchNetwork?: TownWarTrenchNetworkState | null;
   }): TownWarCoverSlotState {
     const existing =
       input.sourceId !== null
@@ -1597,6 +3222,7 @@ export class TownWarController {
       exposure: clamp01(input.exposure),
       protection: clamp01(input.protection),
       occupiedBySoldierId: null,
+      trenchNetwork: input.trenchNetwork ? cloneTrenchNetwork(input.trenchNetwork) : null,
       createdAtSeconds: this.state.clock.seconds
     };
     this.state.aiTactics.coverSlots.push(slot);
@@ -1729,10 +3355,22 @@ export class TownWarController {
         dugout.connectedTrenchSlotIds = [];
         continue;
       }
-      dugout.connectedTrenchSlotIds = this.state.aiTactics.coverSlots
-        .filter((slot) => slot.sourceKind === "trench" && slot.faction === dugout.faction)
-        .filter((slot) => getDistance(slot.position, dugout.position) <= dugout.rallyRadius)
-        .map((slot) => slot.id);
+      const trenchSlots = this.state.aiTactics.coverSlots.filter((slot) => slot.sourceKind === "trench" && slot.faction === dugout.faction);
+      const linkedNetworkIds = new Set(
+        trenchSlots
+          .filter((slot) => getDistance(slot.position, dugout.position) <= TRENCH_NETWORK_DUGOUT_LINK_DISTANCE)
+          .map((slot) => slot.trenchNetwork?.networkId ?? null)
+          .filter((networkId): networkId is string => typeof networkId === "string" && networkId.length > 0)
+      );
+      const linkedSlotIds = new Set<string>();
+      for (const slot of trenchSlots) {
+        const localLink = getDistance(slot.position, dugout.position) <= dugout.rallyRadius;
+        const networkLink = slot.trenchNetwork?.networkId ? linkedNetworkIds.has(slot.trenchNetwork.networkId) : false;
+        if (localLink || networkLink) {
+          linkedSlotIds.add(slot.id);
+        }
+      }
+      dugout.connectedTrenchSlotIds = [...linkedSlotIds];
     }
   }
 
@@ -1840,7 +3478,11 @@ export class TownWarController {
     if (order.kind === "trench") {
       const dx = Math.cos(order.facingAngleRadians);
       const dy = Math.sin(order.facingAngleRadians);
-      const slotOffsets = [-42, 0, 42];
+      const trenchNetwork =
+        order.trenchNetwork ??
+        this.resolveTrenchNetworkPlacement(order.faction, order.position, order.facingAngleRadians, order.id).trenchNetwork;
+      order.trenchNetwork = cloneTrenchNetwork(trenchNetwork);
+      const slotOffsets = [-TRENCH_SEGMENT_HALF_LENGTH, 0, TRENCH_SEGMENT_HALF_LENGTH];
       const slots = slotOffsets.map((offset, index) =>
         this.addCoverSlot({
           faction: order.faction,
@@ -1855,16 +3497,21 @@ export class TownWarController {
           facing: this.getOpposingCampId(order.faction),
           facingAngleRadians: order.facingAngleRadians,
           exposure: 0.2,
-          protection: 0.54
+          protection: 0.54,
+          trenchNetwork
         })
       );
+      this.refreshTrenchNetworkConnections();
+      if (slots[0]?.trenchNetwork) {
+        order.trenchNetwork = cloneTrenchNetwork(slots[0].trenchNetwork);
+      }
       for (const slot of slots) {
         this.state.aiTactics.completedConstructionImpact.push({
           orderId: order.id,
           coverSlotId: slot.id,
           kind: order.kind,
           faction: order.faction,
-          label: `${slot.label} gives an occupiable trench firing bay`,
+          label: `${slot.label} ${this.getTrenchNetworkImpactRead(slot.trenchNetwork)}`,
           protection: slot.protection,
           createdAtSeconds: this.state.clock.seconds
         });
@@ -1984,17 +3631,13 @@ export class TownWarController {
   }
 
   private assignSoldierToTrench(soldier: TownWarSoldierState, slot: TownWarCoverSlotState, reason = "completed trench"): void {
+    const resumeTask = this.getTrenchResumeCombatTask(soldier, slot);
     soldier.task = {
       kind: "move",
       label: `Occupy trench: ${slot.label}`,
       targetPosition: cloneVec2(slot.position),
       targetEntityId: slot.id,
-      resumeTask: {
-        kind: soldier.role === "suppressor" ? "suppress" : "defend",
-        label: `Hold from ${slot.label}`,
-        targetPosition: null,
-        targetEntityId: slot.id
-      }
+      resumeTask
     };
     soldier.coverIntent = {
       coverSlotId: slot.id,
@@ -2253,6 +3896,12 @@ export class TownWarController {
             : null;
       order.build.buildRate = Number(buildRate.toFixed(2));
       order.build.progress = Number(Math.min(order.build.requiredProgress, order.build.progress + buildRate * deltaSeconds).toFixed(2));
+      const builderFatigueGain = (0.004 + order.build.exposure * 0.004 + (stalled ? 0.003 : 0)) * deltaSeconds;
+      builder.needs.fatigue = clampNeed(builder.needs.fatigue + builderFatigueGain);
+      if (builder.needs.fatigue >= 0.7) {
+        builder.currentNeed = deriveCurrentNeed(builder.needs, builder.health.current, builder.health.max, builder.ammo.reserve);
+        builder.identitySummary = buildIdentitySummary(builder.skills, builder.traits, builder.currentNeed, builder.dramaArc.trustInOfficer);
+      }
       for (const milestone of [25, 50, 75] as const) {
         const milestoneProgress = order.build.requiredProgress * (milestone / 100);
         const milestoneCause = `feedback-progress-${milestone}`;
@@ -2480,14 +4129,24 @@ export class TownWarController {
       kind === "line-collapsed" ||
       kind === "camp-damaged" ||
       kind === "camp-destroyed" ||
+      kind === "camp-weakpoint-destroyed" ||
       kind === "wounded-lost" ||
       kind === "bad-order-cost"
     ) {
       return "critical";
     }
 
-    if (kind === "camp-under-fire" || kind === "ammo-crate-low" || kind === "medic-rescue-stalled" || riskTier === "high") {
+    if (kind === "camp-under-fire" || kind === "ammo-crate-low" || kind === "medic-rescue-stalled" || kind === "camp-breach-detonated" || kind === "camp-weakpoint-damaged" || riskTier === "high") {
       return "high";
+    }
+    if (kind === "camp-breach-ordered" || kind === "camp-breach-planted" || kind === "camp-breach-retreating" || kind === "camp-breach-failed") {
+      return "medium";
+    }
+    if (kind === "expedition-pinned" || kind === "expedition-wounded" || kind === "expedition-retreating") {
+      return "high";
+    }
+    if (kind === "expedition-spotted" || kind === "expedition-separated" || kind === "expedition-low-ammo") {
+      return "medium";
     }
 
     return riskTier === "medium" ? "medium" : "low";
@@ -2793,6 +4452,15 @@ export class TownWarController {
     if (event.kind === "camp-damaged" || event.kind === "camp-destroyed") {
       return { cause: "camp-hit", responsibility: "enemy-pressure", tag: "camp-hit", emotionalWeight: event.kind === "camp-destroyed" ? 0.95 : 0.7 };
     }
+    if (event.kind.startsWith("camp-breach-") || event.kind.startsWith("camp-weakpoint-") || event.kind === "demolition-prepared") {
+      if (event.kind === "camp-breach-failed") {
+        return { cause: "camp-breach", responsibility: "enemy-pressure", tag: "breach-failed", emotionalWeight: 0.68 };
+      }
+      if (event.kind === "camp-weakpoint-damaged" || event.kind === "camp-weakpoint-destroyed" || event.kind === "camp-breach-detonated") {
+        return { cause: "camp-breach", responsibility: "officer-helped", tag: "camp-breach", emotionalWeight: event.kind === "camp-weakpoint-destroyed" ? 0.82 : 0.62 };
+      }
+      return { cause: "camp-breach", responsibility: "officer-helped", tag: "breach-setup", emotionalWeight: 0.42 };
+    }
     if (event.kind === "line-collapsed") {
       return { cause: "trench-failed", responsibility: "enemy-pressure", tag: "trench-failed", emotionalWeight: 0.84 };
     }
@@ -2815,6 +4483,18 @@ export class TownWarController {
         tag: supplyFailure ? "supply-failure" : "officer-cost",
         emotionalWeight: 0.82
       };
+    }
+    if (event.kind.startsWith("expedition-")) {
+      if (event.kind === "expedition-low-ammo") {
+        return { cause: "ammo-shortage", responsibility: "supply-failure", tag: "expedition-low-ammo", emotionalWeight: 0.54 };
+      }
+      if (event.kind === "expedition-reached-line") {
+        return { cause: "order-saved-line", responsibility: "officer-helped", tag: "expedition-reached-line", emotionalWeight: 0.64 };
+      }
+      if (event.kind === "expedition-wounded" || event.kind === "expedition-retreating") {
+        return { cause: "expedition-risk", responsibility: "enemy-pressure", tag: event.kind, emotionalWeight: 0.7 };
+      }
+      return { cause: "expedition-risk", responsibility: "terrain-failure", tag: event.kind, emotionalWeight: 0.52 };
     }
     return null;
   }
@@ -2967,11 +4647,29 @@ export class TownWarController {
     if (event.kind === "camp-damaged" || event.kind === "camp-destroyed") {
       return { kind: "camp", tags: [event.kind === "camp-destroyed" ? "last-stand" : "camp-shelled"], emotionalWeight: event.kind === "camp-destroyed" ? 0.95 : 0.72 };
     }
+    if (event.kind.startsWith("camp-breach-") || event.kind.startsWith("camp-weakpoint-") || event.kind === "demolition-prepared") {
+      return { kind: "breach", tags: uniqueLimited(["camp-breach", "weak-point", ...event.tags], 12), emotionalWeight: event.kind === "camp-weakpoint-destroyed" ? 0.84 : 0.64 };
+    }
     if (event.kind === "bad-order-cost") {
       if (event.tags.some((tag) => tag === "ammo" || tag === "looted" || tag === "destroyed")) {
         return { kind: "ammo", tags: ["ammo-ran-dry"], emotionalWeight: 0.74 };
       }
       return { kind: "body", tags: ["body-left-here"], emotionalWeight: 0.82 };
+    }
+    if (event.kind === "expedition-spotted" || event.kind === "expedition-pinned") {
+      return { kind: "road", tags: uniqueLimited(["road-crossing-hot", ...event.tags], 12), emotionalWeight: event.kind === "expedition-pinned" ? 0.72 : 0.5 };
+    }
+    if (event.kind === "expedition-separated") {
+      return { kind: "road", tags: uniqueLimited(["tree-line-split", ...event.tags], 12), emotionalWeight: 0.58 };
+    }
+    if (event.kind === "expedition-wounded") {
+      return { kind: "body", tags: uniqueLimited(["route-wounded-here", ...event.tags], 12), emotionalWeight: 0.74 };
+    }
+    if (event.kind === "expedition-retreating") {
+      return { kind: "line", tags: uniqueLimited(["fallback-route-marked", ...event.tags], 12), emotionalWeight: 0.62 };
+    }
+    if (event.kind === "expedition-reached-line") {
+      return { kind: "line", tags: uniqueLimited(["school-ruins-contested", ...event.tags], 12), emotionalWeight: 0.66 };
     }
     return null;
   }
@@ -3050,6 +4748,39 @@ export class TownWarController {
     }
     if (input.kind === "build-order-issued") {
       return "setup";
+    }
+    if (input.kind === "expedition-ordered") {
+      return "setup";
+    }
+    if (input.kind === "expedition-spotted" || input.kind === "expedition-low-ammo") {
+      return "rising-pressure";
+    }
+    if (input.kind === "expedition-pinned" || input.kind === "expedition-separated") {
+      return "complication";
+    }
+    if (input.kind === "expedition-wounded") {
+      return "cost";
+    }
+    if (input.kind === "expedition-retreating") {
+      return "reversal";
+    }
+    if (input.kind === "expedition-reached-line") {
+      return "payoff";
+    }
+    if (input.kind === "demolition-prepared" || input.kind === "camp-breach-ordered") {
+      return "setup";
+    }
+    if (input.kind === "camp-breach-planted") {
+      return "rising-pressure";
+    }
+    if (input.kind === "camp-breach-failed") {
+      return "reversal";
+    }
+    if (input.kind === "camp-breach-retreating") {
+      return "aftermath";
+    }
+    if (input.kind === "camp-breach-detonated" || input.kind === "camp-weakpoint-damaged" || input.kind === "camp-weakpoint-destroyed") {
+      return "payoff";
     }
     if (input.kind === "builder-moving" || input.kind === "construction-started") {
       return input.riskTier === "high" ? "rising-pressure" : "setup";
@@ -3241,18 +4972,14 @@ export class TownWarController {
 
   private tickAmmoConsumption(deltaSeconds: number): void {
     for (const combatant of this.state.combatants) {
-      if (combatant.task.targetPosition) {
-        continue;
-      }
-      const roundsPerSecond =
-        combatant.task.kind === "suppress"
-          ? SUPPRESS_FIRE_ROUNDS_PER_SECOND
-          : combatant.task.kind === "attack"
-            ? ATTACK_FIRE_ROUNDS_PER_SECOND
-            : combatant.task.kind === "defend"
-              ? DEFEND_FIRE_ROUNDS_PER_SECOND
-              : 0;
-      const shots = Math.max(0, Math.round(deltaSeconds * roundsPerSecond));
+      const fireProfile = this.getCombatFireProfile(combatant);
+      const roundsPerSecond = fireProfile?.roundsPerSecond ?? 0;
+      const expectedShots = Math.max(0, deltaSeconds * roundsPerSecond);
+      const guaranteedShots = Math.floor(expectedShots);
+      const fractionalShotChance = expectedShots - guaranteedShots;
+      const fractionalSeed = Math.floor(this.state.clock.seconds * 10) * 181 + getTrailingIdNumber(combatant.id) * 67;
+      const shots =
+        guaranteedShots + (fractionalShotChance > 0 && getDeterministicUnit(fractionalSeed) < fractionalShotChance ? 1 : 0);
       if (shots <= 0) {
         continue;
       }
@@ -3579,6 +5306,20 @@ export class TownWarController {
               ? 24
               : 44
           : 0;
+      const networkFit =
+        slot.sourceKind === "trench" && slot.trenchNetwork
+          ? slot.trenchNetwork.retreatHint === "fallback-path"
+            ? 18 + Math.min(16, slot.trenchNetwork.connectedSegmentIds.length * 8)
+            : slot.trenchNetwork.retreatHint === "bad-retreat-path"
+              ? -16
+              : Math.min(10, slot.trenchNetwork.connectedSegmentIds.length * 5)
+          : 0;
+      const comboFit =
+        slot.sourceKind === "trench"
+          ? (this.hasFieldworkUpgradeForSlot(slot, "sandbags") && directionRead.label === "front-protected" ? 18 : 0) +
+            (this.getAmmoSupportForTrenchSlot(slot) ? 12 : 0) +
+            (this.getDugoutForCoverSlot(slot.id) ? 10 : 0)
+          : 0;
       return (
         directionRead.protection * 100 -
         slot.exposure * 35 -
@@ -3587,7 +5328,9 @@ export class TownWarController {
         trenchTaskFit +
         trenchCombatFit +
         directionalFit +
-        dugoutRallyFit
+        dugoutRallyFit +
+        networkFit +
+        comboFit
       );
     };
 
@@ -3631,10 +5374,12 @@ export class TownWarController {
 
     const fit = this.getTrenchBroadsideFit(slot, sourcePosition);
     const multiplier = clamp(0.22 + fit * 0.94, 0.18, 1.08);
+    const label = fit >= 0.72 ? "front-protected" : fit >= 0.38 ? "angled" : "enfiladed";
+    const sandbagBonus = label === "front-protected" && this.hasFieldworkUpgradeForSlot(slot, "sandbags") ? SANDBAG_FRONT_PROTECTION_BONUS : 0;
     return {
-      protection: clamp01(slot.protection * multiplier),
+      protection: clamp01(slot.protection * multiplier + sandbagBonus),
       fit,
-      label: fit >= 0.72 ? "front-protected" : fit >= 0.38 ? "angled" : "enfiladed"
+      label
     };
   }
 
@@ -3672,9 +5417,10 @@ export class TownWarController {
         : directionRead.label === "angled"
           ? TRENCH_FIRE_RANGE_ANGLED_MULTIPLIER
           : TRENCH_FIRE_RANGE_ENFILADED_MULTIPLIER;
+    const upgradeMultiplier = directionRead.label === "front-protected" && this.hasFieldworkUpgradeForSlot(slot, "sandbags") ? 1 + SANDBAG_FRONT_FIRE_RANGE_BONUS : 1;
     return {
-      range: baseRange * multiplier,
-      multiplier,
+      range: baseRange * multiplier * upgradeMultiplier,
+      multiplier: multiplier * upgradeMultiplier,
       label: directionRead.label,
       slot
     };
@@ -3690,7 +5436,73 @@ export class TownWarController {
     if (combatant.task.kind === "defend") {
       return DEFEND_FIRE_RANGE;
     }
+    if (
+      combatant.ammo.inMag + combatant.ammo.reserve > 0
+    ) {
+      return DEFEND_FIRE_RANGE;
+    }
     return null;
+  }
+
+  private getCombatFireProfile(combatant: TownWarCombatantState): {
+    kind: "suppress" | "attack" | "defend";
+    damagePerSecond: number;
+    pressurePerSecond: number;
+    hitChance: number;
+    roundsPerSecond: number;
+  } | null {
+    if (combatant.task.kind === "suppress") {
+      return {
+        kind: "suppress",
+        damagePerSecond: SUPPRESS_DAMAGE_PER_SECOND,
+        pressurePerSecond: SUPPRESS_PRESSURE_PER_SECOND,
+        hitChance: 0.42,
+        roundsPerSecond: SUPPRESS_FIRE_ROUNDS_PER_SECOND
+      };
+    }
+    if (combatant.task.kind === "attack") {
+      return {
+        kind: "attack",
+        damagePerSecond: ATTACK_DAMAGE_PER_SECOND,
+        pressurePerSecond: ATTACK_PRESSURE_PER_SECOND,
+        hitChance: 0.55,
+        roundsPerSecond: ATTACK_FIRE_ROUNDS_PER_SECOND
+      };
+    }
+    if (combatant.task.kind === "defend") {
+      return {
+        kind: "defend",
+        damagePerSecond: DEFEND_DAMAGE_PER_SECOND,
+        pressurePerSecond: DEFEND_PRESSURE_PER_SECOND,
+        hitChance: 0.5,
+        roundsPerSecond: DEFEND_FIRE_ROUNDS_PER_SECOND
+      };
+    }
+    if (
+      combatant.ammo.inMag + combatant.ammo.reserve > 0
+    ) {
+      return {
+        kind: "defend",
+        damagePerSecond: DEFEND_DAMAGE_PER_SECOND,
+        pressurePerSecond: DEFEND_PRESSURE_PER_SECOND,
+        hitChance: 0.5,
+        roundsPerSecond: DEFEND_FIRE_ROUNDS_PER_SECOND
+      };
+    }
+    return null;
+  }
+
+  private shouldHoldOccupiedTrenchAgainstTravelOrder(combatant: TownWarCombatantState): boolean {
+    if (!combatant.task.targetPosition || !this.getOccupiedTrenchSlot(combatant) || combatant.ammo.inMag + combatant.ammo.reserve <= 0) {
+      return false;
+    }
+
+    return (
+      combatant.task.kind !== "move" &&
+      combatant.task.kind !== "build" &&
+      combatant.task.kind !== "resupply" &&
+      combatant.task.kind !== "heal"
+    );
   }
 
   private getTrenchGrenadeRead(
@@ -3757,6 +5569,8 @@ export class TownWarController {
     }
 
     for (const soldier of this.state.soldiers) {
+      const previousCoverSlotId = soldier.coverIntent.coverSlotId;
+      const previousCoverState = soldier.coverIntent.state;
       const slot = this.findCoverSlot(soldier.coverIntent.coverSlotId);
       if (!slot) {
         continue;
@@ -3771,6 +5585,24 @@ export class TownWarController {
           state: "occupying",
           reason: `holding ${slot.label}`
         };
+        if (
+          slot.sourceKind === "trench" &&
+          (previousCoverSlotId !== slot.id || previousCoverState !== "occupying") &&
+          !this.hasRecentFrontlineStory(soldier.id, "occupy", 32)
+        ) {
+          this.pushFrontlineStory({
+            kind: "occupy",
+            faction: soldier.faction,
+            soldier,
+            work: soldier.taskDecision.selectedWork ?? "Defend",
+            orderId: slot.sourceId,
+            relatedId: slot.id,
+            position: slot.position,
+            summary: `${soldier.displayName} got into ${slot.label} and turned the marker into a real firing position.`,
+            consequence: `${slot.label} now has a named soldier in the lip, so trench bonuses and fallback pressure belong to an actual body.`,
+            memoryTag: `occupied-${slot.id}`
+          });
+        }
       }
     }
   }
@@ -3830,6 +5662,30 @@ export class TownWarController {
             reason: "suppressor covering exposed builder"
           });
         }
+        continue;
+      }
+
+      if (
+        inCover &&
+        occupiedCover?.sourceKind === "trench" &&
+        soldier.task.kind !== "move" &&
+        soldier.task.kind !== "build" &&
+        soldier.task.kind !== "resupply" &&
+        soldier.task.kind !== "heal"
+      ) {
+        soldier.tacticalIntent = {
+          state: "hold-cover",
+          reason: `trench reducing pressure at ${ownedCover.label}`,
+          coverSlotId: ownedCover.id,
+          partnerId: suppressor?.id ?? null,
+          pressureRatio: Number(pressureRatio.toFixed(3)),
+          lastUpdatedAtSeconds: this.state.clock.seconds
+        };
+        soldier.coverIntent = {
+          coverSlotId: ownedCover.id,
+          state: "occupying",
+          reason: `holding trench: ${ownedCover.label}`
+        };
         continue;
       }
 
@@ -3901,12 +5757,7 @@ export class TownWarController {
 
       if (coverSlot && shouldProactivelyOccupyTrench) {
         const connectedDugout = this.getDugoutForCoverSlot(coverSlot.id);
-        const resumeTask: TownWarTask = {
-          kind: soldier.task.kind === "suppress" ? "suppress" : "defend",
-          label: `Hold from ${coverSlot.label}`,
-          targetPosition: null,
-          targetEntityId: coverSlot.id
-        };
+        const resumeTask = this.getTrenchResumeCombatTask(soldier, coverSlot);
         soldier.task = {
           kind: "move",
           label: `Occupy trench: ${coverSlot.label}`,
@@ -4103,30 +5954,11 @@ export class TownWarController {
       if (deadIds.has(combatant.id)) {
         continue;
       }
-      if (combatant.task.targetPosition) {
-        continue;
-      }
 
       const baseFireRange = this.getBaseFireRangeForCombatant(combatant);
-      let damagePerSecond = 0;
-      let pressurePerSecond = 0;
-      let hitChance = 0;
+      const fireProfile = this.getCombatFireProfile(combatant);
 
-      if (combatant.task.kind === "suppress") {
-        damagePerSecond = SUPPRESS_DAMAGE_PER_SECOND;
-        pressurePerSecond = SUPPRESS_PRESSURE_PER_SECOND;
-        hitChance = 0.42;
-      } else if (combatant.task.kind === "attack") {
-        damagePerSecond = ATTACK_DAMAGE_PER_SECOND;
-        pressurePerSecond = ATTACK_PRESSURE_PER_SECOND;
-        hitChance = 0.55;
-      } else if (combatant.task.kind === "defend") {
-        damagePerSecond = DEFEND_DAMAGE_PER_SECOND;
-        pressurePerSecond = DEFEND_PRESSURE_PER_SECOND;
-        hitChance = 0.5;
-      }
-
-      if (baseFireRange === null) {
+      if (baseFireRange === null || fireProfile === null) {
         continue;
       }
 
@@ -4182,7 +6014,7 @@ export class TownWarController {
           ? coverProtection * 0.28
           : coverProtection * 0.18;
       const extendedRangeAccuracyPenalty = extendedRangeShot ? clamp((target.distance - baseFireRange) / Math.max(1, attackerRangeRead.range - baseFireRange), 0, 1) * 0.1 : 0;
-      const missed = roll > Math.max(0.08, hitChance + trenchFireBonus - tacticalAccuracyPenalty - extendedRangeAccuracyPenalty);
+      const missed = roll > Math.max(0.08, fireProfile.hitChance + trenchFireBonus - tacticalAccuracyPenalty - extendedRangeAccuracyPenalty);
 
       const scaledRoll = 0.7 + roll * 0.6;
       const coverDamageScale = targetInCover ? (targetInTrench ? Math.max(0.18, 1 - coverProtection) : 1 - coverProtection) : 1;
@@ -4198,9 +6030,9 @@ export class TownWarController {
           ? 1 - coverProtection * 0.72
           : 1;
       const extendedRangePowerScale = extendedRangeShot ? 0.82 : 1;
-      const damage = missed ? 0 : damagePerSecond * deltaSeconds * scaledRoll * coverDamageScale * extendedRangePowerScale;
+      const damage = missed ? 0 : fireProfile.damagePerSecond * deltaSeconds * scaledRoll * coverDamageScale * extendedRangePowerScale;
       const pressure =
-        pressurePerSecond *
+        fireProfile.pressurePerSecond *
         deltaSeconds *
         (missed ? 0.25 : 0.85 + roll * 0.4) *
         coverPressureScale *
@@ -4231,6 +6063,25 @@ export class TownWarController {
         continue;
       }
 
+      if (
+        attackerRangeRead.slot &&
+        combatant.kind === "soldier" &&
+        !this.hasRecentFrontlineStory(combatant.id, "fire", 26)
+      ) {
+        this.pushFrontlineStory({
+          kind: "fire",
+          faction: combatant.faction,
+          soldier: combatant,
+          work: combatant.taskDecision.selectedWork ?? (combatant.task.kind === "suppress" ? "Suppress" : "Defend"),
+          orderId: attackerRangeRead.slot.sourceId,
+          relatedId: target.enemy.id,
+          position: attackerRangeRead.slot.position,
+          summary: `${combatant.displayName} fired from ${attackerRangeRead.slot.label} at ${Math.round(target.distance)}m.`,
+          consequence: `${attackerRangeRead.slot.label} extended the shot lane; ${target.enemy.displayName} took ${Math.round(damage + grenadeRead.damage)} damage and ${Math.round(pressure + grenadeRead.pressure)} pressure.`,
+          memoryTag: `trench-fire-${attackerRangeRead.slot.id}`
+        });
+      }
+
       if (target.enemy.health.current <= 0) {
         deadIds.add(target.enemy.id);
         continue;
@@ -4245,7 +6096,30 @@ export class TownWarController {
         continue;
       }
 
-      const fallbackDugout = this.getNearestActiveDugout(target.enemy.faction, target.enemy.position, DUGOUT_SHELTER_RADIUS);
+      const targetOccupiedTrench = this.getOccupiedTrenchSlot(target.enemy);
+      if (
+        targetOccupiedTrench &&
+        target.enemy.task.kind !== "move"
+      ) {
+        target.enemy.tacticalIntent = {
+          state: "hold-cover",
+          reason: `suppressed but braced in ${targetOccupiedTrench.label}`,
+          coverSlotId: targetOccupiedTrench.id,
+          partnerId: null,
+          pressureRatio: Number(suppressed.toFixed(3)),
+          lastUpdatedAtSeconds: this.state.clock.seconds
+        };
+        target.enemy.coverIntent = {
+          coverSlotId: targetOccupiedTrench.id,
+          state: "occupying",
+          reason: `holding trench under suppression: ${targetOccupiedTrench.label}`
+        };
+        continue;
+      }
+
+      const fallbackDugout =
+        (targetOccupiedTrench ? this.getDugoutForCoverSlot(targetOccupiedTrench.id) : null) ??
+        this.getNearestActiveDugout(target.enemy.faction, target.enemy.position, DUGOUT_SHELTER_RADIUS);
 
       if (target.enemy.kind === "soldier") {
         this.pushChatter({
@@ -4280,6 +6154,22 @@ export class TownWarController {
         reason: fallbackDugout ? "pinned by frontline pressure, dugout shelter available" : "pinned by frontline pressure",
         lastUpdatedAtSeconds: this.state.clock.seconds
       };
+      if (target.enemy.kind === "soldier" && !this.hasRecentFrontlineStory(target.enemy.id, "fallback", 24)) {
+        this.pushFrontlineStory({
+          kind: "fallback",
+          faction: target.enemy.faction,
+          soldier: target.enemy,
+          work: "Rest",
+          orderId: null,
+          relatedId: fallbackDugout?.id ?? target.enemy.faction,
+          position: fallbackPosition,
+          summary: `${target.enemy.displayName} broke contact and fell back to ${fallbackDugout ? fallbackDugout.id : "camp"}.`,
+          consequence: fallbackDugout
+            ? `${fallbackDugout.id} caught the retreat, keeping the soldier recoverable instead of losing the trench line outright.`
+            : "No dugout caught the retreat, so the line gave ground all the way back to camp.",
+          memoryTag: fallbackDugout ? `fallback-${fallbackDugout.id}` : `fallback-${target.enemy.faction}`
+        });
+      }
     }
 
     this.applyCasualties(deadIds);
@@ -4300,11 +6190,12 @@ export class TownWarController {
           combatant.health.current > 0 &&
           getDistance(combatant.position, dugout.position) <= DUGOUT_CONTEST_DISTANCE
       );
+      const connectedTrenchSlotIds = new Set(dugout.connectedTrenchSlotIds);
       const sheltering = this.state.soldiers.filter(
         (soldier) =>
           soldier.faction === dugout.faction &&
           soldier.health.current > 0 &&
-          getDistance(soldier.position, dugout.position) <= dugout.shelterRadius &&
+          (getDistance(soldier.position, dugout.position) <= dugout.shelterRadius || connectedTrenchSlotIds.has(soldier.coverIntent.coverSlotId ?? "")) &&
           (soldier.health.current <= soldier.health.max * 0.62 || soldier.morale.pressure / Math.max(1, soldier.morale.maxPressure) >= 0.58)
       );
 
@@ -4348,10 +6239,6 @@ export class TownWarController {
     const perTick = Math.max(1, Math.floor(deltaSeconds * AMMO_CRATE_RESUPPLY_PER_SECOND));
 
     for (const soldier of this.state.soldiers) {
-      if (soldier.role === "builder") {
-        continue;
-      }
-
       const desiredReserve = soldier.ammo.maxMag * 3;
       const missingMag = Math.max(0, soldier.ammo.maxMag - soldier.ammo.inMag);
       const missingReserve = Math.max(0, desiredReserve - soldier.ammo.reserve);
@@ -4360,25 +6247,30 @@ export class TownWarController {
         continue;
       }
 
-      const nearest = this.state.ammoCrates
-        .filter((crate) => crate.destroyedAtSeconds === null && crate.faction === soldier.faction && crate.ammo > 0)
-        .reduce<{ crate: TownWarAmmoCrateState; distance: number } | null>((best, crate) => {
-          const distance = getDistance(crate.position, soldier.position);
-          if (distance > AMMO_CRATE_RESUPPLY_DISTANCE) {
-            return best;
-          }
-          if (!best || distance < best.distance) {
-            return { crate, distance };
-          }
-          return best;
-        }, null);
+      const occupiedTrench = this.getOccupiedTrenchSlot(soldier);
+      const nearest =
+        occupiedTrench !== null
+          ? this.getAmmoSupportForTrenchSlot(occupiedTrench)
+          : this.state.ammoCrates
+              .filter((crate) => crate.destroyedAtSeconds === null && crate.faction === soldier.faction && crate.ammo > 0)
+              .reduce<{ crate: TownWarAmmoCrateState; distance: number; mode: "local" } | null>((best, crate) => {
+                const distance = getDistance(crate.position, soldier.position);
+                if (distance > AMMO_CRATE_RESUPPLY_DISTANCE) {
+                  return best;
+                }
+                if (!best || distance < best.distance) {
+                  return { crate, distance, mode: "local" };
+                }
+                return best;
+              }, null);
 
       if (!nearest) {
         continue;
       }
 
       const previousAmmo = nearest.crate.ammo;
-      const transfer = Math.min(nearest.crate.ammo, perTick, missing);
+      const transferPerTick = nearest.mode === "network" ? Math.max(1, Math.floor(perTick * 0.75)) : perTick;
+      const transfer = Math.min(nearest.crate.ammo, transferPerTick, missing);
       if (transfer <= 0) {
         continue;
       }
@@ -4396,7 +6288,10 @@ export class TownWarController {
           orderId: nearest.crate.builtFromOrderId,
           relatedId: nearest.crate.id,
           position: nearest.crate.position,
-          summary: `${soldier.displayName} pulled ${Math.round(transfer)} rounds from ${nearest.crate.id} and kept the line fed.`,
+          summary:
+            nearest.mode === "network"
+              ? `${soldier.displayName} pulled ${Math.round(transfer)} rounds through the trench network from ${nearest.crate.id}.`
+              : `${soldier.displayName} pulled ${Math.round(transfer)} rounds from ${nearest.crate.id} and kept the line fed.`,
           consequence: `${soldier.displayName} resumed with ${soldier.ammo.inMag + soldier.ammo.reserve} rounds while the crate fell to ${Math.round(nearest.crate.ammo)}.`,
           memoryTag: `ammo-run-${nearest.crate.id}`
         });
@@ -4452,6 +6347,11 @@ export class TownWarController {
             : Math.max(1, Math.floor(soldier.ammo.maxMag * 2));
 
       if (totalAmmo >= desiredTotal) {
+        continue;
+      }
+
+      const occupiedTrench = this.getOccupiedTrenchSlot(soldier);
+      if (occupiedTrench && this.getAmmoSupportForTrenchSlot(occupiedTrench)) {
         continue;
       }
 
@@ -4718,6 +6618,133 @@ export class TownWarController {
     return uniqueLimited(recommendations, 5);
   }
 
+  private buildOperationSupplyRecovery(camp: TownWarCampState): { bankedSupply: TownWarCampSupplyState; lostSupply: TownWarCampSupplyState } {
+    const committed = this.state.operation.stockpile.lastCommitted;
+    const recoverable = clampSupplyToAvailable(camp.supply, committed);
+    const recoveryRate = camp.destroyed ? 0.2 : camp.health.current < camp.health.max * 0.5 ? 0.6 : 0.85;
+    const bankedSupply: TownWarCampSupplyState = {
+      ammo: Math.floor(recoverable.ammo * recoveryRate),
+      build: Math.floor(recoverable.build * recoveryRate),
+      food: Math.floor(recoverable.food * recoveryRate),
+      med: Math.floor(recoverable.med * recoveryRate)
+    };
+    return {
+      bankedSupply,
+      lostSupply: subtractSupply(committed, bankedSupply)
+    };
+  }
+
+  private buildOperationSoldierLines(records: TownWarPersistentSoldierRecordState[]): string[] {
+    const statusRank: Record<TownWarPersistentSoldierStatus, number> = {
+      lost: 0,
+      wounded: 1,
+      recovering: 2,
+      ready: 3
+    };
+    const notable = records
+      .slice()
+      .sort((left, right) => {
+        const statusDelta = statusRank[left.status] - statusRank[right.status];
+        if (statusDelta !== 0) {
+          return statusDelta;
+        }
+        return right.fatigue + (1 - right.morale) - (left.fatigue + (1 - left.morale));
+      })
+      .slice(0, 6);
+    return notable.map(
+      (record) =>
+        `${record.displayName} (${record.role}) carried ${record.status}; fatigue ${Math.round(record.fatigue * 100)}%, morale ${Math.round(record.morale * 100)}%, operations ${record.operations}.`
+    );
+  }
+
+  private buildOperationDebriefAnalysis(records: TownWarPersistentSoldierRecordState[]): {
+    soldierLines: string[];
+    buildingComboLines: string[];
+    workLines: string[];
+    routeLines: string[];
+    campDamageLines: string[];
+    recommendations: string[];
+  } {
+    const recommendations: string[] = [];
+    const combo = this.getBuildingComboReport();
+    const playerNetworks = combo.networks.filter((network) => network.faction === TOWN_WAR_PLAYER_FACTION);
+    const readabilityOverlay = this.getReadabilityOverlay();
+    const readabilityLines = readabilityOverlay.icons
+      .filter((icon) => icon.visibility === "normal" && (icon.targetType === "trench" || icon.targetType === "ammo-crate" || icon.targetType === "dugout"))
+      .slice(0, 3)
+      .map((icon) => `Readability ${icon.label}: ${icon.shortReason}.`);
+    const buildingComboLines =
+      playerNetworks.length > 0
+        ? [
+            ...readabilityLines,
+            ...playerNetworks.slice(0, 4).map((network) => {
+              const support = [
+                network.ammo.linked ? "ammo linked" : "ammo missing",
+                network.dugout.linked ? "dugout linked" : "dugout missing",
+                network.sandbags.count > 0 ? `${network.sandbags.count} sandbags` : "no sandbags",
+                network.wire.count > 0 ? `${network.wire.count} wire` : "no wire"
+              ].join(", ");
+              return `Trench ${network.networkId}: ${network.segmentCount} segments, ${network.occupiedCount}/${network.slotCount} occupied, ${support}${network.warnings.length > 0 ? `; warnings ${network.warnings.join(", ")}` : ""}.`;
+            })
+          ]
+        : ["No connected Russian trench network survived the operation."];
+    if (!playerNetworks.some((network) => network.ammo.linked)) {
+      recommendations.push("Stock the connected trench network with a closer ammo box before the next push.");
+    }
+    if (!playerNetworks.some((network) => network.dugout.linked)) {
+      recommendations.push("Link a dugout to the trench network so wounded and tired soldiers have somewhere to fall back.");
+    }
+    if (!playerNetworks.some((network) => network.wire.count > 0)) {
+      recommendations.push("Add wire to the likely Ukrainian approach, but leave one retreat mouth clear.");
+    }
+
+    const workReport = this.getWorkQueueReport(TOWN_WAR_PLAYER_FACTION);
+    const workLines =
+      workReport.debriefLines.length > 0
+        ? workReport.debriefLines.slice(0, 6)
+        : ["No named colony work was active at debrief; set Build, Resupply, Medic, and Suppress priorities before stepping off."];
+    recommendations.push(...workReport.warnings.map((warning) => `Resolve work warning before next operation: ${warning}.`));
+
+    const expeditionReport = this.getExpeditionReport();
+    const latestExpedition = expeditionReport.latestExpedition;
+    const routeLines = latestExpedition
+      ? uniqueLimited(
+          [
+            `${latestExpedition.label}: ${latestExpedition.status}, progress ${Math.round(latestExpedition.progress * 100)}%, danger ${Math.round(latestExpedition.danger * 100)}%.`,
+            latestExpedition.beats.length > 0 ? `Route beats: ${latestExpedition.beats.map((beat) => beat.kind).join(" > ")}.` : "Route had no recorded beats.",
+            ...expeditionReport.routeScars.slice(0, 3).map((scar) => `${scar.label}: ${scar.kind} scar, tags ${scar.tags.slice(0, 4).join(", ")}.`)
+          ],
+          6
+        )
+      : ["No expedition was ordered; the next breach needs a four-soldier route read before demolition work."];
+    if (!latestExpedition) {
+      recommendations.push("Send a small expedition before the next breach so the route can create warnings before casualties.");
+    } else if (latestExpedition.danger >= 0.5 || expeditionReport.routeScars.length > 0) {
+      recommendations.push("Treat the last route as dangerous; cover the road crossing with suppression or extend the trench first.");
+    }
+
+    const campDamageReport = this.getCampDamageReport(TOWN_WAR_ENEMY_FACTION);
+    const damagedWeakPoints = campDamageReport.weakPoints.filter((weakPoint) => weakPoint.status !== "intact");
+    const campDamageLines =
+      campDamageReport.debriefLines.length > 0
+        ? campDamageReport.debriefLines.slice(0, 6)
+        : ["No Ukrainian camp weak point was damaged; prepare demolition stock and target the ammo dump or spawn dugout."];
+    if (damagedWeakPoints.length <= 0) {
+      recommendations.push("Prepare demolition and hit a Ukrainian weak point; passive camp damage is not the main win path.");
+    } else {
+      recommendations.push(`Exploit the damaged Ukrainian ${damagedWeakPoints[0].label.toLowerCase()} before it recovers capacity.`);
+    }
+
+    return {
+      soldierLines: this.buildOperationSoldierLines(records),
+      buildingComboLines,
+      workLines,
+      routeLines,
+      campDamageLines,
+      recommendations: uniqueLimited(recommendations, 8)
+    };
+  }
+
   private capturePersistentSoldierRecords(campId: TownWarFactionId): TownWarPersistentSoldierRecordState[] {
     return this.state.soldiers
       .filter((soldier) => soldier.faction === campId)
@@ -4780,7 +6807,7 @@ export class TownWarController {
 
   startNextOperation(): TownWarOperationMutationResult {
     const previousOperation = cloneOperationState(this.state.operation);
-    const committed = cloneSupply(previousOperation.stockpile.committed);
+    const committed = clampSupplyToAvailable(previousOperation.stockpile.committed, previousOperation.stockpile.protected);
     const nextOperationId = previousOperation.nextOperationId;
     const protectedSupply: TownWarCampSupplyState = {
       ammo: Math.max(0, previousOperation.stockpile.protected.ammo - committed.ammo),
@@ -4807,7 +6834,7 @@ export class TownWarController {
     this.ensureDemoSeeded();
     const camp = this.getCamp(TOWN_WAR_PLAYER_FACTION);
     const readable = camp
-      ? `Operation ${nextOperationId} launched for Russian camp: ammo ${camp.supply.ammo}, build ${camp.supply.build}, food ${camp.supply.food}, med ${camp.supply.med}.`
+      ? `Operation ${nextOperationId} launched for Russian camp: ${formatSupplyBundle(camp.supply)}. Protected reserve left ${formatSupplyBundle(protectedSupply)}.`
       : `Operation ${nextOperationId} launched.`;
     return {
       ok: true,
@@ -4820,6 +6847,17 @@ export class TownWarController {
 
   endOperation(): TownWarOperationMutationResult {
     this.ensureDemoSeeded();
+    if (this.state.operation.phase === "debriefed" && this.state.operation.lastDebrief) {
+      const debrief = cloneOperationDebrief(this.state.operation.lastDebrief);
+      return {
+        ok: true,
+        reason: null,
+        operation: cloneOperationState(this.state.operation),
+        debrief,
+        readable: `Operation ${debrief.operationId} already debriefed. Next: ${debrief.recommendations.slice(0, 2).join(" ")}`
+      };
+    }
+
     this.tickCampSustainment(0);
     const camp = this.getCamp(TOWN_WAR_PLAYER_FACTION);
     if (!camp) {
@@ -4833,7 +6871,8 @@ export class TownWarController {
     }
 
     const records = this.capturePersistentSoldierRecords(TOWN_WAR_PLAYER_FACTION);
-    const recommendations = this.buildOperationRecommendations(camp, records);
+    const analysis = this.buildOperationDebriefAnalysis(records);
+    const recommendations = uniqueLimited([...this.buildOperationRecommendations(camp, records), ...analysis.recommendations], 10);
     const playerDugouts = this.state.dugouts.filter((dugout) => dugout.faction === TOWN_WAR_PLAYER_FACTION);
     for (const dugout of playerDugouts) {
       if (dugout.status === "active" && dugout.connectedTrenchSlotIds.length > 0) {
@@ -4848,29 +6887,38 @@ export class TownWarController {
       recommendations.push("Wounded survived because they reached shelter.");
     }
     const warnings = uniqueLimited([...this.buildOperationWarnings(camp), ...camp.sustainment.warnings], 10);
+    const supplyRecovery = this.buildOperationSupplyRecovery(camp);
+    this.state.operation.stockpile.protected = addSupply(this.state.operation.stockpile.protected, supplyRecovery.bankedSupply);
     const woundedCount = records.filter((record) => record.status === "wounded" || record.status === "recovering").length;
-    const summary = `Operation ${this.state.operation.activeId} ended: ${records.length} Russian soldiers carried, ${woundedCount} wounded/recovering, readiness ${camp.sustainment.readiness}, build ${camp.supply.build}, ammo ${camp.supply.ammo}.`;
+    const summary = `Operation ${this.state.operation.activeId} ended: ${records.length} Russian soldiers carried, ${woundedCount} wounded/recovering, readiness ${camp.sustainment.readiness}, banked ${formatSupplyBundle(supplyRecovery.bankedSupply)}, lost/spent ${formatSupplyBundle(supplyRecovery.lostSupply)}.`;
     const debrief: TownWarOperationDebriefState = {
       operationId: this.state.operation.activeId,
       startedAtSeconds: this.state.operation.startedAtSeconds,
       endedAtSeconds: this.state.clock.seconds,
       campId: TOWN_WAR_PLAYER_FACTION,
       summary,
-      recommendations,
+      recommendations: uniqueLimited(recommendations, 10),
       supplyRemaining: cloneSupply(camp.supply),
+      bankedSupply: cloneSupply(supplyRecovery.bankedSupply),
+      lostSupply: cloneSupply(supplyRecovery.lostSupply),
       carriedSoldiers: records.map((record) => clonePersistentSoldierRecord(record)),
+      soldierLines: analysis.soldierLines,
+      buildingComboLines: analysis.buildingComboLines,
+      workLines: analysis.workLines,
+      routeLines: analysis.routeLines,
+      campDamageLines: analysis.campDamageLines,
       warnings
     };
     this.state.operation.phase = "debriefed";
     this.state.operation.lastDebrief = debrief;
     this.state.operation.carriedSoldiers = records;
-    this.state.operation.recommendations = recommendations;
+    this.state.operation.recommendations = debrief.recommendations;
     return {
       ok: true,
       reason: null,
       operation: cloneOperationState(this.state.operation),
       debrief: cloneOperationDebrief(debrief),
-      readable: `${summary} Next: ${recommendations.slice(0, 2).join(" ")}`
+      readable: `${summary} Next: ${debrief.recommendations.slice(0, 2).join(" ")}`
     };
   }
 
@@ -4900,12 +6948,23 @@ export class TownWarController {
     facingAngleRadians?: number;
     valid?: boolean;
   }): void {
+    const facingAngleRadians = normalizeAngleRadians(input.facingAngleRadians ?? this.buildPlacementPreview.facingAngleRadians);
+    const requestedPosition = input.position ? cloneVec2(input.position) : null;
+    let position = requestedPosition ? cloneVec2(requestedPosition) : null;
+    let trenchNetwork: TownWarTrenchNetworkState | null = null;
+    if (input.kind === "trench" && input.faction && requestedPosition && (input.valid ?? true)) {
+      const placement = this.resolveTrenchNetworkPlacement(input.faction, requestedPosition, facingAngleRadians, "preview");
+      position = placement.position;
+      trenchNetwork = cloneTrenchNetwork(placement.trenchNetwork);
+    }
     this.buildPlacementPreview = {
       kind: input.kind,
       faction: input.faction,
-      position: input.position ? cloneVec2(input.position) : null,
-      facingAngleRadians: normalizeAngleRadians(input.facingAngleRadians ?? this.buildPlacementPreview.facingAngleRadians),
-      valid: input.valid ?? input.kind !== null
+      requestedPosition,
+      position,
+      facingAngleRadians,
+      valid: input.valid ?? input.kind !== null,
+      trenchNetwork
     };
   }
 
@@ -4913,16 +6972,20 @@ export class TownWarController {
     this.buildPlacementPreview = {
       kind: null,
       faction: null,
+      requestedPosition: null,
       position: null,
       facingAngleRadians: 0,
-      valid: false
+      valid: false,
+      trenchNetwork: null
     };
   }
 
   getBuildPlacementPreview(): TownWarBuildPlacementPreviewState {
     return {
       ...this.buildPlacementPreview,
-      position: this.buildPlacementPreview.position ? cloneVec2(this.buildPlacementPreview.position) : null
+      requestedPosition: this.buildPlacementPreview.requestedPosition ? cloneVec2(this.buildPlacementPreview.requestedPosition) : null,
+      position: this.buildPlacementPreview.position ? cloneVec2(this.buildPlacementPreview.position) : null,
+      trenchNetwork: this.buildPlacementPreview.trenchNetwork ? cloneTrenchNetwork(this.buildPlacementPreview.trenchNetwork) : null
     };
   }
 
@@ -4964,6 +7027,13 @@ export class TownWarController {
       currentNeed: identity.currentNeed,
       experience: identity.experience,
       identitySummary: identity.identitySummary,
+      squadBridge: {
+        status: "camp",
+        squadSlot: null,
+        legacySquadMateId: null,
+        assignedAtSeconds: null,
+        operatorMenuVisible: input.faction === TOWN_WAR_PLAYER_FACTION
+      },
       taskDecision: createEmptyTaskDecision(this.state.clock.seconds),
       position: cloneVec2(input.position),
       spawnedFromCampId,
@@ -5055,9 +7125,14 @@ export class TownWarController {
       return { ok: false, reason: "camp-destroyed", campId, role, requested, spawned: 0, soldierIds: [] };
     }
 
+    const spawnDugout = this.getCampWeakPoints(campId).find((weakPoint) => weakPoint.kind === "spawn-dugout") ?? null;
+    if (spawnDugout?.status === "destroyed") {
+      return { ok: false, reason: "spawn-dugout-destroyed", campId, role, requested, spawned: 0, soldierIds: [] };
+    }
+    const appliedRequested = spawnDugout?.status === "damaged" ? Math.max(1, Math.ceil(requested * 0.5)) : requested;
     const soldierIds: string[] = [];
     const rallyDugout = this.getNearestActiveDugout(campId, camp.spawn.position, 2400);
-    for (let index = 0; index < requested; index += 1) {
+    for (let index = 0; index < appliedRequested; index += 1) {
       const soldier = this.spawnSoldierFromCamp({ faction: campId, role });
       if (!soldier) {
         break;
@@ -5262,11 +7337,12 @@ export class TownWarController {
       const restPriority = this.getCampWorkPriority(camp.id, "Rest");
       const foodStock = clamp(camp.supply.food / 180, 0, 1);
       const ammoStock = clamp(camp.supply.ammo / 250, 0, 1);
+      const weakPointPenalty = this.getWeakPointPenalty(camp.id);
       const cookEffect = clamp(cookingScore / 34 + cookPriority * 0.035 + foodStock * 0.18 - hungerAverage * 0.2, 0, 1);
       const restCycle = clamp(enduranceScore / 40 + restPriority * 0.045 - fatigueAverage * 0.15, 0, 1);
-      const ammoFlow = clamp(logisticsScore / 38 + resupplyPriority * 0.04 + ammoStock * 0.18 - ammoNeed * 0.16, 0, 1);
+      const ammoFlow = clamp(logisticsScore / 38 + resupplyPriority * 0.04 + ammoStock * 0.18 - ammoNeed * 0.16 - weakPointPenalty.ammoFlow, 0, 1);
       const readiness = clamp(
-        0.2 + ammoFlow * 0.25 + cookEffect * 0.25 + restCycle * 0.18 + moraleAverage * 0.17 - fatigueAverage * 0.22 - hungerAverage * 0.2,
+        0.2 + ammoFlow * 0.25 + cookEffect * 0.25 + restCycle * 0.18 + moraleAverage * 0.17 - fatigueAverage * 0.22 - hungerAverage * 0.2 - weakPointPenalty.readiness,
         0,
         1
       );
@@ -5286,6 +7362,7 @@ export class TownWarController {
       if (ammoNeed >= 1.2) {
         warnings.push("Suppressor dry");
       }
+      warnings.push(...weakPointPenalty.warnings);
 
       const bottleneckReason =
         ammoFlow < 0.3
@@ -5316,7 +7393,7 @@ export class TownWarController {
         lastUpdatedAtSeconds: this.state.clock.seconds
       };
       camp.control.readiness = camp.sustainment.readiness;
-      camp.control.morale = Number(clamp(moraleAverage, 0, 1).toFixed(2));
+      camp.control.morale = Number(clamp(moraleAverage - weakPointPenalty.morale, 0, 1).toFixed(2));
 
       const foodUse = (0.004 + manpower * 0.0009) * deltaSeconds * (cookPriority >= 4 ? 1.25 : 1);
       camp.supply.food = Number(Math.max(0, camp.supply.food - foodUse).toFixed(2));
@@ -5371,6 +7448,9 @@ export class TownWarController {
 
     for (const combatant of this.state.combatants) {
       if (!movementTaskKinds.has(combatant.task.kind)) {
+        continue;
+      }
+      if (this.shouldHoldOccupiedTrenchAgainstTravelOrder(combatant)) {
         continue;
       }
 
@@ -5441,7 +7521,7 @@ export class TownWarController {
         continue;
       }
 
-      const maxStep = movementSpeed * deltaSeconds;
+      const maxStep = movementSpeed * this.getWireMovementSpeedMultiplier(combatant) * deltaSeconds;
       if (maxStep >= distance) {
         combatant.position = cloneVec2(target);
 
@@ -5516,6 +7596,8 @@ export class TownWarController {
       combatant.position.y += dy * maxStep;
     }
 
+    this.tickExpeditions();
+    this.tickCampBreaches();
     this.refreshAiThreats();
     this.refreshTacticalIntents();
     this.tickCampSustainment(deltaSeconds);
@@ -5550,8 +7632,8 @@ export class TownWarController {
       faction: TOWN_WAR_PLAYER_FACTION,
       role: "builder",
       spawnReason: "initial",
-      ammoInMag: 12,
-      ammoReserve: 24,
+      ammoInMag: 30,
+      ammoReserve: 60,
       task: {
         kind: "hold",
         label: "Camp work: builder waiting for orders",
@@ -5759,13 +7841,15 @@ export class TownWarController {
     this.state.officer.lastCommandRead = `Order trench (${campId})`;
     this.state.officer.lastCommandAtSeconds = this.state.clock.seconds;
 
-    const position = requestedPosition;
     const facingAngle = normalizeAngleRadians(facingAngleRadians);
+    const orderId = buildOrderId(this.state);
+    const networkPlacement = this.resolveTrenchNetworkPlacement(campId, requestedPosition, facingAngle, orderId);
+    const position = networkPlacement.position;
+    const finalRiskTier = this.computeRiskTier(campId, position);
 
     const travelDistance = getDistance(builder.position, position);
     const etaSeconds = travelDistance / DEFAULT_MOVEMENT_SPEED;
 
-    const orderId = buildOrderId(this.state);
     const task: TownWarTask = {
       kind: "build",
       label: `Order: trench @ ${Math.round(position.x)},${Math.round(position.y)}`,
@@ -5775,7 +7859,7 @@ export class TownWarController {
 
     camp.supply.build = Math.max(0, camp.supply.build - costBuild);
     builder.task = task;
-    this.recordSelectedWork(builder, "Build", position, riskTier);
+    this.recordSelectedWork(builder, "Build", position, finalRiskTier);
 
     const buildOrder: TownWarBuildOrderState = {
       id: orderId,
@@ -5788,6 +7872,7 @@ export class TownWarController {
       build: this.createBuildExecution(campId, position),
       ammoPayload: null,
       builtEntityId: null,
+      trenchNetwork: cloneTrenchNetwork(networkPlacement.trenchNetwork),
       createdAtSeconds: this.state.clock.seconds,
       completedAtSeconds: null
     };
@@ -5802,32 +7887,32 @@ export class TownWarController {
       orderKind: "trench",
       soldierId: builder.id,
       position,
-      riskTier,
-      summary: `Officer ordered ${builder.id} to dig a trench at ${Math.round(position.x)},${Math.round(position.y)}.`,
-      tags: ["order", "build", "trench", `risk-${riskTier}`]
+      riskTier: finalRiskTier,
+      summary: `Officer ordered ${builder.id} to dig a trench at ${Math.round(position.x)},${Math.round(position.y)}. ${networkPlacement.trenchNetwork.readable}`,
+      tags: ["order", "build", "trench", `risk-${finalRiskTier}`, `network-${networkPlacement.trenchNetwork.placementKind}`]
     });
 
     this.emitDramaEvent({
-      kind: riskTier === "high" ? "builder-exposed" : "builder-moving",
+      kind: finalRiskTier === "high" ? "builder-exposed" : "builder-moving",
       faction: campId,
       campId,
       orderId,
       orderKind: "trench",
       soldierId: builder.id,
       position,
-      riskTier,
+      riskTier: finalRiskTier,
       summary:
-        riskTier === "high"
+        finalRiskTier === "high"
           ? `${builder.id} is crossing exposed ground for the trench order.`
           : `${builder.id} is moving to the trench build site.`,
-      tags: ["builder", "build", "trench", `risk-${riskTier}`]
+      tags: ["builder", "build", "trench", `risk-${finalRiskTier}`]
     });
 
     this.pushChatter({
       faction: builder.faction,
       channel: this.buildSoldierChannel(builder),
-      text: `Copy. Digging a trench at ${Math.round(position.x)},${Math.round(position.y)}.`,
-      tags: ["order", "build", "trench"],
+      text: `Copy. Digging a trench at ${Math.round(position.x)},${Math.round(position.y)}. ${networkPlacement.trenchNetwork.placementKind === "branch" ? "Making a branch." : networkPlacement.trenchNetwork.placementKind === "extend" ? "Extending the line." : "Starting a line."}`,
+      tags: ["order", "build", "trench", `network-${networkPlacement.trenchNetwork.placementKind}`],
       cooldownKey: `${builder.id}:order-build:trench`,
       cooldownSeconds: 8
     });
@@ -5843,7 +7928,8 @@ export class TownWarController {
       orderId,
       travelDistance,
       etaSeconds,
-      riskTier
+      riskTier: finalRiskTier,
+      trenchNetwork: cloneTrenchNetwork(networkPlacement.trenchNetwork)
     };
   }
 
@@ -5886,13 +7972,18 @@ export class TownWarController {
     }
 
     this.completeOrder(buildOrder);
-    const coverSlot = this.state.aiTactics.coverSlots.find((slot) => slot.sourceKind === "trench" && slot.sourceId === buildOrder.id) ?? null;
+    const coverSlot =
+      this.state.aiTactics.coverSlots.find(
+        (slot) => slot.sourceKind === "trench" && typeof slot.sourceId === "string" && slot.sourceId.startsWith(`${buildOrder.id}:slot-`)
+      ) ?? null;
     return {
       ok: true,
       reason: null,
       order,
       coverSlot,
-      readable: `Debug trench placed at ${Math.round(buildOrder.position.x)},${Math.round(buildOrder.position.y)} for ${campId}.`
+      readable: `Debug trench placed at ${Math.round(buildOrder.position.x)},${Math.round(buildOrder.position.y)} for ${campId}. ${
+        buildOrder.trenchNetwork?.readable ?? ""
+      }`
     };
   }
 
@@ -6125,6 +8216,172 @@ export class TownWarController {
     };
   }
 
+  private resolveFieldworkUpgradeSlot(campId: TownWarFactionId, target?: TownWarFieldworkUpgradeTarget | null): TownWarCoverSlotState | null {
+    const trenchSlots = this.state.aiTactics.coverSlots.filter((slot) => slot.sourceKind === "trench" && slot.faction === campId);
+    if (trenchSlots.length <= 0) {
+      return null;
+    }
+
+    if (target?.coverSlotId) {
+      const slot = this.findCoverSlot(target.coverSlotId);
+      return slot?.sourceKind === "trench" && slot.faction === campId ? slot : null;
+    }
+
+    if (target?.segmentId) {
+      const slot = trenchSlots.find((candidate) => candidate.trenchNetwork?.segmentId === target.segmentId) ?? null;
+      if (slot) {
+        return slot;
+      }
+    }
+
+    if (target?.networkId) {
+      const slot = trenchSlots.find((candidate) => candidate.trenchNetwork?.networkId === target.networkId) ?? null;
+      if (slot) {
+        return slot;
+      }
+    }
+
+    if (target?.position && Number.isFinite(target.position.x) && Number.isFinite(target.position.y)) {
+      return trenchSlots.reduce<{ slot: TownWarCoverSlotState; distance: number } | null>((best, slot) => {
+        const distance = getDistance(slot.position, target.position!);
+        if (distance > 240) {
+          return best;
+        }
+        if (!best || distance < best.distance) {
+          return { slot, distance };
+        }
+        return best;
+      }, null)?.slot ?? null;
+    }
+
+    return (
+      trenchSlots.find((slot) => slot.occupiedBySoldierId !== null) ??
+      trenchSlots.find((slot) => (slot.trenchNetwork?.connectedSegmentIds.length ?? 0) > 0) ??
+      trenchSlots[0] ??
+      null
+    );
+  }
+
+  private orderFieldworkUpgrade(
+    campId: TownWarFactionId,
+    kind: TownWarFieldworkUpgradeKind,
+    target?: TownWarFieldworkUpgradeTarget | null,
+    buildCost = kind === "sandbags" ? 8 : 6
+  ): TownWarFieldworkUpgradeResult {
+    this.ensureDemoSeeded();
+
+    const camp = this.getCamp(campId);
+    if (!camp) {
+      return { ok: false, reason: "camp-missing", campId, kind, campSupply: null, upgrade: null, coverSlot: null, readable: `${kind} order failed: camp missing.` };
+    }
+    if (!Number.isFinite(buildCost) || buildCost <= 0) {
+      return {
+        ok: false,
+        reason: "invalid-cost",
+        campId,
+        kind,
+        campSupply: { ...camp.supply },
+        upgrade: null,
+        coverSlot: null,
+        readable: `${kind} order failed: invalid build cost.`
+      };
+    }
+    if (camp.supply.build < buildCost) {
+      return {
+        ok: false,
+        reason: "insufficient-build-supply",
+        campId,
+        kind,
+        campSupply: { ...camp.supply },
+        upgrade: null,
+        coverSlot: null,
+        readable: `${kind} order failed: not enough build supply.`
+      };
+    }
+
+    const slot = this.resolveFieldworkUpgradeSlot(campId, target);
+    if (!slot) {
+      return {
+        ok: false,
+        reason: "no-trench-target",
+        campId,
+        kind,
+        campSupply: { ...camp.supply },
+        upgrade: null,
+        coverSlot: null,
+        readable: `${kind} order failed: no friendly trench segment to upgrade.`
+      };
+    }
+
+    const duplicate = this.state.fieldworkUpgrades.find((upgrade) => upgrade.kind === kind && this.fieldworkUpgradeAppliesToSlot(upgrade, slot)) ?? null;
+    if (duplicate) {
+      return {
+        ok: false,
+        reason: "already-upgraded",
+        campId,
+        kind,
+        campSupply: { ...camp.supply },
+        upgrade: cloneFieldworkUpgrade(duplicate),
+        coverSlot: cloneCoverSlot(slot),
+        readable: `${slot.label} already has ${kind}.`
+      };
+    }
+
+    const normal = this.getTrenchForwardNormal(slot);
+    const offset = kind === "sandbags" ? 24 : 54;
+    const upgrade: TownWarFieldworkUpgradeState = {
+      id: buildFieldworkUpgradeId(this.state),
+      kind,
+      faction: campId,
+      position: {
+        x: slot.position.x + normal.x * offset,
+        y: slot.position.y + normal.y * offset
+      },
+      facingAngleRadians: slot.facingAngleRadians,
+      networkId: slot.trenchNetwork?.networkId ?? null,
+      segmentId: slot.trenchNetwork?.segmentId ?? null,
+      coverSlotId: slot.id,
+      effect: kind === "sandbags" ? "front-protection" : "assault-obstacle",
+      createdAtSeconds: this.state.clock.seconds,
+      readable:
+        kind === "sandbags"
+          ? `Sandbags strengthen the intended firing side of ${slot.label}.`
+          : `Wire slows assault paths near ${slot.label} but can snarl a retreat.`
+    };
+    camp.supply.build = Math.max(0, camp.supply.build - buildCost);
+    this.state.fieldworkUpgrades.push(upgrade);
+    this.state.officer.lastCommandRead = `Order ${kind} (${campId})`;
+    this.state.officer.lastCommandAtSeconds = this.state.clock.seconds;
+
+    this.pushChatter({
+      faction: campId,
+      channel: `${campId} fieldworks`,
+      text: kind === "sandbags" ? "Sandbags are up on the firing side." : "Wire is set on the approach. Watch the retreat path.",
+      tags: ["order", "fieldwork", kind],
+      cooldownKey: `${campId}:fieldwork:${kind}:${slot.id}`,
+      cooldownSeconds: 8
+    });
+
+    return {
+      ok: true,
+      reason: null,
+      campId,
+      kind,
+      campSupply: { ...camp.supply },
+      upgrade: cloneFieldworkUpgrade(upgrade),
+      coverSlot: cloneCoverSlot(slot),
+      readable: upgrade.readable
+    };
+  }
+
+  orderSandbags(campId: TownWarFactionId, target?: TownWarFieldworkUpgradeTarget | null): TownWarFieldworkUpgradeResult {
+    return this.orderFieldworkUpgrade(campId, "sandbags", target, 8);
+  }
+
+  orderWire(campId: TownWarFactionId, target?: TownWarFieldworkUpgradeTarget | null): TownWarFieldworkUpgradeResult {
+    return this.orderFieldworkUpgrade(campId, "wire", target, 6);
+  }
+
   damageDugout(dugoutId: string, amount: number): TownWarDugoutState | null {
     const dugout = this.findDugout(dugoutId);
     if (!dugout || !Number.isFinite(amount) || amount <= 0 || dugout.destroyedAtSeconds !== null) {
@@ -6168,6 +8425,782 @@ export class TownWarController {
             )
             .join(" ");
     return { dugouts, readable };
+  }
+
+  getBuildingComboReport(): TownWarBuildingComboReport {
+    this.ensureDemoSeeded();
+    this.refreshDugoutConnections();
+    const trenchReport = this.getTrenchNetworkReport();
+    const activeDugouts = this.state.dugouts.filter((dugout) => dugout.destroyedAtSeconds === null);
+    const activeCrates = this.state.ammoCrates.filter((crate) => crate.destroyedAtSeconds === null && crate.ammo > 0);
+
+    const networks: TownWarBuildingComboNetworkReport[] = trenchReport.networks.map((network) => {
+      const slots = network.segments
+        .flatMap((segment) => segment.slotIds)
+        .map((slotId) => this.findCoverSlot(slotId))
+        .filter((slot): slot is TownWarCoverSlotState => slot !== null);
+      const slotIds = new Set(slots.map((slot) => slot.id));
+      const ammoCrates = activeCrates.filter((crate) => this.isAmmoCrateLinkedToNetwork(crate, network.faction, network.networkId));
+      const localFedSlotIds = slots
+        .filter((slot) =>
+          activeCrates.some(
+            (crate) =>
+              crate.faction === network.faction &&
+              crate.destroyedAtSeconds === null &&
+              crate.ammo > 0 &&
+              getDistance(crate.position, slot.position) <= AMMO_CRATE_RESUPPLY_DISTANCE
+          )
+        )
+        .map((slot) => slot.id);
+      const networkFedSlotIds = ammoCrates.length > 0 ? slots.map((slot) => slot.id) : [];
+      const sameFactionCrates = activeCrates.filter((crate) => crate.faction === network.faction);
+      const linkedDugouts = activeDugouts.filter(
+        (dugout) => dugout.faction === network.faction && dugout.connectedTrenchSlotIds.some((slotId) => slotIds.has(slotId))
+      );
+      const connectedSlotIds = [...new Set(linkedDugouts.flatMap((dugout) => dugout.connectedTrenchSlotIds).filter((slotId) => slotIds.has(slotId)))];
+      const shelteringSoldierIds = [...new Set(linkedDugouts.flatMap((dugout) => dugout.shelteringSoldierIds))];
+      const sandbags = this.state.fieldworkUpgrades.filter(
+        (upgrade) => upgrade.kind === "sandbags" && upgrade.faction === network.faction && upgrade.networkId === network.networkId
+      );
+      const wire = this.state.fieldworkUpgrades.filter(
+        (upgrade) => upgrade.kind === "wire" && upgrade.faction === network.faction && upgrade.networkId === network.networkId
+      );
+      const occupiedSlots = slots.filter((slot) => slot.occupiedBySoldierId !== null);
+      const grenadeDanger = occupiedSlots.some((slot) =>
+        this.state.combatants.some(
+          (combatant) => combatant.faction !== network.faction && combatant.health.current > 0 && getDistance(combatant.position, slot.position) <= TRENCH_GRENADE_RANGE
+        )
+      );
+      const ammoTooFar = sameFactionCrates.length > 0 && ammoCrates.length <= 0;
+      const dugoutNotLinked = activeDugouts.some((dugout) => dugout.faction === network.faction) && linkedDugouts.length <= 0;
+      const wireBlocksRetreat =
+        wire.length > 0 && (network.retreatHints.includes("bad-retreat-path") || network.retreatHints.includes("open-line"));
+      const flankOpen = sandbags.length <= 0 || network.retreatHints.includes("bad-retreat-path");
+      const warnings = [
+        ammoTooFar ? "Ammo too far" : null,
+        dugoutNotLinked ? "Dugout not linked" : null,
+        wireBlocksRetreat ? "Wire blocks retreat" : null,
+        flankOpen ? "Flank open" : null,
+        grenadeDanger ? "Grenade danger" : null
+      ].filter((warning): warning is string => Boolean(warning));
+      const readableParts = [
+        ammoCrates.length > 0 ? `ammo linked ${ammoCrates.length}` : ammoTooFar ? "ammo too far" : "no ammo box",
+        linkedDugouts.length > 0 ? `dugout linked ${linkedDugouts.length}` : dugoutNotLinked ? "dugout not linked" : "no dugout",
+        sandbags.length > 0 ? `sandbags ${sandbags.length}` : "flank open",
+        wire.length > 0 ? `wire ${wire.length}` : "no wire"
+      ];
+
+      return {
+        faction: network.faction,
+        networkId: network.networkId,
+        segmentCount: network.segmentCount,
+        slotCount: network.slotCount,
+        occupiedCount: network.occupiedCount,
+        ammo: {
+          linked: ammoCrates.length > 0,
+          crateIds: ammoCrates.map((crate) => crate.id),
+          networkFedSlotIds,
+          localFedSlotIds,
+          warning: ammoTooFar ? "Ammo too far" : null,
+          networkFeedDistance: TRENCH_NETWORK_AMMO_FEED_DISTANCE
+        },
+        dugout: {
+          linked: linkedDugouts.length > 0,
+          dugoutIds: linkedDugouts.map((dugout) => dugout.id),
+          connectedSlotIds,
+          shelteringSoldierIds,
+          warning: dugoutNotLinked ? "Dugout not linked" : null
+        },
+        sandbags: {
+          count: sandbags.length,
+          upgradeIds: sandbags.map((upgrade) => upgrade.id),
+          frontProtectionBonus: sandbags.length > 0 ? SANDBAG_FRONT_PROTECTION_BONUS : 0,
+          flankProtectionBonus: 0,
+          fireRangeBonus: sandbags.length > 0 ? SANDBAG_FRONT_FIRE_RANGE_BONUS : 0
+        },
+        wire: {
+          count: wire.length,
+          upgradeIds: wire.map((upgrade) => upgrade.id),
+          enemySpeedMultiplier: wire.length > 0 ? WIRE_ASSAULT_SPEED_MULTIPLIER : 1,
+          friendlyRetreatSpeedMultiplier: wire.length > 0 ? WIRE_RETREAT_SPEED_MULTIPLIER : 1,
+          wireBlocksRetreat
+        },
+        warnings,
+        readable: `${network.networkId}: ${readableParts.join("; ")}${warnings.length > 0 ? `; warnings ${warnings.join(", ")}` : ""}.`
+      };
+    });
+
+    const totals = {
+      networks: networks.length,
+      ammoLinked: networks.filter((network) => network.ammo.linked).length,
+      dugoutLinked: networks.filter((network) => network.dugout.linked).length,
+      sandbags: networks.reduce((sum, network) => sum + network.sandbags.count, 0),
+      wire: networks.reduce((sum, network) => sum + network.wire.count, 0),
+      warnings: networks.reduce((sum, network) => sum + network.warnings.length, 0)
+    };
+    const readable =
+      networks.length === 0
+        ? "No trench networks have building combos yet."
+        : networks
+            .map((network) => network.readable)
+            .join(" ");
+
+    return { ok: true, networks, totals, readable };
+  }
+
+  getReadabilityOverlay(): TownWarReadabilityOverlay {
+    this.ensureDemoSeeded();
+    this.refreshDugoutConnections();
+    this.refreshTrenchNetworkConnections();
+
+    const trenchReport = this.getTrenchNetworkReport();
+    const comboReport = this.getBuildingComboReport();
+    const comboByNetworkId = new Map(comboReport.networks.map((network) => [`${network.faction}:${network.networkId}`, network]));
+    const activeCasualtyBySoldierId = new Map(
+      this.state.casualties
+        .filter((casualty) => casualty.status === "wounded" || casualty.status === "downed")
+        .map((casualty) => [casualty.soldierId, casualty])
+    );
+    const icons: TownWarReadabilityIcon[] = [];
+
+    const pushIcon = (icon: TownWarReadabilityIcon): void => {
+      icons.push({
+        ...icon,
+        detailLines: [...icon.detailLines],
+        pulse: icon.pulse ?? "none"
+      });
+    };
+
+    const buildOrderIcon = (order: TownWarBuildOrderState): TownWarReadabilityIcon => {
+      const progress =
+        order.build.requiredProgress > 0 ? Math.round((order.build.progress / order.build.requiredProgress) * 100) : 0;
+      const noun = order.kind === "ammo-crate" ? "Ammo crate" : order.kind === "dugout" ? "Dugout" : "Trench";
+      return {
+        id: `readability:order:${order.id}`,
+        targetType: order.kind === "ammo-crate" ? "ammo-crate" : order.kind,
+        targetId: order.id,
+        icon: progress > 0 ? "hammer" : "outline-hammer",
+        tone: "working",
+        priority: progress > 0 ? 55 : 45,
+        label: `${noun} building`,
+        shortReason: progress > 0 ? `${noun} is ${progress}% built` : `${noun} is ordered but not started`,
+        detailLines: [
+          `${noun} order ${order.id}`,
+          `Builder: ${order.assignedSoldierId ?? "unassigned"}`,
+          order.build.stalled ? `Blocked: ${order.build.stallReason ?? "work stalled"}` : `Progress: ${progress}%`
+        ],
+        worldX: order.position.x,
+        worldY: order.position.y,
+        visibility: "normal",
+        pulse: "slow"
+      };
+    };
+
+    for (const order of this.state.orders.filter((entry) => entry.status === "assigned")) {
+      pushIcon(buildOrderIcon(order));
+    }
+
+    const preview = this.buildPlacementPreview;
+    if (preview.kind && preview.faction && preview.position) {
+      const previewPosition = preview.position;
+      const enemyCamp = this.getCamp(this.getOpposingCampId(preview.faction));
+      const homeCamp = this.getCamp(preview.faction);
+      const enemyDistance = enemyCamp ? getDistance(previewPosition, enemyCamp.spawn.position) : Number.POSITIVE_INFINITY;
+      const homeDistance = homeCamp ? getDistance(previewPosition, homeCamp.spawn.position) : 0;
+      const enemyAngle = enemyCamp
+        ? Math.atan2(enemyCamp.spawn.position.y - previewPosition.y, enemyCamp.spawn.position.x - previewPosition.x)
+        : preview.facingAngleRadians;
+      const facingEnemy = getFacingDeltaRadians(preview.facingAngleRadians, enemyAngle) <= Math.PI * 0.62;
+      const nearbyTrenchSlots = this.state.aiTactics.coverSlots.filter(
+        (slot) => slot.faction === preview.faction && slot.sourceKind === "trench" && getDistance(slot.position, previewPosition) <= AMMO_CRATE_RESUPPLY_DISTANCE
+      );
+      const nearbyDugoutSlots = this.state.aiTactics.coverSlots.filter(
+        (slot) => slot.faction === preview.faction && slot.sourceKind === "trench" && getDistance(slot.position, previewPosition) <= TRENCH_NETWORK_DUGOUT_LINK_DISTANCE
+      );
+      const linkedAmmoCrates = this.state.ammoCrates.filter(
+        (crate) =>
+          crate.faction === preview.faction &&
+          crate.destroyedAtSeconds === null &&
+          crate.ammo > 0 &&
+          getDistance(crate.position, previewPosition) <= AMMO_CRATE_RESUPPLY_DISTANCE
+      );
+      const linkedDugouts = this.state.dugouts.filter(
+        (dugout) =>
+          dugout.faction === preview.faction &&
+          dugout.destroyedAtSeconds === null &&
+          dugout.status !== "destroyed" &&
+          getDistance(dugout.position, previewPosition) <= TRENCH_NETWORK_DUGOUT_LINK_DISTANCE
+      );
+      const pathTone: TownWarReadabilityIconTone = homeDistance > 1050 ? "warn" : "ok";
+      const pathReason = homeDistance > 1050 ? "Builder route is long and exposed" : "Builders can reach this placement";
+
+      const pushPreviewIcon = (input: Omit<TownWarReadabilityIcon, "visibility" | "pulse"> & { pulse?: TownWarReadabilityPulse }): void => {
+        pushIcon({
+          ...input,
+          visibility: "build-preview",
+          pulse: input.pulse ?? "none"
+        });
+      };
+
+      if (preview.kind === "trench") {
+        const retreatHint = preview.trenchNetwork?.retreatHint ?? "open-line";
+        pushPreviewIcon({
+          id: "readability:preview:trench-facing",
+          targetType: "trench",
+          targetId: "preview:trench",
+          icon: facingEnemy ? "muzzle-burst" : "crossed-sightline",
+          tone: facingEnemy ? "ok" : "warn",
+          priority: facingEnemy ? 74 : 94,
+          label: facingEnemy ? "Preview trench faces enemy" : "Preview trench faces away",
+          shortReason: facingEnemy ? "Firing arc points toward enemy camp" : "Rotate before placing; firing arc points away",
+          detailLines: [
+            preview.trenchNetwork?.readable ?? "New trench preview",
+            linkedAmmoCrates.length > 0 ? `Ammo in range: ${linkedAmmoCrates.length}` : "Ammo in range: none",
+            linkedDugouts.length > 0 ? `Dugouts in range: ${linkedDugouts.length}` : "Dugouts in range: none"
+          ],
+          worldX: previewPosition.x,
+          worldY: previewPosition.y - 48
+        });
+        pushPreviewIcon({
+          id: "readability:preview:trench-support",
+          targetType: "trench",
+          targetId: "preview:trench",
+          icon: linkedAmmoCrates.length > 0 ? "chain-ammo-pulse" : "broken-chain",
+          tone: linkedAmmoCrates.length > 0 ? "working" : "warn",
+          priority: linkedAmmoCrates.length > 0 ? 70 : 82,
+          label: linkedAmmoCrates.length > 0 ? "Preview ammo linked" : "Preview lacks ammo",
+          shortReason: linkedAmmoCrates.length > 0 ? "A stocked crate can feed this line" : "No stocked ammo crate is close enough",
+          detailLines: [
+            `Stocked crates in range: ${linkedAmmoCrates.length}`,
+            `Support dugouts in range: ${linkedDugouts.length}`,
+            `Path from camp: ${Math.round(homeDistance)}m`
+          ],
+          worldX: previewPosition.x + 34,
+          worldY: previewPosition.y - 26,
+          pulse: linkedAmmoCrates.length > 0 ? "slow" : "none"
+        });
+        if (retreatHint === "bad-retreat-path") {
+          pushPreviewIcon({
+            id: "readability:preview:trench-retreat",
+            targetType: "trench",
+            targetId: "preview:trench",
+            icon: "rear-arrow",
+            tone: "danger",
+            priority: 90,
+            label: "Preview bad retreat",
+            shortReason: "Fallback path will be brittle from this trench",
+            detailLines: [preview.trenchNetwork?.readable ?? "Retreat route warning", "Move or branch the line before committing"],
+            worldX: previewPosition.x - 34,
+            worldY: previewPosition.y - 26,
+            pulse: "danger"
+          });
+        }
+        pushPreviewIcon({
+          id: "readability:preview:trench-path",
+          targetType: "trench",
+          targetId: "preview:trench",
+          icon: "route-arrow",
+          tone: pathTone,
+          priority: pathTone === "warn" ? 72 : 52,
+          label: pathTone === "warn" ? "Preview long route" : "Preview reachable",
+          shortReason: pathReason,
+          detailLines: [`Path from camp: ${Math.round(homeDistance)}m`, `Enemy camp distance: ${Math.round(enemyDistance)}m`],
+          worldX: previewPosition.x,
+          worldY: previewPosition.y + 36
+        });
+      } else if (preview.kind === "ammo-crate") {
+        pushPreviewIcon({
+          id: "readability:preview:ammo-feed",
+          targetType: "ammo-crate",
+          targetId: "preview:ammo-crate",
+          icon: nearbyTrenchSlots.length > 0 ? "chain-ammo-pulse" : "broken-chain",
+          tone: nearbyTrenchSlots.length > 0 ? "working" : "warn",
+          priority: nearbyTrenchSlots.length > 0 ? 76 : 86,
+          label: nearbyTrenchSlots.length > 0 ? "Preview ammo feeds line" : "Preview ammo unlinked",
+          shortReason:
+            nearbyTrenchSlots.length > 0
+              ? `Will feed ${nearbyTrenchSlots.length} trench slot${nearbyTrenchSlots.length === 1 ? "" : "s"}`
+              : "No trench slot is close enough to feed",
+          detailLines: [`Trench slots in range: ${nearbyTrenchSlots.length}`, `Path from camp: ${Math.round(homeDistance)}m`],
+          worldX: previewPosition.x,
+          worldY: previewPosition.y - 42,
+          pulse: nearbyTrenchSlots.length > 0 ? "slow" : "none"
+        });
+        pushPreviewIcon({
+          id: "readability:preview:ammo-exposure",
+          targetType: "ammo-crate",
+          targetId: "preview:ammo-crate",
+          icon: enemyDistance < 760 ? "warning-chevrons" : "route-arrow",
+          tone: enemyDistance < 760 ? "danger" : pathTone,
+          priority: enemyDistance < 760 ? 84 : 54,
+          label: enemyDistance < 760 ? "Preview crate exposed" : "Preview crate reachable",
+          shortReason: enemyDistance < 760 ? "Enemy pressure can reach this crate quickly" : pathReason,
+          detailLines: [`Enemy camp distance: ${Math.round(enemyDistance)}m`, `Path from camp: ${Math.round(homeDistance)}m`],
+          worldX: previewPosition.x + 36,
+          worldY: previewPosition.y - 18,
+          pulse: enemyDistance < 760 ? "danger" : "none"
+        });
+      } else if (preview.kind === "dugout") {
+        pushPreviewIcon({
+          id: "readability:preview:dugout-link",
+          targetType: "dugout",
+          targetId: "preview:dugout",
+          icon: nearbyDugoutSlots.length > 0 ? "chain-shield" : "broken-chain",
+          tone: nearbyDugoutSlots.length > 0 ? "working" : "warn",
+          priority: nearbyDugoutSlots.length > 0 ? 76 : 88,
+          label: nearbyDugoutSlots.length > 0 ? "Preview dugout linked" : "Preview dugout too far",
+          shortReason:
+            nearbyDugoutSlots.length > 0
+              ? `Will support ${nearbyDugoutSlots.length} trench slot${nearbyDugoutSlots.length === 1 ? "" : "s"}`
+              : "Too far from trench network",
+          detailLines: [`Connected trench slots: ${nearbyDugoutSlots.length}`, `Shelter radius: ${DUGOUT_SHELTER_RADIUS}m`],
+          worldX: previewPosition.x,
+          worldY: previewPosition.y - 46,
+          pulse: nearbyDugoutSlots.length > 0 ? "slow" : "none"
+        });
+        pushPreviewIcon({
+          id: "readability:preview:dugout-exposure",
+          targetType: "dugout",
+          targetId: "preview:dugout",
+          icon: enemyDistance <= DUGOUT_SHELTER_RADIUS * 2.2 ? "warning-shield" : "route-arrow",
+          tone: enemyDistance <= DUGOUT_SHELTER_RADIUS * 2.2 ? "danger" : pathTone,
+          priority: enemyDistance <= DUGOUT_SHELTER_RADIUS * 2.2 ? 82 : 54,
+          label: enemyDistance <= DUGOUT_SHELTER_RADIUS * 2.2 ? "Preview dugout exposed" : "Preview dugout reachable",
+          shortReason: enemyDistance <= DUGOUT_SHELTER_RADIUS * 2.2 ? "Dugout is too far forward under pressure" : pathReason,
+          detailLines: [`Enemy camp distance: ${Math.round(enemyDistance)}m`, `Path from camp: ${Math.round(homeDistance)}m`],
+          worldX: previewPosition.x + 38,
+          worldY: previewPosition.y - 18,
+          pulse: enemyDistance <= DUGOUT_SHELTER_RADIUS * 2.2 ? "danger" : "none"
+        });
+      }
+    }
+
+    for (const network of trenchReport.networks) {
+      const combo = comboByNetworkId.get(`${network.faction}:${network.networkId}`) ?? null;
+      for (const segment of network.segments) {
+        const slots = segment.slotIds
+          .map((slotId) => this.findCoverSlot(slotId))
+          .filter((slot): slot is TownWarCoverSlotState => slot !== null);
+        const occupiedSoldiers = segment.occupiedBySoldierIds
+          .map((soldierId) => this.findSoldierById(soldierId))
+          .filter((soldier): soldier is TownWarSoldierState => soldier !== null && soldier.health.current > 0);
+        const fightingSoldiers = occupiedSoldiers.filter(
+          (soldier) =>
+            this.getCombatFireProfile(soldier) !== null &&
+            soldier.targetIntent.targetKind !== "none"
+        );
+        const suppressingSoldiers = fightingSoldiers.filter((soldier) => soldier.task.kind === "suppress");
+        const hasSoldierAmmo = occupiedSoldiers.some((soldier) => soldier.ammo.inMag + soldier.ammo.reserve > 0);
+        const hasLinkedAmmo = Boolean(combo?.ammo.linked);
+        const pinnedSoldiers = occupiedSoldiers.filter(
+          (soldier) =>
+            soldier.morale.pressure / Math.max(1, soldier.morale.maxPressure) >= 0.72 ||
+            soldier.tacticalIntent.state === "fallback" ||
+            soldier.tacticalIntent.state === "reload-behind-cover"
+        );
+        const woundedSoldiers = occupiedSoldiers.filter((soldier) => activeCasualtyBySoldierId.has(soldier.id) || soldier.health.current <= soldier.health.max * 0.35);
+        const firstSlot = slots[0] ?? null;
+        const enemyCamp = this.getCamp(this.getOpposingCampId(network.faction));
+        const facingAngle = firstSlot?.facingAngleRadians ?? (network.faction === "camp-a" ? Math.PI : 0);
+        const targetAngle = enemyCamp ? Math.atan2(enemyCamp.spawn.position.y - segment.center.y, enemyCamp.spawn.position.x - segment.center.x) : facingAngle;
+        const wrongFacing = getFacingDeltaRadians(facingAngle, targetAngle) > Math.PI * 0.62;
+        const noTarget = occupiedSoldiers.length > 0 && fightingSoldiers.length <= 0;
+        const wireBlocksRetreat = combo?.wire.wireBlocksRetreat || segment.retreatHint === "bad-retreat-path";
+
+        let icon = "solid-dot";
+        let tone: TownWarReadabilityIconTone = "ok";
+        let priority = 35;
+        let label = "Trench online idle";
+        let shortReason = "Trench is built and ready";
+        let pulse: TownWarReadabilityPulse = "none";
+
+        if (wrongFacing) {
+          icon = "crossed-sightline";
+          tone = "warn";
+          priority = 86;
+          label = "Trench facing wrong way";
+          shortReason = "Trench faces away from enemy pressure";
+        } else if (occupiedSoldiers.length <= 0) {
+          icon = "person-outline";
+          tone = "warn";
+          priority = 80;
+          label = "Trench needs occupant";
+          shortReason = "No one occupying firing slot";
+        } else if (!hasSoldierAmmo) {
+          icon = "crossed-magazine";
+          tone = "danger";
+          priority = 92;
+          label = "Trench needs ammo";
+          shortReason = "Occupants have no personal ammo";
+          pulse = "slow";
+        } else if (woundedSoldiers.length > 0) {
+          icon = "medical-cross";
+          tone = "danger";
+          priority = 90;
+          label = "Trench casualty";
+          shortReason = "Soldier down in trench";
+          pulse = "slow";
+        } else if (pinnedSoldiers.length > 0) {
+          icon = "warning-chevrons";
+          tone = "danger";
+          priority = 84;
+          label = "Trench pinned";
+          shortReason = "Occupants suppressed";
+          pulse = "danger";
+        } else if (suppressingSoldiers.length > 0) {
+          icon = "stacked-chevrons";
+          tone = "working";
+          priority = 66;
+          label = "Trench suppressing";
+          shortReason = "Trench is applying pressure";
+          pulse = "slow";
+        } else if (fightingSoldiers.length > 0) {
+          icon = "muzzle-burst";
+          tone = "working";
+          priority = 70;
+          label = "Trench firing";
+          shortReason = "Occupied soldiers are attacking from trench";
+          pulse = "shot";
+        } else if (noTarget) {
+          icon = "dim-sightline";
+          tone = "info";
+          priority = 42;
+          label = "Trench idle";
+          shortReason = "No target in arc";
+        }
+
+        const supportLines = [
+          `${segment.occupiedCount}/${segment.slotCount} occupied`,
+          `Personal ammo: ${occupiedSoldiers.reduce((total, soldier) => total + soldier.ammo.inMag + soldier.ammo.reserve, 0)}`,
+          hasLinkedAmmo ? `Linked ammo: ${combo?.ammo.crateIds.join(", ")}` : "Linked ammo: none",
+          combo?.dugout.linked ? `Linked dugout: ${combo.dugout.dugoutIds.join(", ")}` : "Linked dugout: none",
+          wireBlocksRetreat ? "Warning: retreat path blocked" : null
+        ].filter((line): line is string => Boolean(line));
+
+        pushIcon({
+          id: `readability:trench:${segment.segmentId}`,
+          targetType: "trench",
+          targetId: segment.segmentId,
+          icon,
+          tone,
+          priority,
+          label,
+          shortReason,
+          detailLines: [`Network ${segment.networkId}`, ...supportLines],
+          worldX: segment.center.x,
+          worldY: segment.center.y - 26,
+          visibility: tone === "ok" || tone === "info" ? "inspect" : "normal",
+          pulse
+        });
+      }
+    }
+
+    const linkedCrateIds = new Set(comboReport.networks.flatMap((network) => network.ammo.crateIds));
+    for (const crate of this.state.ammoCrates) {
+      const ratio = crate.maxAmmo > 0 ? crate.ammo / crate.maxAmmo : 0;
+      const destroyed = crate.destroyedAtSeconds !== null || crate.health <= 0;
+      const linked = linkedCrateIds.has(crate.id);
+      let icon = "ammo-box-check";
+      let tone: TownWarReadabilityIconTone = "ok";
+      let priority = 34;
+      let label = "Ammo crate stocked";
+      let shortReason = "Ammo crate has usable stock";
+      let pulse: TownWarReadabilityPulse = "none";
+
+      if (destroyed) {
+        icon = "cracked-ammo-box";
+        tone = "disabled";
+        priority = 82;
+        label = "Ammo crate destroyed";
+        shortReason = "Ammo crate is gone or unusable";
+      } else if (crate.ammo <= 0) {
+        icon = "crossed-ammo-box";
+        tone = "danger";
+        priority = 88;
+        label = "Ammo crate empty";
+        shortReason = "No ammo left to support firing";
+        pulse = "slow";
+      } else if (linked) {
+        icon = "chain-ammo-pulse";
+        tone = "working";
+        priority = 64;
+        label = "Ammo crate feeding";
+        shortReason = "Ammo crate is linked to trench support";
+        pulse = "slow";
+      } else if (ratio <= 0.35) {
+        icon = "half-ammo-box";
+        tone = "warn";
+        priority = 62;
+        label = "Ammo crate low";
+        shortReason = "Ammo crate is almost empty";
+      } else {
+        const sameFactionTrench = this.state.aiTactics.coverSlots.some(
+          (slot) => slot.faction === crate.faction && slot.sourceKind === "trench" && getDistance(slot.position, crate.position) <= AMMO_CRATE_RESUPPLY_DISTANCE
+        );
+        if (!sameFactionTrench) {
+          icon = "broken-chain";
+          tone = "warn";
+          priority = 58;
+          label = "Ammo crate unlinked";
+          shortReason = "Stock exists, but no trench uses it";
+        }
+      }
+
+      pushIcon({
+        id: `readability:ammo-crate:${crate.id}`,
+        targetType: "ammo-crate",
+        targetId: crate.id,
+        icon,
+        tone,
+        priority,
+        label,
+        shortReason,
+        detailLines: [
+          `Stock: ${Math.round(crate.ammo)}/${crate.maxAmmo}`,
+          linked ? "Linked: trench network" : "Linked: no active trench feed",
+          `Health: ${Math.round(crate.health)}/${crate.maxHealth}`
+        ],
+        worldX: crate.position.x,
+        worldY: crate.position.y - 20,
+        visibility: tone === "ok" ? "inspect" : "normal",
+        pulse
+      });
+    }
+
+    const trenchSlotsById = new Map(this.state.aiTactics.coverSlots.filter((slot) => slot.sourceKind === "trench").map((slot) => [slot.id, slot]));
+    for (const dugout of this.state.dugouts) {
+      const destroyed = dugout.destroyedAtSeconds !== null || dugout.status === "destroyed" || dugout.health <= 0;
+      const connectedSlots = dugout.connectedTrenchSlotIds.map((slotId) => trenchSlotsById.get(slotId)).filter((slot): slot is TownWarCoverSlotState => Boolean(slot));
+      const enemyCamp = this.getCamp(this.getOpposingCampId(dugout.faction));
+      const enemyDistance = enemyCamp ? getDistance(dugout.position, enemyCamp.spawn.position) : Number.POSITIVE_INFINITY;
+      let icon = "chain-shield";
+      let tone: TownWarReadabilityIconTone = "ok";
+      let priority = 36;
+      let label = "Dugout linked";
+      let shortReason = "Dugout supports the trench network";
+      let pulse: TownWarReadabilityPulse = "none";
+
+      if (destroyed) {
+        icon = "cracked-shield";
+        tone = "disabled";
+        priority = 86;
+        label = "Dugout destroyed";
+        shortReason = "Dugout support is gone";
+      } else if (dugout.status === "damaged") {
+        icon = "cracked-shield";
+        tone = "danger";
+        priority = 78;
+        label = "Dugout damaged";
+        shortReason = "Dugout support is degraded";
+      } else if (connectedSlots.length <= 0) {
+        icon = "broken-chain";
+        tone = "warn";
+        priority = 74;
+        label = "Dugout not linked";
+        shortReason = "Too far from trench network";
+      } else if (dugout.shelteringSoldierIds.length > 0) {
+        icon = "shield-pulse";
+        tone = "working";
+        priority = 68;
+        label = "Dugout shelter active";
+        shortReason = "Wounded or suppressed soldiers are sheltering";
+        pulse = "slow";
+      } else if (enemyDistance <= dugout.shelterRadius * 2.2) {
+        icon = "warning-shield";
+        tone = "danger";
+        priority = 70;
+        label = "Dugout exposed";
+        shortReason = "Dugout under direct pressure";
+        pulse = "danger";
+      }
+
+      pushIcon({
+        id: `readability:dugout:${dugout.id}`,
+        targetType: "dugout",
+        targetId: dugout.id,
+        icon,
+        tone,
+        priority,
+        label,
+        shortReason,
+        detailLines: [
+          `Connected slots: ${connectedSlots.length}`,
+          `Sheltering: ${dugout.shelteringSoldierIds.length}`,
+          `Status: ${dugout.status}`,
+          dugout.readable
+        ],
+        worldX: dugout.position.x,
+        worldY: dugout.position.y - 22,
+        visibility: tone === "ok" ? "inspect" : "normal",
+        pulse
+      });
+    }
+
+    for (const soldier of this.state.soldiers) {
+      if (soldier.health.current <= 0) {
+        continue;
+      }
+      const casualty = activeCasualtyBySoldierId.get(soldier.id) ?? null;
+      const pressureRatio = soldier.morale.pressure / Math.max(1, soldier.morale.maxPressure);
+      const ammoTotal = soldier.ammo.inMag + soldier.ammo.reserve;
+      const fireProfile = this.getCombatFireProfile(soldier);
+      let icon = "route-arrow";
+      let tone: TownWarReadabilityIconTone = "info";
+      let priority = 20;
+      let label = "Soldier moving";
+      let shortReason = "Following an order";
+      let visibility: TownWarReadabilityVisibility = "inspect";
+      let pulse: TownWarReadabilityPulse = "none";
+
+      if (fireProfile?.kind === "suppress") {
+        icon = "stacked-chevrons";
+        tone = "working";
+        priority = 98;
+        label = "Soldier suppressing";
+        shortReason = `${soldier.displayName} is pinning a lane`;
+        visibility = "normal";
+        pulse = "shot";
+      } else if (fireProfile && soldier.targetIntent.targetKind !== "none") {
+        icon = "muzzle-burst";
+        tone = "working";
+        priority = 97;
+        label = "Soldier firing";
+        shortReason =
+          soldier.task.kind === "attack" || soldier.task.kind === "defend" || soldier.task.kind === "build" || soldier.task.kind === "resupply" || soldier.task.kind === "heal"
+            ? `${soldier.displayName} is fighting through the task`
+            : `${soldier.displayName} is firing from trench`;
+        visibility = "normal";
+        pulse = "shot";
+      } else if (casualty || soldier.currentNeed === "wounded" || soldier.health.current <= soldier.health.max * 0.35) {
+        icon = "medical-cross";
+        tone = "danger";
+        priority = 96;
+        label = "Soldier wounded";
+        shortReason = casualty ? `${soldier.displayName} is ${casualty.status}` : `${soldier.displayName} is badly hurt`;
+        visibility = "normal";
+        pulse = "slow";
+      } else if (soldier.task.kind === "heal") {
+        icon = "cross-arrow";
+        tone = "working";
+        priority = 82;
+        label = "Soldier rescuing";
+        shortReason = `${soldier.displayName} is recovering a casualty`;
+        visibility = "normal";
+        pulse = "slow";
+      } else if (pressureRatio >= 0.72 || soldier.tacticalIntent.state === "fallback") {
+        icon = soldier.tacticalIntent.state === "fallback" ? "rear-arrow" : "warning-chevrons";
+        tone = "danger";
+        priority = 80;
+        label = soldier.tacticalIntent.state === "fallback" ? "Soldier retreating" : "Soldier pinned";
+        shortReason =
+          soldier.tacticalIntent.state === "fallback"
+            ? `${soldier.displayName} is falling back`
+            : `${soldier.displayName} is suppressed`;
+        visibility = "normal";
+        pulse = "danger";
+      } else if (ammoTotal <= 0) {
+        icon = "crossed-magazine";
+        tone = "danger";
+        priority = 78;
+        label = "Soldier out of ammo";
+        shortReason = `${soldier.displayName} cannot keep fighting`;
+        visibility = "normal";
+        pulse = "slow";
+      } else if (ammoTotal <= soldier.ammo.maxMag) {
+        icon = "half-magazine";
+        tone = "warn";
+        priority = 60;
+        label = "Soldier low ammo";
+        shortReason = `${soldier.displayName} needs resupply soon`;
+        visibility = "normal";
+      } else if (soldier.task.kind === "build") {
+        icon = "hammer";
+        tone = "working";
+        priority = 52;
+        label = "Soldier building";
+        shortReason = `${soldier.displayName} is constructing`;
+      } else if (soldier.task.kind === "resupply") {
+        icon = "ammo-box";
+        tone = "working";
+        priority = 50;
+        label = "Soldier resupplying";
+        shortReason = `${soldier.displayName} is moving ammo`;
+      } else if (soldier.coverIntent.coverSlotId) {
+        icon = "shield";
+        tone = "ok";
+        priority = 36;
+        label = "Soldier in cover";
+        shortReason = `${soldier.displayName} is holding cover`;
+      } else if (soldier.task.kind === "idle") {
+        icon = "question-warning";
+        tone = "warn";
+        priority = 38;
+        label = "Soldier idle";
+        shortReason = `${soldier.displayName} has no useful task`;
+      }
+
+      pushIcon({
+        id: `readability:soldier:${soldier.id}`,
+        targetType: "soldier",
+        targetId: soldier.id,
+        icon,
+        tone,
+        priority,
+        label,
+        shortReason,
+        detailLines: [
+          `${soldier.displayName} | ${soldier.role}`,
+          `Task: ${soldier.task.label ?? soldier.task.kind}`,
+          `Ammo: ${soldier.ammo.inMag}/${soldier.ammo.reserve}`,
+          `Pressure: ${Math.round(pressureRatio * 100)}%`
+        ],
+        worldX: soldier.position.x,
+        worldY: soldier.position.y - 24,
+        visibility,
+        pulse
+      });
+    }
+
+    icons.sort((left, right) => right.priority - left.priority || left.id.localeCompare(right.id));
+    const byTargetType: Record<TownWarReadabilityTargetType, number> = {
+      trench: 0,
+      "ammo-crate": 0,
+      dugout: 0,
+      soldier: 0,
+      camp: 0
+    };
+    const byTone: Record<TownWarReadabilityIconTone, number> = {
+      ok: 0,
+      working: 0,
+      warn: 0,
+      danger: 0,
+      disabled: 0,
+      info: 0
+    };
+    for (const icon of icons) {
+      byTargetType[icon.targetType] += 1;
+      byTone[icon.tone] += 1;
+    }
+
+    const totals = {
+      icons: icons.length,
+      normal: icons.filter((icon) => icon.visibility === "normal").length,
+      inspect: icons.filter((icon) => icon.visibility === "inspect").length,
+      buildPreview: icons.filter((icon) => icon.visibility === "build-preview").length,
+      blockers: icons.filter((icon) => icon.tone === "warn" || icon.tone === "danger" || icon.tone === "disabled").length,
+      byTargetType,
+      byTone
+    };
+    const topReads = icons
+      .filter((icon) => icon.visibility === "normal")
+      .slice(0, 8)
+      .map((icon) => `${icon.label}: ${icon.shortReason}`);
+    const readable =
+      topReads.length > 0
+        ? `Readability overlay: ${totals.icons} icons, ${totals.blockers} blockers. ${topReads.join(" | ")}`
+        : `Readability overlay: ${totals.icons} icons, no urgent blockers.`;
+
+    return { ok: true, icons, totals, readable };
   }
 
   focusLane(campId: TownWarFactionId, lane: TownWarOfficerLaneId): TownWarOfficerFocusResult {
@@ -6238,13 +9271,20 @@ export class TownWarController {
                   targetPosition: cloneVec2(this.getCampSpawn(campId).position),
                   targetEntityId: campId
                 }
-              : selectedWork === "Scout"
+            : selectedWork === "Scout"
                 ? {
                     kind: "defend",
                     label: `Order: watch ${lane} flank`,
                     targetPosition: { x: focusX, y: laneY + (soldier.id.endsWith("1") ? -70 : 70) },
                     targetEntityId: null
                   }
+                : selectedWork === "Assault"
+                  ? {
+                      kind: "attack",
+                      label: `Order: press ${lane} lane`,
+                      targetPosition: { x: focusX + (campId === "camp-a" ? -90 : 90), y: laneY },
+                      targetEntityId: null
+                    }
                 : {
                     kind: "defend",
                     label: `Order: hold ${lane} lane`,
@@ -6286,6 +9326,20 @@ export class TownWarController {
           cooldownKey: `${soldier.id}:order-rest:${lane}`,
           cooldownSeconds: 10
         });
+        if (!this.hasRecentFrontlineStory(soldier.id, "recover", 28)) {
+          this.pushFrontlineStory({
+            kind: "recover",
+            faction: soldier.faction,
+            soldier,
+            work: "Rest",
+            orderId: null,
+            relatedId: campId,
+            position: this.getCampSpawn(campId).position,
+            summary: `${soldier.displayName} rotated off ${lane} because fatigue beat the fight score.`,
+            consequence: `Rest priority is visible now: ${soldier.displayName} stops being a bad assault body and starts recovering for the next push.`,
+            memoryTag: `rest-cycle-${lane}`
+          });
+        }
       } else if (selectedWork !== "Suppress" && !holdChatterSent) {
         holdChatterSent = true;
         this.pushChatter({
@@ -6543,6 +9597,33 @@ export class TownWarController {
       this.refreshTaskDecisionForSoldier(soldier, soldier.position);
     }
     this.tickCampSustainment(0);
+    const responder = this.state.soldiers
+      .filter((soldier) => soldier.faction === campId && soldier.health.current > 0)
+      .map((soldier) => ({
+        soldier,
+        decision: this.refreshTaskDecisionForSoldier(soldier, soldier.task.targetPosition ?? soldier.position)
+      }))
+      .find(({ decision }) =>
+        work === "Cook"
+          ? decision.selectedWork === "Cook"
+          : work === "Resupply"
+            ? decision.selectedWork === "Resupply" || decision.selectedWork === "Haul"
+            : decision.selectedWork === "Rest"
+      );
+    if (responder && !this.hasRecentFrontlineStory(responder.soldier.id, "priority", 8)) {
+      this.pushFrontlineStory({
+        kind: "priority",
+        faction: campId,
+        soldier: responder.soldier,
+        work: responder.decision.selectedWork,
+        orderId: null,
+        relatedId: campId,
+        position: responder.soldier.position,
+        summary: `${camp.label} camp priority changed: ${work} ${value}.`,
+        consequence: `${responder.soldier.displayName} is the first visible response, now leaning toward ${responder.decision.selectedWork ?? "no work"} with score ${Math.round(responder.decision.selectedScore)}.`,
+        memoryTag: `camp-priority-${work.toLowerCase()}-${value}`
+      });
+    }
     return { ok: true, reason: null, campId, work, priority: value, report: this.getSustainmentReport() };
   }
 
@@ -6882,6 +9963,20 @@ export class TownWarController {
 
     soldier.workPriorities[work] = Math.round(clamp(priority, 0, 5));
     const decision = this.refreshTaskDecisionForSoldier(soldier, soldier.task.targetPosition ?? soldier.position);
+    if (!this.hasRecentFrontlineStory(soldier.id, "priority", 8)) {
+      this.pushFrontlineStory({
+        kind: "priority",
+        faction: soldier.faction,
+        soldier,
+        work,
+        orderId: null,
+        relatedId: soldier.id,
+        position: soldier.position,
+        summary: `${soldier.displayName} priority changed: ${work} ${soldier.workPriorities[work]}.`,
+        consequence: `Decision stack now favors ${decision.selectedWork ?? "no work"} with score ${Math.round(decision.selectedScore)}${decision.blockedReason ? `, blocked by ${decision.blockedReason}` : ""}.`,
+        memoryTag: `priority-${work.toLowerCase()}-${soldier.workPriorities[work]}`
+      });
+    }
     return {
       ok: true,
       reason: null,
@@ -6921,6 +10016,20 @@ export class TownWarController {
     }
 
     const decision = this.refreshTaskDecisionForSoldier(soldier, soldier.task.targetPosition ?? soldier.position);
+    if (!this.hasRecentFrontlineStory(soldier.id, "priority", 8)) {
+      this.pushFrontlineStory({
+        kind: "priority",
+        faction: soldier.faction,
+        soldier,
+        work: decision.selectedWork,
+        orderId: null,
+        relatedId: preset,
+        position: soldier.position,
+        summary: `${soldier.displayName} received the ${preset} priority preset.`,
+        consequence: `The RimWorld layer now sees ${decision.selectedWork ?? "no work"} as the top job with score ${Math.round(decision.selectedScore)}.`,
+        memoryTag: `priority-preset-${preset}`
+      });
+    }
     return {
       ok: true,
       reason: null,
@@ -6989,6 +10098,176 @@ export class TownWarController {
     };
   }
 
+  applySoldierSquadRaidOutcome(
+    soldierId: string,
+    outcome: {
+      healthCurrent?: number | null;
+      healthMax?: number | null;
+      ammoInMag?: number | null;
+      reserveAmmo?: number | null;
+      fatigue?: number | null;
+      morale?: number | null;
+      pressure?: number | null;
+      killed?: boolean | null;
+      assigned?: boolean | null;
+      legacySquadMateId?: string | null;
+    }
+  ): TownWarSoldierState | null {
+    this.ensureDemoSeeded();
+    const soldier = this.findSoldierById(soldierId);
+    if (!soldier) {
+      return null;
+    }
+
+    if (outcome.killed) {
+      soldier.health.current = 0;
+    } else if (Number.isFinite(outcome.healthCurrent)) {
+      soldier.health.current = Math.max(0, Math.min(soldier.health.max, Math.round(outcome.healthCurrent ?? soldier.health.current)));
+    }
+    if (Number.isFinite(outcome.healthMax)) {
+      soldier.health.max = Math.max(1, Math.round(outcome.healthMax ?? soldier.health.max));
+      soldier.health.current = Math.min(soldier.health.current, soldier.health.max);
+    }
+    if (Number.isFinite(outcome.ammoInMag)) {
+      soldier.ammo.inMag = Math.max(0, Math.min(soldier.ammo.maxMag, Math.floor(outcome.ammoInMag ?? soldier.ammo.inMag)));
+    }
+    if (Number.isFinite(outcome.reserveAmmo)) {
+      soldier.ammo.reserve = Math.max(0, Math.floor(outcome.reserveAmmo ?? soldier.ammo.reserve));
+    }
+    if (Number.isFinite(outcome.fatigue)) {
+      soldier.needs.fatigue = clampNeed(outcome.fatigue ?? soldier.needs.fatigue);
+    }
+    if (Number.isFinite(outcome.morale)) {
+      soldier.needs.morale = clampNeed(outcome.morale ?? soldier.needs.morale);
+    }
+    if (Number.isFinite(outcome.pressure)) {
+      soldier.morale.pressure = Math.max(0, Math.min(soldier.morale.maxPressure, outcome.pressure ?? soldier.morale.pressure));
+    }
+
+    soldier.experience.operations += 1;
+    soldier.squadBridge = {
+      ...soldier.squadBridge,
+      status: outcome.assigned === false || outcome.killed ? "camp" : "assigned",
+      legacySquadMateId: outcome.killed ? null : outcome.legacySquadMateId ?? soldier.squadBridge.legacySquadMateId,
+      squadSlot: outcome.killed ? null : soldier.squadBridge.squadSlot,
+      operatorMenuVisible: true
+    };
+    soldier.currentNeed = deriveCurrentNeed(soldier.needs, soldier.health.current, soldier.health.max, soldier.ammo.reserve);
+    soldier.identitySummary = buildIdentitySummary(soldier.skills, soldier.traits, soldier.currentNeed, soldier.dramaArc.trustInOfficer);
+    this.refreshTaskDecisionForSoldier(soldier, soldier.task.targetPosition ?? soldier.position);
+    return soldier;
+  }
+
+  private getTrenchResumeCombatTask(soldier: TownWarSoldierState, slot: TownWarCoverSlotState): TownWarTask {
+    const combatKind =
+      soldier.task.kind === "attack" || soldier.task.kind === "suppress" || soldier.task.kind === "defend"
+        ? soldier.task.kind
+        : soldier.role === "suppressor"
+          ? "suppress"
+          : "defend";
+    const verb = combatKind === "attack" ? "Press" : combatKind === "suppress" ? "Suppress" : "Hold";
+    return {
+      kind: combatKind,
+      label: `${verb} from ${slot.label}`,
+      targetPosition: null,
+      targetEntityId: slot.id
+    };
+  }
+
+  setSoldierTaskForDebug(
+    soldierId: string,
+    taskKind: TownWarTask["kind"],
+    label: string | null = null,
+    targetPosition?: Vec2 | null
+  ): TownWarPriorityMutationResult {
+    this.ensureDemoSeeded();
+    const soldier = this.findSoldierById(soldierId);
+    if (!soldier) {
+      return { ok: false, reason: "soldier-missing", soldierId, work: null, priority: null, soldier: null, candidates: [] };
+    }
+    soldier.task = {
+      kind: taskKind,
+      label,
+      targetPosition:
+        targetPosition && Number.isFinite(targetPosition.x) && Number.isFinite(targetPosition.y)
+          ? cloneVec2(targetPosition)
+          : null,
+      targetEntityId: null
+    };
+    const decision = this.refreshTaskDecisionForSoldier(soldier, soldier.position);
+    return {
+      ok: true,
+      reason: null,
+      soldierId: soldier.id,
+      work: decision.selectedWork,
+      priority: decision.selectedWork ? soldier.workPriorities[decision.selectedWork] : null,
+      soldier,
+      candidates: decision.candidates
+    };
+  }
+
+  stageSoldierInCoverSlotForDebug(
+    soldierId: string,
+    coverSlotId: string,
+    taskKind: TownWarTask["kind"] = "hold"
+  ): TownWarPriorityMutationResult {
+    this.ensureDemoSeeded();
+    const soldier = this.findSoldierById(soldierId);
+    const slot = this.findCoverSlot(coverSlotId);
+    if (!soldier) {
+      return { ok: false, reason: "soldier-missing", soldierId, work: null, priority: null, soldier: null, candidates: [] };
+    }
+    if (!slot) {
+      return { ok: false, reason: "cover-slot-missing", soldierId, work: null, priority: null, soldier, candidates: [] };
+    }
+    if (slot.faction !== soldier.faction) {
+      return { ok: false, reason: "cover-slot-wrong-faction", soldierId, work: null, priority: null, soldier, candidates: [] };
+    }
+
+    for (const coverSlot of this.state.aiTactics.coverSlots) {
+      if (coverSlot.occupiedBySoldierId === soldier.id) {
+        coverSlot.occupiedBySoldierId = null;
+      }
+    }
+    const displaced = slot.occupiedBySoldierId ? this.findSoldierById(slot.occupiedBySoldierId) : null;
+    if (displaced && displaced.id !== soldier.id) {
+      displaced.coverIntent = createNoCoverIntent("debug displaced from staged cover");
+    }
+
+    soldier.position = cloneVec2(slot.position);
+    soldier.task = {
+      kind: taskKind,
+      label: `Debug trench ${taskKind}`,
+      targetPosition: null,
+      targetEntityId: slot.id
+    };
+    soldier.coverIntent = {
+      coverSlotId: slot.id,
+      state: "occupying",
+      reason: `debug occupying ${slot.label}`
+    };
+    soldier.tacticalIntent = {
+      state: "hold-cover",
+      reason: `debug occupying ${slot.label}`,
+      coverSlotId: slot.id,
+      partnerId: null,
+      pressureRatio: Number((soldier.morale.pressure / Math.max(1, soldier.morale.maxPressure)).toFixed(3)),
+      lastUpdatedAtSeconds: this.state.clock.seconds
+    };
+    slot.occupiedBySoldierId = soldier.id;
+
+    const decision = this.refreshTaskDecisionForSoldier(soldier, soldier.position);
+    return {
+      ok: true,
+      reason: null,
+      soldierId: soldier.id,
+      work: decision.selectedWork,
+      priority: decision.selectedWork ? soldier.workPriorities[decision.selectedWork] : null,
+      soldier,
+      candidates: decision.candidates
+    };
+  }
+
   orderTrenchForBuilder(
     builderId: string,
     targetPosition?: Vec2 | null,
@@ -7018,10 +10297,13 @@ export class TownWarController {
         : { x: this.getCampFrontlineX(campId, 190), y: this.getCampSpawn(campId).position.y - 72 };
     const riskTier = this.computeRiskTier(campId, position);
     const orderId = buildOrderId(this.state);
+    const facingAngle = campId === "camp-a" ? Math.PI : 0;
+    const networkPlacement = this.resolveTrenchNetworkPlacement(campId, position, facingAngle, orderId);
+    const buildPosition = networkPlacement.position;
     const task: TownWarTask = {
       kind: "build",
-      label: `Build test: trench @ ${Math.round(position.x)},${Math.round(position.y)}`,
-      targetPosition: position,
+      label: `Build test: trench @ ${Math.round(buildPosition.x)},${Math.round(buildPosition.y)}`,
+      targetPosition: buildPosition,
       targetEntityId: orderId
     };
 
@@ -7029,30 +10311,31 @@ export class TownWarController {
       camp.supply.build = Math.max(0, camp.supply.build - costBuild);
     }
     builder.task = task;
-    this.recordSelectedWork(builder, "Build", position, riskTier);
+    this.recordSelectedWork(builder, "Build", buildPosition, riskTier);
 
     const coveredBy = coveredById ? this.findSoldierById(coveredById) : null;
     if (coveredBy && coveredBy.faction === campId) {
       coveredBy.task = {
         kind: "suppress",
         label: `Cover build: ${orderId}`,
-        targetPosition: cloneVec2(position),
+        targetPosition: cloneVec2(buildPosition),
         targetEntityId: orderId
       };
-      this.recordSelectedWork(coveredBy, "Suppress", position, riskTier);
+      this.recordSelectedWork(coveredBy, "Suppress", buildPosition, riskTier);
     }
 
     const buildOrder: TownWarBuildOrderState = {
       id: orderId,
       kind: "trench",
       faction: campId,
-      position: cloneVec2(position),
-      facingAngleRadians: campId === "camp-a" ? Math.PI : 0,
+      position: cloneVec2(buildPosition),
+      facingAngleRadians: facingAngle,
       status: "assigned",
       assignedSoldierId: builder.id,
-      build: this.createBuildExecution(campId, position),
+      build: this.createBuildExecution(campId, buildPosition),
       ammoPayload: null,
       builtEntityId: null,
+      trenchNetwork: cloneTrenchNetwork(networkPlacement.trenchNetwork),
       createdAtSeconds: this.state.clock.seconds,
       completedAtSeconds: null
     };
@@ -7066,8 +10349,8 @@ export class TownWarController {
     this.pushChatter({
       faction: builder.faction,
       channel: this.buildSoldierChannel(builder),
-      text: `Build test order received at ${Math.round(position.x)},${Math.round(position.y)}.`,
-      tags: ["order", "build", "trench", "skill-test"],
+      text: `Build test order received at ${Math.round(buildPosition.x)},${Math.round(buildPosition.y)}. ${networkPlacement.trenchNetwork.readable}`,
+      tags: ["order", "build", "trench", "skill-test", `network-${networkPlacement.trenchNetwork.placementKind}`],
       cooldownKey: `${builder.id}:build-test:${orderId}`,
       cooldownSeconds: 8
     });
@@ -7081,9 +10364,10 @@ export class TownWarController {
       assignedRole: builder.role,
       task,
       orderId,
-      travelDistance: getDistance(builder.position, position),
-      etaSeconds: getDistance(builder.position, position) / DEFAULT_MOVEMENT_SPEED,
-      riskTier
+      travelDistance: getDistance(builder.position, buildPosition),
+      etaSeconds: getDistance(builder.position, buildPosition) / DEFAULT_MOVEMENT_SPEED,
+      riskTier,
+      trenchNetwork: cloneTrenchNetwork(networkPlacement.trenchNetwork)
     };
   }
 
@@ -7100,8 +10384,1026 @@ export class TownWarController {
     const readable =
       `${order.id} ${order.kind} ${order.status}: ${progressPercent}% (${order.build.progress}/${order.build.requiredProgress}) ` +
       `rate ${order.build.buildRate}/s stall ${order.build.stallReason ?? "none"} support ${order.build.supportingSuppressorId ?? "none"} ` +
-      `ammo ${order.build.supportAmmoState} stage ${this.getBuildFeedbackStage(order)} cause ${order.build.outcomeCause ?? order.build.causeChain.join(" > ")}`;
+      `ammo ${order.build.supportAmmoState} stage ${this.getBuildFeedbackStage(order)} cause ${order.build.outcomeCause ?? order.build.causeChain.join(" > ")}${
+        order.trenchNetwork ? ` network ${order.trenchNetwork.placementKind}/${order.trenchNetwork.retreatHint}` : ""
+      }`;
     return { ok: true, reason: null, order, builder, supportingSuppressor, readable };
+  }
+
+  getWorkQueueReport(campId?: TownWarFactionId | null): TownWarWorkQueueReport {
+    this.ensureDemoSeeded();
+    this.tickCampSustainment(0);
+
+    const actualCampId = campId === "camp-a" || campId === "camp-b" ? campId : null;
+    const activeCasualties = this.state.casualties.filter(
+      (casualty) => casualty.status === "wounded" || casualty.status === "downed"
+    );
+    const activeOrders = this.state.orders.filter((order) => order.status === "assigned");
+    const activeCasualtyById = new Map(activeCasualties.map((casualty) => [casualty.id, casualty]));
+    const activeCasualtyBySoldierId = new Map(activeCasualties.map((casualty) => [casualty.soldierId, casualty]));
+    const activeOrderById = new Map(activeOrders.map((order) => [order.id, order]));
+
+    const resolveWork = (soldier: TownWarSoldierState): TownWarWorkPriorityId | null => {
+      const selected = soldier.taskDecision.selectedWork;
+      if (selected && this.getTaskKindForWork(selected) === soldier.task.kind) {
+        return selected;
+      }
+      if (soldier.task.kind === "build") {
+        return "Build";
+      }
+      if (soldier.task.kind === "heal") {
+        return selected === "Medic" ? "Medic" : "Rescue";
+      }
+      if (soldier.task.kind === "resupply") {
+        return selected === "Haul" ? "Haul" : "Resupply";
+      }
+      if (soldier.task.kind === "suppress") {
+        return "Suppress";
+      }
+      if (soldier.task.kind === "defend") {
+        return selected === "Scout" ? "Scout" : "Defend";
+      }
+      if (soldier.task.kind === "attack") {
+        return "Assault";
+      }
+      if (soldier.task.kind === "hold" && soldier.task.label?.toLowerCase().includes("rest")) {
+        return "Rest";
+      }
+      if (soldier.currentNeed === "tired" && soldier.needs.fatigue >= 0.68) {
+        return "Rest";
+      }
+      return selected ?? null;
+    };
+
+    const resolveState = (
+      soldier: TownWarSoldierState,
+      order: TownWarBuildOrderState | null,
+      casualty: TownWarCasualtyState | null,
+      targetPosition: Vec2 | null
+    ): TownWarWorkQueueEntryState => {
+      if (soldier.health.current <= 0 || soldier.currentNeed === "wounded") {
+        return "recovering";
+      }
+      if (soldier.task.kind === "idle") {
+        return "idle";
+      }
+      if (soldier.task.kind === "build" && order) {
+        if (order.build.stalled) {
+          return "blocked";
+        }
+        return getDistance(soldier.position, order.position) > 8 ? "moving" : "working";
+      }
+      if (soldier.task.kind === "heal" && casualty) {
+        return getDistance(soldier.position, casualty.position) > 10 ? "moving" : "working";
+      }
+      if (casualty?.assignedMedicId === soldier.id) {
+        return "blocked";
+      }
+      if (targetPosition && (soldier.task.kind === "move" || getDistance(soldier.position, targetPosition) > 96)) {
+        return "moving";
+      }
+      if (soldier.task.kind === "hold" && soldier.task.label?.toLowerCase().includes("rest")) {
+        return "recovering";
+      }
+      return "working";
+    };
+
+    const buildOwnerRead = (
+      soldier: TownWarSoldierState,
+      work: TownWarWorkPriorityId | null,
+      order: TownWarBuildOrderState | null,
+      casualty: TownWarCasualtyState | null,
+      targetSoldier: TownWarSoldierState | null
+    ): string => {
+      if (order && soldier.task.kind === "build") {
+        return `${soldier.displayName} owns ${order.kind} ${order.id}`;
+      }
+      if (order && soldier.task.kind === "suppress") {
+        const builder = order.assignedSoldierId ? this.findSoldierById(order.assignedSoldierId) : null;
+        return `${soldier.displayName} covers ${builder?.displayName ?? "the builder"}`;
+      }
+      if (casualty && soldier.task.kind === "heal") {
+        return `${soldier.displayName} rescues ${targetSoldier?.displayName ?? casualty.soldierId}`;
+      }
+      if (casualty?.assignedMedicId === soldier.id) {
+        return `${soldier.displayName} owns rescue for ${targetSoldier?.displayName ?? casualty.soldierId}`;
+      }
+      if (work === "Resupply" || work === "Haul") {
+        return `${soldier.displayName} keeps ammo moving`;
+      }
+      if (work === "Rest") {
+        return `${soldier.displayName} rotates out to recover`;
+      }
+      if (work === "Assault") {
+        return `${soldier.displayName} is marked for a push`;
+      }
+      return `${soldier.displayName} works ${work ?? soldier.task.kind}`;
+    };
+
+    const buildConsequenceRead = (
+      soldier: TownWarSoldierState,
+      work: TownWarWorkPriorityId | null,
+      order: TownWarBuildOrderState | null,
+      casualty: TownWarCasualtyState | null,
+      candidate: TownWarTaskCandidateState | null
+    ): string => {
+      if (order && soldier.task.kind === "build") {
+        const progress = order.build.requiredProgress > 0 ? Math.round((order.build.progress / order.build.requiredProgress) * 100) : 0;
+        return `${soldier.displayName} builds at ${order.build.buildRate}/s, ${progress}% done, ${Math.round(soldier.needs.fatigue * 100)}% fatigue.`;
+      }
+      if (order && soldier.task.kind === "suppress") {
+        return `${soldier.displayName} gives ${Math.round(order.build.coverFireSupport * 100)}% cover fire; ammo support is ${order.build.supportAmmoState}.`;
+      }
+      if (casualty && soldier.task.kind === "heal") {
+        const progress = casualty.requiredTreatment > 0 ? Math.round((casualty.treatmentProgress / casualty.requiredTreatment) * 100) : 0;
+        return `${soldier.displayName} treatment is ${progress}% complete on a ${casualty.rescueReason}.`;
+      }
+      if (casualty?.assignedMedicId === soldier.id) {
+        return `${soldier.displayName} cannot reach treatment yet: ${casualty.outcomeCause ?? casualty.rescueReason}.`;
+      }
+      if (work === "Rest") {
+        return `${soldier.displayName} is tired enough that assault work scores worse than recovery.`;
+      }
+      if (work === "Assault") {
+        return `${soldier.displayName} assault reliability is limited by ${Math.round(soldier.needs.fatigue * 100)}% fatigue.`;
+      }
+      return candidate
+        ? `${soldier.displayName} chose ${work ?? "work"} because score ${candidate.score}: ${candidate.reason}.`
+        : `${soldier.displayName} is waiting for a clearer job.`;
+    };
+
+    const entries = this.state.soldiers
+      .filter((soldier) => (actualCampId ? soldier.faction === actualCampId : true))
+      .map<TownWarWorkQueueEntry>((soldier) => {
+        const targetId = soldier.task.targetEntityId ?? null;
+        const order =
+          (targetId ? activeOrderById.get(targetId) ?? null : null) ??
+          activeOrders.find((entry) => entry.assignedSoldierId === soldier.id || entry.build.supportingSuppressorId === soldier.id) ??
+          null;
+        const casualty =
+          (targetId ? activeCasualtyById.get(targetId) ?? null : null) ??
+          activeCasualties.find((entry) => entry.assignedMedicId === soldier.id) ??
+          activeCasualtyBySoldierId.get(soldier.id) ??
+          null;
+        const targetSoldier = casualty ? this.findSoldierById(casualty.soldierId) : null;
+        const work = resolveWork(soldier);
+        const targetPosition = soldier.task.targetPosition ?? order?.position ?? casualty?.position ?? null;
+        const riskTier = targetPosition ? this.computeRiskTier(soldier.faction, targetPosition) : null;
+        const candidate = work
+          ? this.scoreTaskCandidate({
+              soldier,
+              work,
+              targetPosition,
+              riskTier: riskTier ?? undefined,
+              urgency: soldier.task.kind === "build" || soldier.task.kind === "heal" ? 16 : soldier.task.kind === "suppress" ? 12 : 6,
+              supplyNeed: work === "Resupply" || work === "Haul" ? this.getFriendlyAmmoNeed(soldier.faction) * 7 : work === "Rescue" || work === "Medic" ? this.getFriendlyRescueNeed(soldier.faction) * 7 : 0
+            })
+          : null;
+        const state = resolveState(soldier, order, casualty, targetPosition);
+        const warning =
+          candidate?.blockedReason ??
+          (casualty?.assignedMedicId === soldier.id && soldier.task.kind !== "heal" ? casualty.outcomeCause ?? casualty.rescueReason : null) ??
+          (soldier.currentNeed === "wounded"
+            ? "wounded, cannot hold normal work"
+            : soldier.needs.fatigue >= 0.82
+              ? "exhausted: assault and exposed work unreliable"
+              : soldier.needs.fatigue >= 0.68
+                ? "tired: slower builds and weaker pushes"
+                : soldier.ammo.inMag + soldier.ammo.reserve <= soldier.ammo.maxMag * 0.5
+                  ? "low ammo"
+                  : null);
+        const skill = work ? this.getSkillFitForWork(soldier, work) : 0;
+        const ownerRead = buildOwnerRead(soldier, work, order, casualty, targetSoldier);
+        const consequenceRead = buildConsequenceRead(soldier, work, order, casualty, candidate);
+
+        return {
+          soldierId: soldier.id,
+          soldierName: soldier.displayName,
+          role: soldier.role,
+          work,
+          taskKind: soldier.task.kind,
+          taskLabel: soldier.task.label ?? "No assigned work",
+          targetId,
+          targetPosition: targetPosition ? cloneVec2(targetPosition) : null,
+          state,
+          priority: work ? soldier.workPriorities[work] ?? 0 : 0,
+          skill: Number(skill.toFixed(2)),
+          score: Number((candidate?.score ?? 0).toFixed(2)),
+          fatigue: soldier.needs.fatigue,
+          hunger: soldier.needs.hunger,
+          morale: soldier.needs.morale,
+          riskTier,
+          warning,
+          ownerRead,
+          consequenceRead
+        };
+      })
+      .sort((left, right) => {
+        const rank: Record<TownWarWorkQueueEntryState, number> = {
+          working: 0,
+          moving: 1,
+          assigned: 2,
+          blocked: 3,
+          recovering: 4,
+          idle: 5
+        };
+        const stateDelta = rank[left.state] - rank[right.state];
+        if (stateDelta !== 0) {
+          return stateDelta;
+        }
+        return right.score - left.score;
+      });
+
+    const activeCount = entries.filter((entry) => entry.state !== "idle" && entry.state !== "recovering").length;
+    const warnings = uniqueLimited(
+      entries
+        .map((entry) => entry.warning)
+        .filter((warning): warning is string => typeof warning === "string" && warning.length > 0),
+      8
+    );
+    const namedConsequences = entries
+      .filter((entry) => entry.state !== "idle")
+      .map((entry) => entry.consequenceRead)
+      .slice(0, 8);
+    const storyLines = this.state.frontlineStories
+      .filter((story) => (actualCampId ? story.faction === actualCampId : true))
+      .slice(0, 5)
+      .map((story) => `${story.summary} ${story.consequence}`);
+    const debriefLines = uniqueLimited(
+      [...storyLines, ...entries.filter((entry) => entry.state !== "idle").map((entry) => `${entry.ownerRead}. ${entry.consequenceRead}`)],
+      10
+    );
+    const readable =
+      entries.length === 0
+        ? "No soldiers in work queue."
+        : entries
+            .slice(0, 8)
+            .map((entry) => `${entry.soldierName}:${entry.work ?? entry.taskKind}/${entry.state}${entry.warning ? ` (${entry.warning})` : ""}`)
+            .join(" | ");
+
+    return {
+      ok: true,
+      reason: null,
+      campId: actualCampId,
+      entries,
+      activeCount,
+      warnings,
+      namedConsequences,
+      debriefLines,
+      readable
+    };
+  }
+
+  prepareDemolition(
+    campId: TownWarFactionId,
+    requested?: Partial<Record<TownWarDemolitionToolId, number>> | null
+  ): TownWarDemolitionPrepResult {
+    this.ensureDemoSeeded();
+    const camp = this.getCamp(campId);
+    if (!camp) {
+      return { ok: false, reason: "camp-missing", campId, stock: null, campSupply: null, readable: "Demolition prep failed: camp missing." };
+    }
+    if (camp.destroyed || this.state.match.status !== "active") {
+      return { ok: false, reason: "camp-not-active", campId, stock: null, campSupply: cloneSupply(camp.supply), readable: "Demolition prep failed: camp is not active." };
+    }
+
+    const counts = {
+      grenade: Math.max(0, Math.floor(requested?.grenade ?? 3)),
+      satchel: Math.max(0, Math.floor(requested?.satchel ?? 1)),
+      "demo-charge": Math.max(0, Math.floor(requested?.["demo-charge"] ?? 1)),
+      rpg: Math.max(0, Math.floor(requested?.rpg ?? 1))
+    } satisfies Record<TownWarDemolitionToolId, number>;
+    const cost = (Object.keys(counts) as TownWarDemolitionToolId[]).reduce(
+      (total, tool) => {
+        total.ammo += TOWN_WAR_DEMOLITION_TOOL_DAMAGE[tool].ammoCost * counts[tool];
+        total.build += TOWN_WAR_DEMOLITION_TOOL_DAMAGE[tool].buildCost * counts[tool];
+        return total;
+      },
+      { ammo: 0, build: 0 }
+    );
+    if (counts.grenade + counts.satchel + counts["demo-charge"] + counts.rpg <= 0) {
+      return { ok: false, reason: "empty-request", campId, stock: cloneDemolitionStock(this.getDemolitionStock(campId)), campSupply: cloneSupply(camp.supply), readable: "Demolition prep failed: no tools requested." };
+    }
+    if (camp.supply.ammo < cost.ammo || camp.supply.build < cost.build) {
+      return {
+        ok: false,
+        reason: "insufficient-supply",
+        campId,
+        stock: cloneDemolitionStock(this.getDemolitionStock(campId)),
+        campSupply: cloneSupply(camp.supply),
+        readable: `Demolition prep failed: need ${cost.ammo} ammo and ${cost.build} build supply.`
+      };
+    }
+
+    camp.supply.ammo = Number(Math.max(0, camp.supply.ammo - cost.ammo).toFixed(2));
+    camp.supply.build = Number(Math.max(0, camp.supply.build - cost.build).toFixed(2));
+    const stock = this.getDemolitionStock(campId);
+    stock.grenades += counts.grenade;
+    stock.satchels += counts.satchel;
+    stock.demoCharges += counts["demo-charge"];
+    stock.rpgRounds += counts.rpg;
+    stock.preparedAtSeconds = this.state.clock.seconds;
+    this.updateDemolitionStockRead(stock);
+    this.state.operation.recommendations = uniqueLimited(
+      [
+        "Demolition stock prepared: suppress the target camp before ordering a breach.",
+        ...this.state.operation.recommendations
+      ],
+      8
+    );
+    this.state.officer.lastCommandRead = "Prepare camp demolition";
+    this.state.officer.lastCommandAtSeconds = this.state.clock.seconds;
+    this.emitDramaEvent({
+      kind: "demolition-prepared",
+      faction: campId,
+      campId,
+      locationLabel: camp.label,
+      summary: `${camp.label} prepared demolition stock: ${stock.readable}`,
+      tags: ["breach", "demolition", "prepared"]
+    });
+
+    return {
+      ok: true,
+      reason: null,
+      campId,
+      stock: cloneDemolitionStock(stock),
+      campSupply: cloneSupply(camp.supply),
+      readable: `${camp.label} prepared demolition stock: ${stock.readable}`
+    };
+  }
+
+  orderCampBreach(input: {
+    attackerCampId: TownWarFactionId;
+    targetCampId?: TownWarFactionId | null;
+    weakPointId?: string | null;
+    weakPointKind?: TownWarCampWeakPointKind | null;
+    soldierIds?: string[] | null;
+  }): TownWarCampBreachOrderResult {
+    this.ensureDemoSeeded();
+    const attackerCamp = this.getCamp(input.attackerCampId);
+    const targetCampId = input.targetCampId ?? this.getOpposingCampId(input.attackerCampId);
+    const targetCamp = this.getCamp(targetCampId);
+    if (!attackerCamp) {
+      return { ok: false, reason: "attacker-camp-missing", campId: input.attackerCampId, targetCampId, breach: null, weakPoint: null, stock: null, assignedSoldiers: [], readable: "Breach failed: attacker camp missing." };
+    }
+    if (!targetCamp) {
+      return { ok: false, reason: "target-camp-missing", campId: input.attackerCampId, targetCampId, breach: null, weakPoint: null, stock: cloneDemolitionStock(this.getDemolitionStock(input.attackerCampId)), assignedSoldiers: [], readable: "Breach failed: target camp missing." };
+    }
+    if (attackerCamp.destroyed || targetCamp.destroyed || this.state.match.status !== "active") {
+      return {
+        ok: false,
+        reason: "camp-not-active",
+        campId: input.attackerCampId,
+        targetCampId,
+        breach: null,
+        weakPoint: null,
+        stock: cloneDemolitionStock(this.getDemolitionStock(input.attackerCampId)),
+        assignedSoldiers: [],
+        readable: "Breach failed: one of the camps is not active."
+      };
+    }
+    const weakPoint = this.chooseCampWeakPoint(targetCampId, input.weakPointId, input.weakPointKind ?? null);
+    if (!weakPoint) {
+      return {
+        ok: false,
+        reason: "no-live-weak-point",
+        campId: input.attackerCampId,
+        targetCampId,
+        breach: null,
+        weakPoint: null,
+        stock: cloneDemolitionStock(this.getDemolitionStock(input.attackerCampId)),
+        assignedSoldiers: [],
+        readable: "Breach failed: no live camp weak point remains."
+      };
+    }
+    const stock = this.getDemolitionStock(input.attackerCampId);
+    const tool = this.chooseDemolitionTool(stock);
+    if (!tool) {
+      return {
+        ok: false,
+        reason: "no-demolition-stock",
+        campId: input.attackerCampId,
+        targetCampId,
+        breach: null,
+        weakPoint: cloneCampWeakPoint(weakPoint),
+        stock: cloneDemolitionStock(stock),
+        assignedSoldiers: [],
+        readable: "Breach failed: prepare grenades, satchels, or a demo charge first."
+      };
+    }
+
+    const selection = this.selectCampBreachSoldiers(input.attackerCampId, weakPoint.position, input.soldierIds);
+    if (selection.soldiers.length < 4) {
+      return {
+        ok: false,
+        reason: "not-enough-soldiers",
+        campId: input.attackerCampId,
+        targetCampId,
+        breach: null,
+        weakPoint: cloneCampWeakPoint(weakPoint),
+        stock: cloneDemolitionStock(stock),
+        assignedSoldiers: selection.soldiers,
+        readable: `Breach failed: ${selection.soldiers.length}/4 Russian soldiers available.`
+      };
+    }
+
+    const breach: TownWarCampBreachState = {
+      id: buildCampBreachId(this.state),
+      attackerFaction: input.attackerCampId,
+      targetCampId,
+      weakPointId: weakPoint.id,
+      status: "moving",
+      origin: cloneVec2(attackerCamp.spawn.position),
+      targetPosition: cloneVec2(weakPoint.position),
+      rallyPosition: cloneVec2(attackerCamp.spawn.position),
+      assignedSoldierIds: selection.soldiers.map((soldier) => soldier.id),
+      roleBySoldierId: selection.roleBySoldierId,
+      tool,
+      progress: 0,
+      pressure: 0,
+      suppression: 0,
+      damageApplied: 0,
+      triggeredStages: ["ordered"],
+      createdAtSeconds: this.state.clock.seconds,
+      lastUpdatedAtSeconds: this.state.clock.seconds,
+      completedAtSeconds: null,
+      readable: `${selection.soldiers.length} Russian soldiers are breaching ${targetCamp.label} ${weakPoint.label} with ${tool}.`
+    };
+
+    this.state.campBreaches = [breach, ...this.state.campBreaches].slice(0, 8);
+    selection.soldiers.forEach((soldier, index) => this.assignCampBreachSoldierTask(breach, soldier, index));
+    this.state.officer.lastCommandRead = `Breach ${weakPoint.label}`;
+    this.state.officer.lastCommandAtSeconds = this.state.clock.seconds;
+    const leadSoldier = selection.soldiers[0];
+    this.pushFrontlineStory({
+      kind: "breach",
+      faction: breach.attackerFaction,
+      soldier: leadSoldier,
+      work: this.getCampBreachRoleWork(selection.roleBySoldierId[leadSoldier.id] ?? "rifleman"),
+      orderId: breach.id,
+      relatedId: weakPoint.id,
+      position: weakPoint.position,
+      summary: `${leadSoldier.displayName} led a breach team toward ${weakPoint.label}.`,
+      consequence: `${tool} stock is now committed to a real camp weak point instead of abstract camp damage.`,
+      memoryTag: `breach-ordered-${weakPoint.kind}`
+    });
+    this.emitDramaEvent({
+      kind: "camp-breach-ordered",
+      faction: breach.attackerFaction,
+      campId: targetCampId,
+      orderId: breach.id,
+      soldierId: leadSoldier.id,
+      position: weakPoint.position,
+      locationLabel: weakPoint.label,
+      riskTier: this.computeRiskTier(breach.attackerFaction, weakPoint.position),
+      summary: `${leadSoldier.displayName} ordered the team onto ${targetCamp.label} ${weakPoint.label}.`,
+      tags: ["breach", "ordered", weakPoint.kind, tool]
+    });
+
+    return {
+      ok: true,
+      reason: null,
+      campId: input.attackerCampId,
+      targetCampId,
+      breach: cloneCampBreach(breach),
+      weakPoint: cloneCampWeakPoint(weakPoint),
+      stock: cloneDemolitionStock(stock),
+      assignedSoldiers: selection.soldiers.map((soldier) => ({ ...soldier, position: cloneVec2(soldier.position), task: { ...soldier.task } })),
+      readable: breach.readable
+    };
+  }
+
+  getCampDamageReport(campId?: TownWarFactionId | null): TownWarCampDamageReport {
+    this.ensureDemoSeeded();
+    this.tickCampSustainment(0);
+    const selectedCampId = campId ?? null;
+    const weakPoints = selectedCampId ? this.getCampWeakPoints(selectedCampId) : this.state.campWeakPoints;
+    const activeBreaches = this.state.campBreaches.filter((breach) => !this.isFinalCampBreachStatus(breach.status));
+    const damaged = weakPoints.filter((weakPoint) => weakPoint.status !== "intact");
+    const debriefLines = uniqueLimited(
+      [
+        ...damaged.map((weakPoint) => `${weakPoint.label}: ${weakPoint.readable}`),
+        ...activeBreaches.map((breach) => `${breach.id}: ${breach.status} ${Math.round(breach.progress * 100)}% toward ${this.getCampWeakPoint(breach.weakPointId)?.label ?? breach.weakPointId}.`),
+        ...this.state.dialogue.recentDramaEvents.filter((event) => event.tags.includes("breach") || event.tags.includes("weak-point")).map((event) => event.summary)
+      ],
+      12
+    );
+    const readable =
+      weakPoints.length === 0
+        ? "No camp weak points registered."
+        : `${damaged.length}/${weakPoints.length} weak points damaged. Active breaches ${activeBreaches.length}. ${debriefLines[0] ?? "No breach has changed camp capacity yet."}`;
+    return {
+      ok: true,
+      reason: null,
+      campId: selectedCampId,
+      camps: this.state.camps.map((camp) => cloneCamp(camp)),
+      weakPoints: weakPoints.map((weakPoint) => cloneCampWeakPoint(weakPoint)),
+      demolitionStock: this.state.demolitionStock.map((stock) => cloneDemolitionStock(stock)),
+      activeBreaches: activeBreaches.map((breach) => cloneCampBreach(breach)),
+      debriefLines,
+      readable
+    };
+  }
+
+  orderExpedition(
+    campId: TownWarFactionId,
+    objective: TownWarExpeditionObjectiveId = "probe-enemy-approach",
+    soldierIds?: string[] | null
+  ): TownWarExpeditionOrderResult {
+    this.ensureDemoSeeded();
+    const camp = this.getCamp(campId);
+    if (!camp) {
+      return { ok: false, reason: "camp-missing", campId, expedition: null, assignedSoldiers: [], readable: "Expedition failed: camp missing." };
+    }
+    if (camp.destroyed || this.state.match.status !== "active") {
+      return { ok: false, reason: "camp-not-active", campId, expedition: null, assignedSoldiers: [], readable: "Expedition failed: camp is not active." };
+    }
+
+    const objectiveId: TownWarExpeditionObjectiveId =
+      objective === "extend-trench" || objective === "stock-forward-line" || objective === "probe-enemy-approach"
+        ? objective
+        : "probe-enemy-approach";
+    const objectivePosition = this.getExpeditionObjectivePosition(campId, objectiveId);
+    const selection = this.selectExpeditionSoldiers(campId, objectivePosition, soldierIds);
+    if (selection.soldiers.length < 4) {
+      return {
+        ok: false,
+        reason: "not-enough-soldiers",
+        campId,
+        expedition: null,
+        assignedSoldiers: selection.soldiers,
+        readable: `Expedition failed: ${selection.soldiers.length}/4 available soldiers.`
+      };
+    }
+
+    const expedition: TownWarExpeditionState = {
+      id: buildExpeditionId(this.state),
+      faction: campId,
+      objective: objectiveId,
+      label: TOWN_WAR_EXPEDITION_OBJECTIVE_LABELS[objectiveId],
+      status: "moving",
+      origin: cloneVec2(camp.spawn.position),
+      objectivePosition,
+      rallyPosition: cloneVec2(camp.spawn.position),
+      assignedSoldierIds: selection.soldiers.map((soldier) => soldier.id),
+      roleBySoldierId: selection.roleBySoldierId,
+      beats: [],
+      triggeredBeatKinds: [],
+      danger: 0,
+      pressure: 0,
+      progress: 0,
+      retreatRequested: false,
+      createdAtSeconds: this.state.clock.seconds,
+      lastUpdatedAtSeconds: this.state.clock.seconds,
+      completedAtSeconds: null,
+      readable: `${selection.soldiers.length} Russian soldiers stepping off toward ${TOWN_WAR_EXPEDITION_OBJECTIVE_LABELS[objectiveId]}.`
+    };
+
+    this.state.expeditions = [expedition, ...this.state.expeditions].slice(0, 8);
+    selection.soldiers.forEach((soldier, index) => this.assignExpeditionSoldierTask(expedition, soldier, index));
+    this.recordExpeditionBeat(expedition, "ordered", expedition.origin, selection.soldiers);
+    this.state.officer.lastCommandRead = `Expedition: ${expedition.label}`;
+    this.state.officer.lastCommandAtSeconds = this.state.clock.seconds;
+
+    return {
+      ok: true,
+      reason: null,
+      campId,
+      expedition: cloneExpedition(expedition),
+      assignedSoldiers: selection.soldiers.map((soldier) => ({ ...soldier, position: cloneVec2(soldier.position), task: { ...soldier.task } })),
+      readable: expedition.readable
+    };
+  }
+
+  requestExpeditionRetreat(expeditionId: string): TownWarExpeditionOrderResult {
+    this.ensureDemoSeeded();
+    const expedition = this.state.expeditions.find((entry) => entry.id === expeditionId) ?? null;
+    if (!expedition) {
+      return { ok: false, reason: "expedition-missing", campId: TOWN_WAR_PLAYER_FACTION, expedition: null, assignedSoldiers: [], readable: `Expedition retreat failed: ${expeditionId} missing.` };
+    }
+    const soldiers = this.getLiveExpeditionSoldiers(expedition);
+    if (this.isFinalExpeditionStatus(expedition.status)) {
+      return {
+        ok: false,
+        reason: "expedition-finished",
+        campId: expedition.faction,
+        expedition: cloneExpedition(expedition),
+        assignedSoldiers: soldiers,
+        readable: `Expedition retreat ignored: ${expedition.status}.`
+      };
+    }
+
+    expedition.retreatRequested = true;
+    expedition.status = "retreating";
+    expedition.lastUpdatedAtSeconds = this.state.clock.seconds;
+    soldiers.forEach((soldier, index) => this.assignExpeditionRetreatTask(expedition, soldier, index));
+    this.recordExpeditionBeat(expedition, "retreating", this.getExpeditionGroupCenter(soldiers, expedition.objectivePosition), soldiers);
+
+    return {
+      ok: true,
+      reason: null,
+      campId: expedition.faction,
+      expedition: cloneExpedition(expedition),
+      assignedSoldiers: soldiers,
+      readable: expedition.readable
+    };
+  }
+
+  getExpeditionReport(expeditionId?: string | null): TownWarExpeditionReport {
+    this.ensureDemoSeeded();
+    const activeExpeditions = this.state.expeditions.filter((expedition) => !this.isFinalExpeditionStatus(expedition.status));
+    const latestExpedition =
+      (expeditionId ? this.state.expeditions.find((expedition) => expedition.id === expeditionId) ?? null : null) ??
+      this.state.expeditions[0] ??
+      null;
+    const campId = latestExpedition?.faction ?? null;
+    const routeEvents = this.state.dialogue.recentDramaEvents.filter((event) => event.tags.includes("expedition"));
+    const routeScars = this.state.locationScars.filter((scar) => scar.tags.some((tag) => tag.includes("road") || tag.includes("tree") || tag.includes("route") || tag.includes("contested")));
+    const readable = latestExpedition
+      ? `${latestExpedition.id} ${latestExpedition.status}: ${Math.round(latestExpedition.progress * 100)}% ${latestExpedition.label}; ${latestExpedition.beats.map((beat) => beat.kind).join(" > ") || "no route beats yet"}`
+      : "No expedition ordered yet.";
+    return {
+      ok: true,
+      reason: null,
+      campId,
+      activeExpeditions: activeExpeditions.map((expedition) => cloneExpedition(expedition)),
+      latestExpedition: latestExpedition ? cloneExpedition(latestExpedition) : null,
+      routeScars: routeScars.map((scar) => cloneLocationScar(scar)),
+      routeEvents: routeEvents.map((event) => ({ ...event, tags: [...event.tags] })),
+      readable
+    };
+  }
+
+  private tickExpeditions(): void {
+    for (const expedition of this.state.expeditions) {
+      if (this.isFinalExpeditionStatus(expedition.status)) {
+        continue;
+      }
+
+      const soldiers = this.getLiveExpeditionSoldiers(expedition);
+      if (soldiers.length < 2) {
+        expedition.status = "failed";
+        expedition.completedAtSeconds = this.state.clock.seconds;
+        expedition.readable = `${expedition.label} failed: too few soldiers remained on the route.`;
+        expedition.lastUpdatedAtSeconds = this.state.clock.seconds;
+        continue;
+      }
+
+      const center = this.getExpeditionGroupCenter(soldiers, expedition.status === "retreating" ? expedition.rallyPosition : expedition.objectivePosition);
+      const totalDistance = Math.max(1, getDistance(expedition.origin, expedition.objectivePosition));
+      expedition.progress = clamp01(getDistance(expedition.origin, center) / totalDistance);
+      const riskTier = this.computeRiskTier(expedition.faction, center);
+      const pressureRatio =
+        soldiers.reduce((total, soldier) => total + soldier.morale.pressure / Math.max(1, soldier.morale.maxPressure), 0) / soldiers.length;
+      const lowAmmoCount = soldiers.filter((soldier) => soldier.ammo.inMag + soldier.ammo.reserve <= soldier.ammo.maxMag * 1.25).length;
+      const maxSpread = soldiers.reduce((spread, soldier) => Math.max(spread, getDistance(soldier.position, center)), 0);
+      expedition.pressure = Number(pressureRatio.toFixed(2));
+      expedition.danger = Number(clamp(this.getExposureForRisk(riskTier) * 0.46 + expedition.progress * 0.34 + pressureRatio * 0.3 + lowAmmoCount * 0.03, 0, 1).toFixed(2));
+      expedition.lastUpdatedAtSeconds = this.state.clock.seconds;
+
+      if (expedition.status === "retreating") {
+        if (getDistance(center, expedition.rallyPosition) <= 78) {
+          expedition.status = "completed";
+          expedition.completedAtSeconds = this.state.clock.seconds;
+          expedition.readable = `${expedition.label} returned to Russian camp with ${soldiers.length} soldiers.`;
+        }
+        continue;
+      }
+
+      if (expedition.progress >= 0.2) {
+        this.recordExpeditionBeat(expedition, "spotted", center, soldiers);
+      }
+      if (expedition.progress >= 0.38) {
+        expedition.status = "contact";
+        this.recordExpeditionBeat(expedition, "pinned", center, soldiers);
+        for (const soldier of soldiers) {
+          soldier.morale.pressure = Math.min(soldier.morale.maxPressure, soldier.morale.pressure + 1.2);
+        }
+      }
+      if (expedition.progress >= 0.52 && (maxSpread >= 80 || soldiers.length >= 5)) {
+        this.recordExpeditionBeat(expedition, "separated", center, soldiers);
+      }
+      if (expedition.progress >= 0.56 && lowAmmoCount > 0) {
+        this.recordExpeditionBeat(expedition, "low-ammo", center, soldiers);
+      }
+      if (expedition.progress >= 0.66 && expedition.danger >= 0.58) {
+        const woundTarget = soldiers
+          .filter((soldier) => soldier.currentNeed !== "wounded")
+          .sort((left, right) => left.health.current - right.health.current)[0] ?? null;
+        if (woundTarget && this.recordExpeditionBeat(expedition, "wounded", center, soldiers)) {
+          woundTarget.health.current = Math.max(32, woundTarget.health.current - 8);
+          woundTarget.morale.pressure = Math.min(woundTarget.morale.maxPressure, woundTarget.morale.pressure + 9);
+          woundTarget.currentNeed = woundTarget.health.current <= 42 ? "wounded" : "shaken";
+          this.refreshSoldierNeedReadout(woundTarget);
+        }
+      }
+
+      if (!expedition.retreatRequested && pressureRatio >= 0.82 && expedition.triggeredBeatKinds.includes("pinned")) {
+        expedition.retreatRequested = true;
+        expedition.status = "retreating";
+        soldiers.forEach((soldier, index) => this.assignExpeditionRetreatTask(expedition, soldier, index));
+        this.recordExpeditionBeat(expedition, "retreating", center, soldiers);
+        continue;
+      }
+
+      if (expedition.progress >= 0.88) {
+        expedition.status = "completed";
+        expedition.completedAtSeconds = this.state.clock.seconds;
+        this.recordExpeditionBeat(expedition, "reached-line", expedition.objectivePosition, soldiers);
+        expedition.readable = `${expedition.label} reached with ${soldiers.length} soldiers and ${expedition.beats.length} route beats.`;
+      }
+    }
+  }
+
+  private tickCampBreaches(): void {
+    for (const breach of this.state.campBreaches) {
+      if (this.isFinalCampBreachStatus(breach.status)) {
+        continue;
+      }
+
+      const soldiers = this.getLiveCampBreachSoldiers(breach);
+      const weakPoint = this.getCampWeakPoint(breach.weakPointId);
+      const targetCamp = this.getCamp(breach.targetCampId);
+      if (!weakPoint || !targetCamp || targetCamp.destroyed) {
+        breach.status = "failed";
+        breach.completedAtSeconds = this.state.clock.seconds;
+        breach.lastUpdatedAtSeconds = this.state.clock.seconds;
+        breach.readable = "Breach failed: target weak point or camp no longer exists.";
+        continue;
+      }
+      if (soldiers.length < 2) {
+        breach.status = "failed";
+        breach.completedAtSeconds = this.state.clock.seconds;
+        breach.lastUpdatedAtSeconds = this.state.clock.seconds;
+        breach.readable = `${weakPoint.label} breach failed: too few soldiers remained alive.`;
+        this.emitDramaEvent({
+          kind: "camp-breach-failed",
+          faction: breach.attackerFaction,
+          campId: breach.targetCampId,
+          orderId: breach.id,
+          position: breach.targetPosition,
+          locationLabel: weakPoint.label,
+          riskTier: this.computeRiskTier(breach.attackerFaction, breach.targetPosition),
+          summary: `${weakPoint.label} breach failed before the demolition could land.`,
+          tags: ["breach", "failed", weakPoint.kind]
+        });
+        continue;
+      }
+
+      const center = this.getExpeditionGroupCenter(soldiers, breach.status === "retreating" ? breach.rallyPosition : breach.targetPosition);
+      const totalDistance = Math.max(1, getDistance(breach.origin, breach.targetPosition));
+      const movementProgress = clamp01(getDistance(breach.origin, center) / totalDistance);
+      const elapsedProgress = clamp01((this.state.clock.seconds - breach.createdAtSeconds) / TOWN_WAR_CAMP_BREACH_DETONATION_SECONDS);
+      breach.progress = Math.max(movementProgress, elapsedProgress);
+      const pressureRatio =
+        soldiers.reduce((total, soldier) => total + soldier.morale.pressure / Math.max(1, soldier.morale.maxPressure), 0) / soldiers.length;
+      const suppressors = soldiers.filter((soldier) => breach.roleBySoldierId[soldier.id] === "suppressor" || soldier.task.kind === "suppress").length;
+      const assaultCount = soldiers.filter((soldier) => breach.roleBySoldierId[soldier.id] === "breacher" || breach.roleBySoldierId[soldier.id] === "rifleman").length;
+      breach.pressure = Number(pressureRatio.toFixed(2));
+      breach.suppression = Number(clamp(suppressors * 0.26 + assaultCount * 0.08 - pressureRatio * 0.18, 0, 1).toFixed(2));
+      breach.lastUpdatedAtSeconds = this.state.clock.seconds;
+
+      if (breach.status === "retreating") {
+        if (getDistance(center, breach.rallyPosition) <= 84) {
+          breach.status = "completed";
+          breach.completedAtSeconds = this.state.clock.seconds;
+          breach.triggeredStages = uniqueLimited([...breach.triggeredStages, "retreated"], 8);
+          breach.readable = `${weakPoint.label} breach team returned to Russian camp after applying ${Math.round(breach.damageApplied)} damage.`;
+        }
+        continue;
+      }
+
+      if (breach.progress >= 0.28 && !breach.triggeredStages.includes("spotted")) {
+        breach.triggeredStages = uniqueLimited([...breach.triggeredStages, "spotted"], 8);
+        breach.status = "contact";
+        this.emitDramaEvent({
+          kind: "expedition-spotted",
+          faction: breach.attackerFaction,
+          campId: breach.targetCampId,
+          orderId: breach.id,
+          soldierId: soldiers[0]?.id ?? null,
+          position: center,
+          locationLabel: `${weakPoint.label} approach`,
+          riskTier: this.computeRiskTier(breach.attackerFaction, center),
+          summary: `${soldiers[0]?.displayName ?? "Breach team"} was spotted closing on ${weakPoint.label}.`,
+          tags: ["breach", "spotted", weakPoint.kind]
+        });
+      }
+      if (breach.progress >= 0.48 && !breach.triggeredStages.includes("suppressed")) {
+        breach.triggeredStages = uniqueLimited([...breach.triggeredStages, "suppressed"], 8);
+        breach.status = "contact";
+        for (const soldier of soldiers) {
+          soldier.morale.pressure = Math.min(soldier.morale.maxPressure, soldier.morale.pressure + 2.4);
+        }
+        this.emitDramaEvent({
+          kind: "expedition-pinned",
+          faction: breach.attackerFaction,
+          campId: breach.targetCampId,
+          orderId: breach.id,
+          soldierId: soldiers[0]?.id ?? null,
+          position: center,
+          locationLabel: `${weakPoint.label} approach`,
+          riskTier: this.computeRiskTier(breach.attackerFaction, center),
+          summary: `${weakPoint.label} breach team took suppression on the final approach.`,
+          tags: ["breach", "suppressed", weakPoint.kind]
+        });
+      }
+      if (breach.progress >= 0.72 && !breach.triggeredStages.includes("planted")) {
+        breach.status = "planting";
+        breach.triggeredStages = uniqueLimited([...breach.triggeredStages, "planted"], 8);
+        this.emitDramaEvent({
+          kind: "camp-breach-planted",
+          faction: breach.attackerFaction,
+          campId: breach.targetCampId,
+          orderId: breach.id,
+          soldierId: soldiers.find((soldier) => breach.roleBySoldierId[soldier.id] === "breacher")?.id ?? soldiers[0]?.id ?? null,
+          position: weakPoint.position,
+          locationLabel: weakPoint.label,
+          riskTier: this.computeRiskTier(breach.attackerFaction, weakPoint.position),
+          summary: `${weakPoint.label} demolition was planted under pressure.`,
+          tags: ["breach", "planted", weakPoint.kind, breach.tool]
+        });
+      }
+      if (!breach.triggeredStages.includes("detonated") && breach.progress >= 0.86) {
+        const stock = this.getDemolitionStock(breach.attackerFaction);
+        if (!this.consumeDemolitionTool(stock, breach.tool)) {
+          breach.status = "failed";
+          breach.completedAtSeconds = this.state.clock.seconds;
+          breach.readable = `${weakPoint.label} breach failed: ${breach.tool} stock was missing at detonation.`;
+          this.emitDramaEvent({
+            kind: "camp-breach-failed",
+            faction: breach.attackerFaction,
+            campId: breach.targetCampId,
+            orderId: breach.id,
+            position: weakPoint.position,
+            locationLabel: weakPoint.label,
+            riskTier: this.computeRiskTier(breach.attackerFaction, weakPoint.position),
+            summary: `${weakPoint.label} breach stalled because demolition stock was missing.`,
+            tags: ["breach", "failed", "no-stock", weakPoint.kind]
+          });
+          continue;
+        }
+
+        const toolDamage = TOWN_WAR_DEMOLITION_TOOL_DAMAGE[breach.tool];
+        const suppressBonus = 1 + breach.suppression * 0.28;
+        const damageApplied = this.applyWeakPointDamage(weakPoint, breach.attackerFaction, toolDamage.weakPoint * suppressBonus, breach.id);
+        breach.damageApplied = Number((breach.damageApplied + damageApplied).toFixed(2));
+        const campDamage = toolDamage.camp * (weakPoint.status === "destroyed" ? 1.2 : 1);
+        this.damageCamp(breach.targetCampId, campDamage);
+        this.tickCampSustainment(0);
+        breach.status = "retreating";
+        breach.triggeredStages = uniqueLimited([...breach.triggeredStages, "detonated"], 8);
+        breach.readable = `${weakPoint.label} hit by ${breach.tool}: ${weakPoint.readable}`;
+        soldiers.forEach((soldier, index) => this.assignCampBreachRetreatTask(breach, soldier, index));
+        const leadSoldier = soldiers[0] ?? null;
+        if (leadSoldier) {
+          this.pushFrontlineStory({
+            kind: "breach",
+            faction: breach.attackerFaction,
+            soldier: leadSoldier,
+            work: this.getCampBreachRoleWork(breach.roleBySoldierId[leadSoldier.id] ?? "rifleman"),
+            orderId: breach.id,
+            relatedId: weakPoint.id,
+            position: weakPoint.position,
+            summary: `${leadSoldier.displayName} got the charge onto ${weakPoint.label}.`,
+            consequence: weakPoint.readable,
+            memoryTag: `breach-hit-${weakPoint.kind}`
+          });
+        }
+        this.emitDramaEvent({
+          kind: "camp-breach-detonated",
+          faction: breach.attackerFaction,
+          campId: breach.targetCampId,
+          orderId: breach.id,
+          soldierId: leadSoldier?.id ?? null,
+          position: weakPoint.position,
+          locationLabel: weakPoint.label,
+          riskTier: this.computeRiskTier(breach.attackerFaction, weakPoint.position),
+          summary: `${weakPoint.label} detonated for ${Math.round(damageApplied)} weak-point damage and ${Math.round(campDamage)} camp damage.`,
+          tags: ["breach", "detonated", weakPoint.kind, breach.tool]
+        });
+        this.emitDramaEvent({
+          kind: "camp-breach-retreating",
+          faction: breach.attackerFaction,
+          campId: breach.targetCampId,
+          orderId: breach.id,
+          soldierId: leadSoldier?.id ?? null,
+          position: center,
+          locationLabel: `${weakPoint.label} fallback`,
+          riskTier: this.computeRiskTier(breach.attackerFaction, center),
+          summary: `${weakPoint.label} breach team is falling back after the blast.`,
+          tags: ["breach", "retreating", weakPoint.kind]
+        });
+      }
+    }
+  }
+
+  getTrenchNetworkReport(): TownWarTrenchNetworkReport {
+    this.ensureDemoSeeded();
+    this.refreshTrenchNetworkConnections();
+
+    const segments = this.getTrenchNetworkSegments().map<TownWarTrenchNetworkSegmentReport>((segment) => {
+      const occupiedBySoldierIds = segment.slots
+        .map((slot) => slot.occupiedBySoldierId)
+        .filter((soldierId): soldierId is string => typeof soldierId === "string" && soldierId.length > 0);
+      const center = getSegmentCenter(segment.nodeA, segment.nodeB);
+      const network = segment.slots[0]?.trenchNetwork ?? segment.trenchNetwork;
+      return {
+        faction: segment.faction,
+        networkId: segment.networkId,
+        segmentId: segment.segmentId,
+        center,
+        nodeA: cloneVec2(network.nodeA),
+        nodeB: cloneVec2(network.nodeB),
+        slotIds: segment.slots.map((slot) => slot.id),
+        slotCount: segment.slots.length,
+        occupiedCount: occupiedBySoldierIds.length,
+        occupiedBySoldierIds,
+        connectedSegmentIds: [...network.connectedSegmentIds],
+        junctionKind: network.junctionKind,
+        placementKind: network.placementKind,
+        retreatHint: network.retreatHint,
+        readable: network.readable
+      };
+    });
+
+    const networkMap = new Map<
+      string,
+      {
+        faction: TownWarFactionId;
+        networkId: string;
+        segmentCount: number;
+        slotCount: number;
+        occupiedCount: number;
+        junctionCount: number;
+        retreatHints: TownWarTrenchRetreatHint[];
+        warnings: string[];
+        segments: TownWarTrenchNetworkSegmentReport[];
+      }
+    >();
+
+    for (const segment of segments) {
+      const key = `${segment.faction}:${segment.networkId}`;
+      const network =
+        networkMap.get(key) ??
+        {
+          faction: segment.faction,
+          networkId: segment.networkId,
+          segmentCount: 0,
+          slotCount: 0,
+          occupiedCount: 0,
+          junctionCount: 0,
+          retreatHints: [],
+          warnings: [],
+          segments: []
+        };
+      network.segmentCount += 1;
+      network.slotCount += segment.slotCount;
+      network.occupiedCount += segment.occupiedCount;
+      if (segment.junctionKind === "junction" || segment.junctionKind === "branch") {
+        network.junctionCount += 1;
+      }
+      if (!network.retreatHints.includes(segment.retreatHint)) {
+        network.retreatHints.push(segment.retreatHint);
+      }
+      network.segments.push(segment);
+      networkMap.set(key, network);
+    }
+
+    const networks = [...networkMap.values()].map((network) => {
+      if (network.segmentCount <= 1) {
+        network.warnings.push("isolated-network");
+      }
+      if (network.retreatHints.includes("bad-retreat-path")) {
+        network.warnings.push("bad-retreat-path");
+      }
+      return {
+        ...network,
+        segments: network.segments.sort((left, right) => left.segmentId.localeCompare(right.segmentId))
+      };
+    });
+
+    const totals = {
+      networks: networks.length,
+      segments: segments.length,
+      trenchSlots: segments.reduce((total, segment) => total + segment.slotCount, 0),
+      occupiedSlots: segments.reduce((total, segment) => total + segment.occupiedCount, 0)
+    };
+    const readable =
+      networks.length > 0
+        ? networks
+            .map(
+              (network) =>
+                `${network.faction} ${network.networkId}: ${network.segmentCount} segment${network.segmentCount === 1 ? "" : "s"}, ${
+                  network.occupiedCount
+                }/${network.slotCount} occupied, ${network.junctionCount} junction${network.junctionCount === 1 ? "" : "s"}${
+                  network.warnings.length > 0 ? `, warnings ${network.warnings.join(", ")}` : ""
+                }`
+            )
+            .join(" | ")
+        : "No built trench networks yet.";
+
+    return { ok: true, networks, totals, readable };
   }
 
   advance(seconds: number, tickSeconds = 0.25): TownWarOfficerAdvanceResult {
@@ -7190,6 +11492,131 @@ export class TownWarController {
     return crate;
   }
 
+  setAmmoCrateAmmo(crateId: string, ammo: number): TownWarAmmoCrateState | null {
+    this.ensureDemoSeeded();
+    const crate = this.findAmmoCrate(crateId);
+    if (!crate || crate.destroyedAtSeconds !== null || !Number.isFinite(ammo)) {
+      return crate;
+    }
+    crate.ammo = Math.max(0, Math.min(crate.maxAmmo, Math.floor(ammo)));
+    return crate;
+  }
+
+  setSoldierPressure(soldierId: string, pressure: number): TownWarSoldierState | null {
+    this.ensureDemoSeeded();
+    const soldier = this.findSoldierById(soldierId);
+    if (!soldier || !Number.isFinite(pressure)) {
+      return soldier;
+    }
+    soldier.morale.pressure = Math.max(0, Math.min(soldier.morale.maxPressure, pressure));
+    if (soldier.morale.pressure / Math.max(1, soldier.morale.maxPressure) >= 0.72) {
+      soldier.tacticalIntent = {
+        state: "fallback",
+        reason: "staged pressure for readability proof",
+        coverSlotId: soldier.coverIntent.coverSlotId,
+        partnerId: null,
+        pressureRatio: soldier.morale.pressure / Math.max(1, soldier.morale.maxPressure),
+        lastUpdatedAtSeconds: this.state.clock.seconds
+      };
+    }
+    return soldier;
+  }
+
+  setSoldierSquadBridge(
+    soldierId: string,
+    update: Partial<Omit<TownWarSoldierSquadBridgeState, "operatorMenuVisible">> & { operatorMenuVisible?: boolean }
+  ): TownWarSoldierState | null {
+    this.ensureDemoSeeded();
+    const soldier = this.findSoldierById(soldierId);
+    if (!soldier) {
+      return null;
+    }
+
+    soldier.squadBridge = {
+      ...soldier.squadBridge,
+      ...update,
+      operatorMenuVisible: update.operatorMenuVisible ?? soldier.squadBridge.operatorMenuVisible
+    };
+    return soldier;
+  }
+
+  private buildUnifiedSoldierReadModel(soldier: TownWarSoldierState): TownWarUnifiedSoldierState {
+    const squadStatus: TownWarUnifiedSoldierState["squad"]["status"] =
+      soldier.health.current <= 0
+        ? "lost"
+        : soldier.currentNeed === "wounded"
+          ? "wounded"
+          : soldier.squadBridge.status === "assigned"
+            ? "assigned"
+          : soldier.task.kind === "attack" || soldier.task.kind === "suppress" || soldier.task.kind === "defend"
+            ? "deployed"
+            : "camp";
+    const taskLabel = soldier.task.label ?? soldier.task.kind;
+    const fightPriority = Math.max(soldier.workPriorities.Defend, soldier.workPriorities.Suppress, soldier.workPriorities.Assault);
+    const weaponId = getDefaultUnifiedSoldierWeaponId(soldier);
+    const occupiedSlot = this.getOccupiedTrenchSlot(soldier);
+    return {
+      id: `unified-${soldier.id}`,
+      source: "town-war-soldier",
+      soldierId: soldier.id,
+      faction: soldier.faction,
+      displayName: soldier.displayName,
+      role: soldier.role,
+      archetype: soldier.archetype,
+      colonist: {
+        skills: { ...soldier.skills },
+        traits: [...soldier.traits],
+        needs: { ...soldier.needs },
+        currentNeed: soldier.currentNeed,
+        workPriorities: { ...soldier.workPriorities },
+        task: {
+          ...soldier.task,
+          targetPosition: soldier.task.targetPosition ? cloneVec2(soldier.task.targetPosition) : soldier.task.targetPosition ?? null,
+          resumeTask: soldier.task.resumeTask
+            ? {
+                ...soldier.task.resumeTask,
+                targetPosition: soldier.task.resumeTask.targetPosition
+                  ? cloneVec2(soldier.task.resumeTask.targetPosition)
+                  : soldier.task.resumeTask.targetPosition ?? null,
+                resumeTask: null
+              }
+            : soldier.task.resumeTask ?? null
+        },
+        taskDecision: cloneTaskDecision(soldier.taskDecision),
+        coverIntent: cloneCoverIntent(soldier.coverIntent),
+        identitySummary: { ...soldier.identitySummary },
+        dramaArc: cloneSoldierDramaArc(soldier.dramaArc)
+      },
+      squad: {
+        status: squadStatus,
+        squadSlot: soldier.squadBridge.squadSlot,
+        assignable: soldier.faction === TOWN_WAR_PLAYER_FACTION && soldier.health.current > 0 && soldier.squadBridge.status !== "assigned",
+        operatorMenuVisible: soldier.squadBridge.operatorMenuVisible,
+        legacySquadMateId: soldier.squadBridge.legacySquadMateId
+      },
+      combat: {
+        weaponId,
+        ammo: { ...soldier.ammo },
+        health: { ...soldier.health },
+        morale: { ...soldier.morale },
+        command: buildUnifiedSoldierCommand(soldier, occupiedSlot, this.state.clock.seconds),
+        tacticalAction: buildUnifiedSoldierTacticalAction(soldier, occupiedSlot, this.state.clock.seconds),
+        targetIntent: cloneTargetIntent(soldier.targetIntent),
+        tacticalIntent: cloneTacticalIntent(soldier.tacticalIntent)
+      },
+      runtime: {
+        position: cloneVec2(soldier.position),
+        liveBodyKind: soldier.health.current > 0 ? "town-war" : "none",
+        liveBodyId: soldier.health.current > 0 ? soldier.id : null
+      },
+      readable: `${soldier.displayName} is a unified soldier candidate: ${taskLabel}, ${squadStatus}, ${weaponId}, Build ${soldier.workPriorities.Build}, Fight ${fightPriority}.`
+    };
+  }
+
+  private getUnifiedSoldierReadModels(): TownWarUnifiedSoldierState[] {
+    return this.state.soldiers.map((soldier) => this.buildUnifiedSoldierReadModel(soldier));
+  }
+
   getSnapshot(): TownWarState {
     return {
       version: this.state.version,
@@ -7197,6 +11624,7 @@ export class TownWarController {
       nextOrderId: this.state.nextOrderId,
       nextCrateId: this.state.nextCrateId,
       nextDugoutId: this.state.nextDugoutId,
+      nextFieldworkUpgradeId: this.state.nextFieldworkUpgradeId,
       nextCasualtyId: this.state.nextCasualtyId,
       nextFlankId: this.state.nextFlankId,
       nextSkillOutcomeId: this.state.nextSkillOutcomeId,
@@ -7207,6 +11635,9 @@ export class TownWarController {
       nextDramaBeatId: this.state.nextDramaBeatId,
       nextDebriefEchoId: this.state.nextDebriefEchoId,
       nextFrontlineStoryId: this.state.nextFrontlineStoryId,
+      nextExpeditionId: this.state.nextExpeditionId,
+      nextExpeditionBeatId: this.state.nextExpeditionBeatId,
+      nextCampBreachId: this.state.nextCampBreachId,
       clock: {
         seconds: this.state.clock.seconds
       },
@@ -7220,13 +11651,15 @@ export class TownWarController {
       orders: this.state.orders.map((order) => ({
         ...order,
         position: cloneVec2(order.position),
-        build: cloneBuildExecution(order.build)
+        build: cloneBuildExecution(order.build),
+        trenchNetwork: order.trenchNetwork ? cloneTrenchNetwork(order.trenchNetwork) : null
       })),
       ammoCrates: this.state.ammoCrates.map((crate) => ({
         ...crate,
         position: cloneVec2(crate.position)
       })),
       dugouts: this.state.dugouts.map((dugout) => cloneDugout(dugout)),
+      fieldworkUpgrades: this.state.fieldworkUpgrades.map((upgrade) => cloneFieldworkUpgrade(upgrade)),
       casualties: this.state.casualties.map((casualty) => cloneCasualty(casualty)),
       flankPressures: this.state.flankPressures.map((flank) => cloneFlankPressure(flank)),
       skillDebrief: cloneSkillDebrief(this.state.skillDebrief),
@@ -7261,6 +11694,10 @@ export class TownWarController {
       },
       debriefEchoes: this.state.debriefEchoes.map((echo) => cloneDebriefEcho(echo)),
       frontlineStories: this.state.frontlineStories.map((story) => cloneFrontlineStory(story)),
+      expeditions: this.state.expeditions.map((expedition) => cloneExpedition(expedition)),
+      campWeakPoints: this.state.campWeakPoints.map((weakPoint) => cloneCampWeakPoint(weakPoint)),
+      demolitionStock: this.state.demolitionStock.map((stock) => cloneDemolitionStock(stock)),
+      campBreaches: this.state.campBreaches.map((breach) => cloneCampBreach(breach)),
       operation: cloneOperationState(this.state.operation),
       town: cloneTown(this.state.town),
       camps: this.state.camps.map((camp) => cloneCamp(camp)),
@@ -7299,6 +11736,7 @@ export class TownWarController {
               workPriorities: { ...(combatant as TownWarSoldierState).workPriorities },
               experience: { ...(combatant as TownWarSoldierState).experience },
               identitySummary: { ...(combatant as TownWarSoldierState).identitySummary },
+              squadBridge: { ...(combatant as TownWarSoldierState).squadBridge },
               taskDecision: cloneTaskDecision((combatant as TownWarSoldierState).taskDecision),
               dramaMemoryTags: [...(combatant as TownWarSoldierState).dramaMemoryTags],
               witnessedEventCount: (combatant as TownWarSoldierState).witnessedEventCount,
@@ -7334,6 +11772,7 @@ export class TownWarController {
         workPriorities: { ...soldier.workPriorities },
         experience: { ...soldier.experience },
         identitySummary: { ...soldier.identitySummary },
+        squadBridge: { ...soldier.squadBridge },
         taskDecision: cloneTaskDecision(soldier.taskDecision),
         dramaMemoryTags: [...soldier.dramaMemoryTags],
         dramaArc: cloneSoldierDramaArc(soldier.dramaArc),
@@ -7357,7 +11796,8 @@ export class TownWarController {
               }
             : soldier.task.resumeTask ?? null
         }
-      }))
+      })),
+      unifiedSoldiers: this.getUnifiedSoldierReadModels()
     };
   }
 }

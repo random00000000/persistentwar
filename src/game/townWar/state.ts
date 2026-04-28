@@ -1,4 +1,5 @@
 import { WORLD_HEIGHT, WORLD_WIDTH, type Vec2 } from "../arena";
+import type { WeaponId } from "../weapons";
 import { TOWN_WAR_ENEMY_FACTION, TOWN_WAR_PLAYER_FACTION } from "./types";
 import type {
   TownWarCurrentNeedId,
@@ -17,6 +18,26 @@ import type {
 export type TownWarBuildOrderKind = "trench" | "ammo-crate" | "dugout";
 
 export type TownWarBuildOrderStatus = "assigned" | "completed" | "cancelled";
+
+export type TownWarTrenchNetworkPlacementKind = "free" | "extend" | "branch";
+
+export type TownWarTrenchJunctionKind = "none" | "extend" | "branch" | "junction";
+
+export type TownWarTrenchRetreatHint = "open-line" | "fallback-path" | "bad-retreat-path";
+
+export interface TownWarTrenchNetworkState {
+  networkId: string;
+  segmentId: string;
+  nodeA: Vec2;
+  nodeB: Vec2;
+  connectedSegmentIds: string[];
+  junctionKind: TownWarTrenchJunctionKind;
+  placementKind: TownWarTrenchNetworkPlacementKind;
+  retreatHint: TownWarTrenchRetreatHint;
+  snapTargetSegmentId: string | null;
+  snapDistance: number | null;
+  readable: string;
+}
 
 export type TownWarDramaEventKind =
   | "build-order-issued"
@@ -43,6 +64,22 @@ export type TownWarDramaEventKind =
   | "wounded-stabilized"
   | "wounded-lost"
   | "camp-sustainment-warning"
+  | "expedition-ordered"
+  | "expedition-spotted"
+  | "expedition-pinned"
+  | "expedition-separated"
+  | "expedition-wounded"
+  | "expedition-low-ammo"
+  | "expedition-retreating"
+  | "expedition-reached-line"
+  | "demolition-prepared"
+  | "camp-breach-ordered"
+  | "camp-breach-planted"
+  | "camp-breach-detonated"
+  | "camp-breach-retreating"
+  | "camp-breach-failed"
+  | "camp-weakpoint-damaged"
+  | "camp-weakpoint-destroyed"
   | "bad-order-cost";
 
 export type TownWarDramaCause =
@@ -50,6 +87,8 @@ export type TownWarDramaCause =
   | "order-exposed-builder"
   | "late-fallback"
   | "ammo-shortage"
+  | "expedition-risk"
+  | "camp-breach"
   | "trench-held"
   | "trench-failed"
   | "camp-hit"
@@ -65,7 +104,7 @@ export type TownWarDramaResponsibility =
   | "terrain-failure"
   | "unclear";
 
-export type TownWarLocationScarKind = "trench" | "road" | "ammo" | "dugout" | "camp" | "body" | "line";
+export type TownWarLocationScarKind = "trench" | "road" | "ammo" | "dugout" | "camp" | "body" | "line" | "breach";
 
 export type TownWarDramaBeatKind =
   | "setup"
@@ -210,6 +249,7 @@ export interface TownWarBuildOrderState {
   build: TownWarBuildExecutionState;
   ammoPayload: number | null;
   builtEntityId: string | null;
+  trenchNetwork?: TownWarTrenchNetworkState | null;
   createdAtSeconds: number;
   completedAtSeconds: number | null;
 }
@@ -265,6 +305,22 @@ export interface TownWarDugoutState {
   createdAtSeconds: number;
   lastUpdatedAtSeconds: number;
   destroyedAtSeconds: number | null;
+  readable: string;
+}
+
+export type TownWarFieldworkUpgradeKind = "sandbags" | "wire";
+
+export interface TownWarFieldworkUpgradeState {
+  id: string;
+  kind: TownWarFieldworkUpgradeKind;
+  faction: TownWarFactionId;
+  position: Vec2;
+  facingAngleRadians: number;
+  networkId: string | null;
+  segmentId: string | null;
+  coverSlotId: string | null;
+  effect: "front-protection" | "assault-obstacle";
+  createdAtSeconds: number;
   readable: string;
 }
 
@@ -373,6 +429,7 @@ export interface TownWarCoverSlotState {
   exposure: number;
   protection: number;
   occupiedBySoldierId: string | null;
+  trenchNetwork?: TownWarTrenchNetworkState | null;
   createdAtSeconds: number;
 }
 
@@ -423,6 +480,14 @@ export interface TownWarSoldierIdentitySummary {
   currentNeed: TownWarCurrentNeedId;
 }
 
+export interface TownWarSoldierSquadBridgeState {
+  status: "camp" | "assigned";
+  squadSlot: number | null;
+  legacySquadMateId: string | null;
+  assignedAtSeconds: number | null;
+  operatorMenuVisible: boolean;
+}
+
 export interface TownWarTaskCandidateState {
   work: TownWarWorkPriorityId;
   taskKind: TownWarTask["kind"];
@@ -461,6 +526,7 @@ export interface TownWarSoldierState extends TownWarCombatantBaseState {
   currentNeed: TownWarCurrentNeedId;
   experience: TownWarExperienceState;
   identitySummary: TownWarSoldierIdentitySummary;
+  squadBridge: TownWarSoldierSquadBridgeState;
   taskDecision: TownWarTaskDecisionState;
   spawnedFromCampId: TownWarFactionId;
   spawnedAtSeconds: number;
@@ -471,6 +537,100 @@ export interface TownWarSoldierState extends TownWarCombatantBaseState {
 }
 
 export type TownWarCombatantState = TownWarSoldierState;
+
+export type TownWarUnifiedSoldierSource = "town-war-soldier";
+
+export type TownWarUnifiedSoldierSquadStatus = "camp" | "assigned" | "deployed" | "wounded" | "lost";
+
+export type TownWarUnifiedSoldierCommandId = "follow" | "defend" | "attack" | "brace-watch" | "move-watch";
+
+export type TownWarUnifiedSoldierTacticalActionId = "grenade" | "suppress";
+
+export type TownWarUnifiedSoldierTacticalActionStatus =
+  | "queued"
+  | "moving-into-range"
+  | "lining-up"
+  | "executing"
+  | "completed"
+  | "failed"
+  | "cancelled";
+
+export interface TownWarUnifiedSoldierCommandState {
+  orderId: TownWarUnifiedSoldierCommandId;
+  anchor: Vec2 | null;
+  anchorLabel: string | null;
+  holdRadius: number;
+  watchTarget: Vec2 | null;
+  watchLabel: string | null;
+  watchDirection: Vec2 | null;
+  watchArcDegrees: number | null;
+  issuedAtSeconds: number;
+}
+
+export interface TownWarUnifiedSoldierTacticalActionState {
+  actionId: TownWarUnifiedSoldierTacticalActionId;
+  status: TownWarUnifiedSoldierTacticalActionStatus;
+  targetPosition: Vec2;
+  targetLabel: string;
+  targetRadius: number | null;
+  durationSeconds: number | null;
+  shotsPlanned: number | null;
+  shotsFired: number;
+  burstShotsRemaining: number | null;
+  requiresLineOfSight: boolean;
+  suppressionProfile: string | null;
+  source: string | null;
+  issuedAtSeconds: number;
+  startedAtSeconds: number | null;
+  completedAtSeconds: number | null;
+  resumeOrderId: TownWarUnifiedSoldierCommandId;
+  failureReason: string | null;
+}
+
+export interface TownWarUnifiedSoldierState {
+  id: string;
+  source: TownWarUnifiedSoldierSource;
+  soldierId: string;
+  faction: TownWarFactionId;
+  displayName: string;
+  role: TownWarRoleId;
+  archetype: TownWarSoldierArchetype;
+  colonist: {
+    skills: TownWarSkillState;
+    traits: TownWarTraitId[];
+    needs: TownWarNeedState;
+    currentNeed: TownWarCurrentNeedId;
+    workPriorities: TownWarWorkPriorityState;
+    task: TownWarTask;
+    taskDecision: TownWarTaskDecisionState;
+    coverIntent: TownWarCoverIntentState;
+    identitySummary: TownWarSoldierIdentitySummary;
+    dramaArc: TownWarSoldierDramaArc;
+  };
+  squad: {
+    status: TownWarUnifiedSoldierSquadStatus;
+    squadSlot: number | null;
+    assignable: boolean;
+    operatorMenuVisible: boolean;
+    legacySquadMateId: string | null;
+  };
+  combat: {
+    weaponId: WeaponId;
+    ammo: TownWarCombatantAmmoState;
+    health: TownWarCombatantHealthState;
+    morale: TownWarCombatantMoraleState;
+    command: TownWarUnifiedSoldierCommandState;
+    tacticalAction: TownWarUnifiedSoldierTacticalActionState | null;
+    targetIntent: TownWarTargetIntentState;
+    tacticalIntent: TownWarTacticalIntentState;
+  };
+  runtime: {
+    position: Vec2;
+    liveBodyKind: "town-war" | "raid-projection" | "none";
+    liveBodyId: string | number | null;
+  };
+  readable: string;
+}
 
 export interface TownWarTownState {
   id: string;
@@ -587,6 +747,68 @@ export interface TownWarCampState {
   destroyed: boolean;
 }
 
+export type TownWarCampWeakPointKind = "command-core" | "spawn-dugout" | "ammo-dump" | "radio-mast" | "bunker-entrance";
+
+export type TownWarCampWeakPointStatus = "intact" | "damaged" | "destroyed";
+
+export interface TownWarCampWeakPointState {
+  id: string;
+  campId: TownWarFactionId;
+  kind: TownWarCampWeakPointKind;
+  label: string;
+  position: Vec2;
+  health: number;
+  maxHealth: number;
+  status: TownWarCampWeakPointStatus;
+  effects: string[];
+  damageMultiplier: number;
+  lastDamagedAtSeconds: number | null;
+  damagedByFaction: TownWarFactionId | null;
+  readable: string;
+}
+
+export type TownWarDemolitionToolId = "grenade" | "satchel" | "demo-charge" | "rpg";
+
+export interface TownWarDemolitionStockState {
+  faction: TownWarFactionId;
+  grenades: number;
+  satchels: number;
+  demoCharges: number;
+  rpgRounds: number;
+  preparedAtSeconds: number | null;
+  lastUsedAtSeconds: number | null;
+  readable: string;
+}
+
+export type TownWarCampBreachStatus = "forming" | "moving" | "contact" | "planting" | "detonated" | "retreating" | "completed" | "failed";
+
+export type TownWarCampBreachRoleId = "suppressor" | "breacher" | "rifleman" | "medic" | "hauler";
+
+export type TownWarCampBreachStage = "ordered" | "spotted" | "suppressed" | "planted" | "detonated" | "retreated";
+
+export interface TownWarCampBreachState {
+  id: string;
+  attackerFaction: TownWarFactionId;
+  targetCampId: TownWarFactionId;
+  weakPointId: string;
+  status: TownWarCampBreachStatus;
+  origin: Vec2;
+  targetPosition: Vec2;
+  rallyPosition: Vec2;
+  assignedSoldierIds: string[];
+  roleBySoldierId: Record<string, TownWarCampBreachRoleId>;
+  tool: TownWarDemolitionToolId;
+  progress: number;
+  pressure: number;
+  suppression: number;
+  damageApplied: number;
+  triggeredStages: TownWarCampBreachStage[];
+  createdAtSeconds: number;
+  lastUpdatedAtSeconds: number;
+  completedAtSeconds: number | null;
+  readable: string;
+}
+
 export interface TownWarMatchState {
   status: TownWarMatchStatus;
   winner: TownWarFactionId | null;
@@ -645,7 +867,19 @@ export interface TownWarCompletedConstructionImpactState {
   createdAtSeconds: number;
 }
 
-export type TownWarFrontlineStoryKind = "build" | "cover" | "resupply" | "medic" | "occupy" | "consequence";
+export type TownWarFrontlineStoryKind =
+  | "build"
+  | "cover"
+  | "resupply"
+  | "medic"
+  | "occupy"
+  | "fire"
+  | "fallback"
+  | "recover"
+  | "priority"
+  | "expedition"
+  | "breach"
+  | "consequence";
 
 export interface TownWarFrontlineStoryState {
   id: string;
@@ -662,6 +896,57 @@ export interface TownWarFrontlineStoryState {
   consequence: string;
   memoryTag: string;
   atSeconds: number;
+}
+
+export type TownWarExpeditionObjectiveId = "extend-trench" | "stock-forward-line" | "probe-enemy-approach";
+
+export type TownWarExpeditionStatus = "forming" | "moving" | "contact" | "retreating" | "reached" | "completed" | "failed";
+
+export type TownWarExpeditionRoleId = "builder" | "suppressor" | "rifleman" | "medic" | "hauler";
+
+export type TownWarExpeditionRouteBeatKind =
+  | "ordered"
+  | "spotted"
+  | "pinned"
+  | "separated"
+  | "wounded"
+  | "low-ammo"
+  | "retreating"
+  | "reached-line";
+
+export interface TownWarExpeditionRouteBeatState {
+  id: string;
+  expeditionId: string;
+  kind: TownWarExpeditionRouteBeatKind;
+  atSeconds: number;
+  position: Vec2;
+  soldierIds: string[];
+  summary: string;
+  consequence: string;
+  scarTag: string | null;
+}
+
+export interface TownWarExpeditionState {
+  id: string;
+  faction: TownWarFactionId;
+  objective: TownWarExpeditionObjectiveId;
+  label: string;
+  status: TownWarExpeditionStatus;
+  origin: Vec2;
+  objectivePosition: Vec2;
+  rallyPosition: Vec2;
+  assignedSoldierIds: string[];
+  roleBySoldierId: Record<string, TownWarExpeditionRoleId>;
+  beats: TownWarExpeditionRouteBeatState[];
+  triggeredBeatKinds: TownWarExpeditionRouteBeatKind[];
+  danger: number;
+  pressure: number;
+  progress: number;
+  retreatRequested: boolean;
+  createdAtSeconds: number;
+  lastUpdatedAtSeconds: number;
+  completedAtSeconds: number | null;
+  readable: string;
 }
 
 export type TownWarOperationPhase = "preparing" | "active" | "debriefed";
@@ -696,7 +981,14 @@ export interface TownWarOperationDebriefState {
   summary: string;
   recommendations: string[];
   supplyRemaining: TownWarCampSupplyState;
+  bankedSupply: TownWarCampSupplyState;
+  lostSupply: TownWarCampSupplyState;
   carriedSoldiers: TownWarPersistentSoldierRecordState[];
+  soldierLines: string[];
+  buildingComboLines: string[];
+  workLines: string[];
+  routeLines: string[];
+  campDamageLines: string[];
   warnings: string[];
 }
 
@@ -731,6 +1023,7 @@ export interface TownWarState {
   nextOrderId: number;
   nextCrateId: number;
   nextDugoutId: number;
+  nextFieldworkUpgradeId: number;
   nextCasualtyId: number;
   nextFlankId: number;
   nextSkillOutcomeId: number;
@@ -741,11 +1034,15 @@ export interface TownWarState {
   nextDramaBeatId: number;
   nextDebriefEchoId: number;
   nextFrontlineStoryId: number;
+  nextExpeditionId: number;
+  nextExpeditionBeatId: number;
+  nextCampBreachId: number;
   clock: TownWarClockState;
   officer: TownWarOfficerState;
   orders: TownWarBuildOrderState[];
   ammoCrates: TownWarAmmoCrateState[];
   dugouts: TownWarDugoutState[];
+  fieldworkUpgrades: TownWarFieldworkUpgradeState[];
   casualties: TownWarCasualtyState[];
   flankPressures: TownWarFlankPressureState[];
   skillDebrief: TownWarSkillDebriefState;
@@ -757,6 +1054,10 @@ export interface TownWarState {
   dramaBeat: TownWarDramaBeatState;
   debriefEchoes: TownWarDebriefEcho[];
   frontlineStories: TownWarFrontlineStoryState[];
+  expeditions: TownWarExpeditionState[];
+  campWeakPoints: TownWarCampWeakPointState[];
+  demolitionStock: TownWarDemolitionStockState[];
+  campBreaches: TownWarCampBreachState[];
   operation: TownWarOperationState;
   town: TownWarTownState;
   camps: TownWarCampState[];
@@ -765,6 +1066,7 @@ export interface TownWarState {
   aiTactics: TownWarAiTacticsState;
   combatants: TownWarCombatantState[];
   soldiers: TownWarSoldierState[];
+  unifiedSoldiers: TownWarUnifiedSoldierState[];
 }
 
 function buildDefaultTownControl(): Record<TownWarFactionId, number> {
@@ -827,6 +1129,52 @@ function createTownWarCampState(id: TownWarFactionId, label: string, spawnPositi
 
 function createTownWarSupplyState(ammo: number, build: number, food: number, med: number): TownWarCampSupplyState {
   return { ammo, build, food, med };
+}
+
+function createTownWarCampWeakPoints(campId: TownWarFactionId, spawnPosition: Vec2): TownWarCampWeakPointState[] {
+  const frontDirection = campId === TOWN_WAR_PLAYER_FACTION ? -1 : 1;
+  const base = (kind: TownWarCampWeakPointKind, label: string, xOffset: number, yOffset: number, maxHealth: number, effects: string[], damageMultiplier = 1): TownWarCampWeakPointState => {
+    const id = `${campId}-${kind}`;
+    return {
+      id,
+      campId,
+      kind,
+      label,
+      position: {
+        x: spawnPosition.x + frontDirection * xOffset,
+        y: spawnPosition.y + yOffset
+      },
+      health: maxHealth,
+      maxHealth,
+      status: "intact",
+      effects,
+      damageMultiplier,
+      lastDamagedAtSeconds: null,
+      damagedByFaction: null,
+      readable: `${label} intact: ${effects.join(", ")}.`
+    };
+  };
+
+  return [
+    base("command-core", "Command core", 0, 0, 260, ["morale", "readiness"], 1.05),
+    base("spawn-dugout", "Spawn dugout", -76, -48, 220, ["reinforcement rate"], 1),
+    base("ammo-dump", "Ammo dump", -70, 54, 180, ["ammo flow", "suppressor endurance"], 1.18),
+    base("radio-mast", "Radio mast", 54, -78, 160, ["coordination", "counter-order speed"], 1.1),
+    base("bunker-entrance", "Bunker entrance", 96, 44, 210, ["defensive readiness", "build tempo"], 0.95)
+  ];
+}
+
+function createTownWarDemolitionStock(faction: TownWarFactionId): TownWarDemolitionStockState {
+  return {
+    faction,
+    grenades: 0,
+    satchels: 0,
+    demoCharges: 0,
+    rpgRounds: 0,
+    preparedAtSeconds: null,
+    lastUsedAtSeconds: null,
+    readable: "No prepared demolition stock."
+  };
 }
 
 function createTownWarOperationState(): TownWarOperationState {
@@ -905,6 +1253,7 @@ export function createTownWarState(): TownWarState {
     nextOrderId: 1,
     nextCrateId: 1,
     nextDugoutId: 1,
+    nextFieldworkUpgradeId: 1,
     nextCasualtyId: 1,
     nextFlankId: 1,
     nextSkillOutcomeId: 1,
@@ -915,6 +1264,9 @@ export function createTownWarState(): TownWarState {
     nextDramaBeatId: 1,
     nextDebriefEchoId: 1,
     nextFrontlineStoryId: 1,
+    nextExpeditionId: 1,
+    nextExpeditionBeatId: 1,
+    nextCampBreachId: 1,
     clock: {
       seconds: 0
     },
@@ -928,6 +1280,7 @@ export function createTownWarState(): TownWarState {
     orders: [],
     ammoCrates: [],
     dugouts: [],
+    fieldworkUpgrades: [],
     casualties: [],
     flankPressures: [],
     skillDebrief: {
@@ -955,6 +1308,13 @@ export function createTownWarState(): TownWarState {
     },
     debriefEchoes: [],
     frontlineStories: [],
+    expeditions: [],
+    campWeakPoints: [
+      ...createTownWarCampWeakPoints(TOWN_WAR_PLAYER_FACTION, playerCampSpawn),
+      ...createTownWarCampWeakPoints(TOWN_WAR_ENEMY_FACTION, enemyCampSpawn)
+    ],
+    demolitionStock: [createTownWarDemolitionStock(TOWN_WAR_PLAYER_FACTION), createTownWarDemolitionStock(TOWN_WAR_ENEMY_FACTION)],
+    campBreaches: [],
     operation: createTownWarOperationState(),
     town: {
       id: "town-001",
@@ -988,7 +1348,8 @@ export function createTownWarState(): TownWarState {
       completedConstructionImpact: []
     },
     combatants: [],
-    soldiers: []
+    soldiers: [],
+    unifiedSoldiers: []
   };
 }
 

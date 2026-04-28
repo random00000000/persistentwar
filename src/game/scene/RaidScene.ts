@@ -83,6 +83,8 @@ import {
   townWarController,
   type TownWarCampState,
   type TownWarFactionId,
+  type TownWarReadabilityIcon,
+  type TownWarReadabilityIconTone,
   type TownWarRoleId,
   type TownWarSoldierState
 } from "../townWar";
@@ -105,6 +107,9 @@ interface ObstacleRevealVisual {
 const OVERLAY_CULL_MARGIN = 160;
 const ENEMY_INTENT_RENDER_LIMIT = 10;
 const ENEMY_STATUS_RENDER_LIMIT = 12;
+const PROJECTED_TOWN_WAR_NAME_LABEL_LIMIT = 8;
+const TOWN_WAR_READABILITY_ICON_RENDER_LIMIT = 18;
+const TOWN_WAR_READABILITY_INSPECT_ICON_RENDER_LIMIT = 34;
 const DEFAULT_RAID_CAMERA_ZOOM = 1;
 const BRACE_SCAN_CAMERA_ZOOM = 0.84;
 const BRACE_SCAN_CAMERA_OFFSET_MAX = 220;
@@ -698,6 +703,10 @@ function isRaidTacticalDrawerOpen(): boolean {
   return typeof document !== "undefined" && document.body.classList.contains("raid-hud-tactical-open");
 }
 
+function isTownWarOfficerHudActive(): boolean {
+  return typeof document !== "undefined" && document.body.classList.contains("town-war-officer-mode");
+}
+
 function buildSceneSquadCommandPanel(): {
   title: string;
   accent: string;
@@ -856,12 +865,12 @@ function buildSceneSquadCommandPanel(): {
       : plannedExtractPosture
         ? plannedExtractPosture.detail
         : selectedMate?.command.orderId === "defend"
-          ? `8/9/0 Select  |  C Follow  |  X Defend  |  V Attack  |  ALT+LMB / ALT+V Quick Suppress  |  CTRL+LMB Commit Suppress  |  ALT+G Frag  |  HOLD ${selectedMate.command.anchorLabel ?? "ordered pocket"} | leash ${Math.round(selectedMate.command.holdRadius)}u`
+          ? `8/9/0/- Select  |  C Follow  |  X Defend  |  V Attack  |  ALT+LMB / ALT+V Quick Suppress  |  CTRL+LMB Commit Suppress  |  ALT+G Frag  |  HOLD ${selectedMate.command.anchorLabel ?? "ordered pocket"} | leash ${Math.round(selectedMate.command.holdRadius)}u`
           : selectedMate?.command.orderId === "brace-watch"
-            ? `8/9/0 Select  |  C Follow  |  X Defend  |  V Attack  |  ALT+RMB Brace Lane  |  CTRL+RMB Covering Move  |  WATCH ${selectedMate.command.watchLabel ?? "ordered sector"} | arc ${Math.round(selectedMate.command.watchArcDegrees ?? 0)}deg`
+            ? `8/9/0/- Select  |  C Follow  |  X Defend  |  V Attack  |  ALT+RMB Brace Lane  |  CTRL+RMB Covering Move  |  WATCH ${selectedMate.command.watchLabel ?? "ordered sector"} | arc ${Math.round(selectedMate.command.watchArcDegrees ?? 0)}deg`
             : selectedMate?.command.orderId === "move-watch"
-              ? `8/9/0 Select  |  C Follow  |  X Defend  |  V Attack  |  ALT+RMB Brace Lane  |  CTRL+RMB Covering Move  |  SUPPRESS ${selectedMate.command.watchLabel ?? "ordered sector"} | arc ${Math.round(selectedMate.command.watchArcDegrees ?? 0)}deg`
-          : "8/9/0 Select  |  C Follow  |  X Defend  |  V Attack  |  ALT+LMB / ALT+V Quick Suppress  |  CTRL+LMB Commit Suppress  |  ALT+G Frag  |  Z Suppress  |  B Hold Net";
+              ? `8/9/0/- Select  |  C Follow  |  X Defend  |  V Attack  |  ALT+RMB Brace Lane  |  CTRL+RMB Covering Move  |  SUPPRESS ${selectedMate.command.watchLabel ?? "ordered sector"} | arc ${Math.round(selectedMate.command.watchArcDegrees ?? 0)}deg`
+          : "8/9/0/- Select  |  C Follow  |  X Defend  |  V Attack  |  ALT+LMB / ALT+V Quick Suppress  |  CTRL+LMB Commit Suppress  |  ALT+G Frag  |  Z Suppress  |  B Hold Net";
   const worldCueLine = orderWorldCue ? `MARK ${orderWorldCue.label} | ${orderWorldCue.detail}` : "MARK No live world cue. Call a boys order to project one into raid.";
   const coffeeLine = coffeeRead ? `COFFEE ${coffeeRead.title.toUpperCase()} | ${coffeeRead.detail}` : null;
   const squadStrainLine = `STRAIN ${squadStrain.title.toUpperCase()} | ${squadStrain.compact}`;
@@ -2569,6 +2578,17 @@ function getTownWarSoldierRenderId(id: string): number {
   return [...id].reduce((hash, char) => hash + char.charCodeAt(0), 0);
 }
 
+const TOWN_WAR_VISUAL_SUPPRESS_FIRE_RANGE = 420;
+const TOWN_WAR_VISUAL_ATTACK_FIRE_RANGE = 340;
+const TOWN_WAR_VISUAL_DEFEND_FIRE_RANGE = 300;
+const TOWN_WAR_VISUAL_TRENCH_FIRE_RANGE_FRONT_MULTIPLIER = 1.48;
+const TOWN_WAR_VISUAL_TRENCH_FIRE_RANGE_ANGLED_MULTIPLIER = 1.24;
+const TOWN_WAR_VISUAL_TRENCH_FIRE_RANGE_ENFILADED_MULTIPLIER = 0.92;
+const TOWN_WAR_VISUAL_AMMO_FEED_DISTANCE = 260;
+const TOWN_WAR_VISUAL_NETWORK_AMMO_FEED_DISTANCE = 560;
+const TOWN_WAR_VISUAL_GRENADE_DANGER_DISTANCE = 285;
+const TOWN_WAR_STATUS_LABEL_LIMIT = 10;
+
 function getNearestTownWarEnemy(
   origin: Vec2,
   faction: TownWarFactionId,
@@ -2593,6 +2613,75 @@ function normalizeTownWarFacing(from: Vec2, to: Vec2): Vec2 | null {
   const dy = to.y - from.y;
   const length = Math.hypot(dx, dy);
   return length > 0.01 ? { x: dx / length, y: dy / length } : null;
+}
+
+function getTownWarVisualBaseFireRange(soldier: TownWarSoldierState): number | null {
+  if (soldier.task.kind === "suppress" || soldier.tacticalIntent.state === "suppress-area") {
+    return TOWN_WAR_VISUAL_SUPPRESS_FIRE_RANGE;
+  }
+  if (soldier.task.kind === "attack") {
+    return TOWN_WAR_VISUAL_ATTACK_FIRE_RANGE;
+  }
+  if (
+    soldier.task.kind === "defend" ||
+    soldier.tacticalIntent.state === "hold-cover" ||
+    soldier.tacticalIntent.state === "reload-behind-cover"
+  ) {
+    return TOWN_WAR_VISUAL_DEFEND_FIRE_RANGE;
+  }
+  if (
+    soldier.ammo.inMag + soldier.ammo.reserve > 0
+  ) {
+    return TOWN_WAR_VISUAL_DEFEND_FIRE_RANGE;
+  }
+  return null;
+}
+
+function getTownWarTrenchBroadsideFit(slot: { sourceKind: string; position: Vec2; facingAngleRadians: number }, sourcePosition: Vec2): number {
+  if (slot.sourceKind !== "trench") {
+    return 1;
+  }
+  const sourceAngle = Math.atan2(sourcePosition.y - slot.position.y, sourcePosition.x - slot.position.x);
+  const delta = Math.atan2(Math.sin(sourceAngle - slot.facingAngleRadians), Math.cos(sourceAngle - slot.facingAngleRadians));
+  return Phaser.Math.Clamp(Math.abs(Math.sin(delta)), 0, 1);
+}
+
+function getTownWarTrenchVisualFireRange(
+  soldier: TownWarSoldierState,
+  slot: { sourceKind: string; position: Vec2; facingAngleRadians: number },
+  targetPosition: Vec2
+): number | null {
+  const baseRange =
+    getTownWarVisualBaseFireRange(soldier) ??
+    (slot.sourceKind === "trench" &&
+    soldier.ammo.inMag + soldier.ammo.reserve > 0
+      ? TOWN_WAR_VISUAL_DEFEND_FIRE_RANGE
+      : null);
+  if (baseRange === null) {
+    return null;
+  }
+  if (slot.sourceKind !== "trench") {
+    return baseRange;
+  }
+  const fit = getTownWarTrenchBroadsideFit(slot, targetPosition);
+  const multiplier =
+    fit >= 0.72
+      ? TOWN_WAR_VISUAL_TRENCH_FIRE_RANGE_FRONT_MULTIPLIER
+      : fit >= 0.38
+        ? TOWN_WAR_VISUAL_TRENCH_FIRE_RANGE_ANGLED_MULTIPLIER
+        : TOWN_WAR_VISUAL_TRENCH_FIRE_RANGE_ENFILADED_MULTIPLIER;
+  return baseRange * multiplier;
+}
+
+function getTownWarVisualFireRange(
+  soldier: TownWarSoldierState,
+  slot: { sourceKind: string; position: Vec2; facingAngleRadians: number } | null,
+  targetPosition: Vec2
+): number | null {
+  if (slot?.sourceKind === "trench") {
+    return getTownWarTrenchVisualFireRange(soldier, slot, targetPosition);
+  }
+  return getTownWarVisualBaseFireRange(soldier);
 }
 
 function getTownWarSoldierFacing(
@@ -7753,8 +7842,28 @@ export class RaidScene extends Phaser.Scene {
   private townWarCampLabels: ObjectiveLabelSlot[] = [];
   private townWarSelectedSoldierLabels: ObjectiveLabelSlot[] = [];
   private townWarLookSoldierLabels: ObjectiveLabelSlot[] = [];
+  private townWarStatusLabels: ObjectiveLabelSlot[] = [];
+  private projectedTownWarNameLabels: ObjectiveLabelSlot[] = [];
+  private townWarReadabilityLabels: ObjectiveLabelSlot[] = [];
+  private townWarReadabilityIconCount = 0;
+  private townWarReadabilityNormalIconCount = 0;
+  private townWarReadabilityInspectIconCount = 0;
+  private townWarReadabilityBuildPreviewIconCount = 0;
+  private townWarReadabilityInspectMode = false;
   private townWarPlayerCampArtObjects: Phaser.GameObjects.GameObject[] = [];
   private townWarPlayerCampArtVisible = true;
+  private townWarVisibleSoldierSprites: Array<{
+    id: string;
+    faction: string;
+    name: string;
+    role: string;
+    task: string;
+    x: number;
+    y: number;
+    projectedIntoRaid: boolean;
+  }> = [];
+  private townWarProjectedSoldierSpriteIds: string[] = [];
+  private townWarNamedProjectileFrame = 0;
   private roomStackLabels: ObjectiveLabelSlot[] = [];
   private edgeObjectiveLabels: ObjectiveLabelSlot[] = [];
   private squadEscortLabels: ObjectiveLabelSlot[] = [];
@@ -7808,6 +7917,7 @@ export class RaidScene extends Phaser.Scene {
   private healKey!: Phaser.Input.Keyboard.Key;
   private supportOrderKeys!: Record<"shiftFire" | "holdPosition" | "dropAmmoCrate", Phaser.Input.Keyboard.Key>;
   private squadSelectionKeys!: Record<"first" | "second" | "third", Phaser.Input.Keyboard.Key>;
+  private unifiedSquadSelectionKey!: Phaser.Input.Keyboard.Key;
   private squadCommandKeys!: Record<"follow" | "defend" | "attack", Phaser.Input.Keyboard.Key>;
 
   public constructor() {
@@ -7825,6 +7935,61 @@ export class RaidScene extends Phaser.Scene {
         object.setVisible(visible);
       }
     }
+  }
+
+  public setTownWarReadabilityInspectMode(active: boolean): void {
+    this.townWarReadabilityInspectMode = active;
+  }
+
+  public getTownWarRenderDebugReport(): {
+    soldierSprites: number;
+    enemySprites: number;
+    fieldworkLabels: number;
+    campLabels: number;
+    selectedSoldierLabels: number;
+    lookSoldierLabels: number;
+    statusLabels: number;
+    readabilityLabels: number;
+    readabilityIcons: number;
+    readabilityNormalIcons: number;
+    readabilityInspectIcons: number;
+    readabilityBuildPreviewIcons: number;
+    readabilityInspectMode: boolean;
+    playerCampArtObjects: number;
+    playerCampArtVisible: boolean;
+    visibleSoldierSprites: Array<{
+      id: string;
+      faction: string;
+      name: string;
+      role: string;
+      task: string;
+      x: number;
+      y: number;
+      projectedIntoRaid: boolean;
+    }>;
+    projectedSoldierSpriteIds: string[];
+    displayObjects: number;
+  } {
+    return {
+      soldierSprites: this.townWarSoldierSprites.size,
+      enemySprites: this.enemySprites.size,
+      fieldworkLabels: this.townWarFieldworkLabels.length,
+      campLabels: this.townWarCampLabels.length,
+      selectedSoldierLabels: this.townWarSelectedSoldierLabels.length,
+      lookSoldierLabels: this.townWarLookSoldierLabels.length,
+      statusLabels: this.townWarStatusLabels.length,
+      readabilityLabels: this.townWarReadabilityLabels.length,
+      readabilityIcons: this.townWarReadabilityIconCount,
+      readabilityNormalIcons: this.townWarReadabilityNormalIconCount,
+      readabilityInspectIcons: this.townWarReadabilityInspectIconCount,
+      readabilityBuildPreviewIcons: this.townWarReadabilityBuildPreviewIconCount,
+      readabilityInspectMode: this.townWarReadabilityInspectMode,
+      playerCampArtObjects: this.townWarPlayerCampArtObjects.length,
+      playerCampArtVisible: this.townWarPlayerCampArtVisible,
+      visibleSoldierSprites: this.townWarVisibleSoldierSprites.map((soldier) => ({ ...soldier })),
+      projectedSoldierSpriteIds: [...this.townWarProjectedSoldierSpriteIds],
+      displayObjects: this.children.list.length
+    };
   }
 
   public preload(): void {
@@ -8180,6 +8345,7 @@ export class RaidScene extends Phaser.Scene {
       second: RAID_SQUAD_SELECTION_KEY_CODES.second,
       third: RAID_SQUAD_SELECTION_KEY_CODES.third
     }) as Record<"first" | "second" | "third", Phaser.Input.Keyboard.Key>;
+    this.unifiedSquadSelectionKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.MINUS);
     this.squadCommandKeys = this.input.keyboard!.addKeys({
       follow: RAID_SQUAD_COMMAND_KEY_CODES.follow,
       defend: RAID_SQUAD_COMMAND_KEY_CODES.defend,
@@ -8229,6 +8395,9 @@ export class RaidScene extends Phaser.Scene {
     }
     if (Phaser.Input.Keyboard.JustDown(this.squadSelectionKeys.third)) {
       raidController.selectSquadMateByIndex(2);
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.unifiedSquadSelectionKey)) {
+      raidController.selectUnifiedSquadMate();
     }
 
     if (Phaser.Input.Keyboard.JustDown(this.squadCommandKeys.follow)) {
@@ -9996,23 +10165,20 @@ export class RaidScene extends Phaser.Scene {
 
   private isSupportRepresentedByFriendlyCombatant(
     support: FrontlineSupportState,
-    friendlyCombatants: ReadonlyArray<{ ownerKind: "squadmate" | "support" | "incident" | "camp-garrison"; ownerId: string | number }>
+    friendlyCombatants: ReadonlyArray<{ ownerKind: "squadmate" | "support" | "incident" | "town-war-soldier"; ownerId: string | number }>
   ): boolean {
-    return (
-      (support.playerEscort && friendlyCombatants.some((combatant) => combatant.ownerKind === "squadmate")) ||
-      (support.kind === "fireteam" &&
-        friendlyCombatants.some((combatant) => combatant.ownerKind === "support" && combatant.ownerId === support.id))
-    );
+    void support;
+    void friendlyCombatants;
+    return true;
   }
 
   private isIncidentRepresentedByFriendlyCombatant(
     incident: FrontlineIncidentState,
-    friendlyCombatants: ReadonlyArray<{ ownerKind: "squadmate" | "support" | "incident" | "camp-garrison"; ownerId: string | number }>
+    friendlyCombatants: ReadonlyArray<{ ownerKind: "squadmate" | "support" | "incident" | "town-war-soldier"; ownerId: string | number }>
   ): boolean {
-    return (
-      incident.kind === "firefight" &&
-      friendlyCombatants.some((combatant) => combatant.ownerKind === "incident" && combatant.ownerId === incident.id)
-    );
+    void incident;
+    void friendlyCombatants;
+    return true;
   }
 
   private getRenderableTracers(tracers: FrontlineTracerState[]): FrontlineTracerState[] {
@@ -10033,6 +10199,7 @@ export class RaidScene extends Phaser.Scene {
     let campLabelCount = 0;
 
     this.drawTownWarFieldworks(snapshot, pulse);
+    this.drawTownWarReadabilityIcons(pulse);
 
     for (const camp of snapshot.camps) {
       if (!camp.destroyed && this.isPointNearCamera(camp.spawn.position, 430)) {
@@ -10040,6 +10207,170 @@ export class RaidScene extends Phaser.Scene {
       }
     }
     this.hideUnusedObjectiveLabels(this.townWarCampLabels, campLabelCount);
+  }
+
+  private getTownWarReadabilityColor(tone: TownWarReadabilityIconTone): { fill: number; stroke: number; text: string } {
+    switch (tone) {
+      case "ok":
+        return { fill: 0x14532d, stroke: 0x86efac, text: "#bbf7d0" };
+      case "working":
+        return { fill: 0x713f12, stroke: 0xfacc15, text: "#fef08a" };
+      case "warn":
+        return { fill: 0x7c2d12, stroke: 0xfb923c, text: "#fed7aa" };
+      case "danger":
+        return { fill: 0x7f1d1d, stroke: 0xf87171, text: "#fecaca" };
+      case "disabled":
+        return { fill: 0x27272a, stroke: 0xa1a1aa, text: "#e4e4e7" };
+      case "info":
+      default:
+        return { fill: 0x0f172a, stroke: 0x7dd3fc, text: "#bae6fd" };
+    }
+  }
+
+  private getTownWarReadabilityGlyph(icon: string): string {
+    switch (icon) {
+      case "crossed-sightline":
+      case "dim-sightline":
+        return "ARC";
+      case "person-outline":
+        return "MAN";
+      case "crossed-magazine":
+      case "half-magazine":
+        return "MAG";
+      case "medical-cross":
+      case "cross-arrow":
+        return "MED";
+      case "warning-chevrons":
+      case "rear-arrow":
+        return "PIN";
+      case "stacked-chevrons":
+        return "SUP";
+      case "muzzle-burst":
+        return "FIR";
+      case "crossed-ammo-box":
+      case "cracked-ammo-box":
+      case "half-ammo-box":
+      case "ammo-box":
+      case "ammo-box-check":
+      case "chain-ammo-pulse":
+        return "AM";
+      case "chain-shield":
+      case "shield-pulse":
+      case "warning-shield":
+      case "cracked-shield":
+      case "shield":
+        return "DUG";
+      case "broken-chain":
+        return "LNK";
+      case "hammer":
+      case "outline-hammer":
+        return "BLD";
+      case "route-arrow":
+        return "MOV";
+      case "question-warning":
+        return "IDLE";
+      default:
+        return "!";
+    }
+  }
+
+  private getTownWarReadabilityShortLabel(icon: TownWarReadabilityIcon): string {
+    return icon.label
+      .replace(/^Soldier\s+/u, "")
+      .replace(/^Ammo crate\s+/u, "Ammo ")
+      .replace(/^Trench\s+/u, "")
+      .replace(/^Dugout\s+/u, "Dugout ");
+  }
+
+  private shouldShowTownWarReadabilityInspectIcon(icon: TownWarReadabilityIcon): boolean {
+    if (this.townWarReadabilityInspectMode) {
+      return true;
+    }
+    if (icon.targetType === "soldier" && icon.targetId === this.selectedTownWarSoldierId) {
+      return true;
+    }
+    if (!this.townWarLookWorld) {
+      return false;
+    }
+    return Phaser.Math.Distance.Between(this.townWarLookWorld.x, this.townWarLookWorld.y, icon.worldX, icon.worldY) <= 78;
+  }
+
+  private drawTownWarReadabilityIcons(pulse: number): void {
+    const graphics = this.townWarCampGraphics;
+    const overlay = townWarController.getReadabilityOverlay();
+    let labelCount = 0;
+    let normalCount = 0;
+    let inspectCount = 0;
+    let buildPreviewCount = 0;
+    const renderLimit = this.townWarReadabilityInspectMode
+      ? TOWN_WAR_READABILITY_INSPECT_ICON_RENDER_LIMIT
+      : TOWN_WAR_READABILITY_ICON_RENDER_LIMIT;
+
+    const icons = overlay.icons
+      .filter((icon) => this.isPointNearCamera({ x: icon.worldX, y: icon.worldY }, 240))
+      .filter((icon) => icon.visibility === "normal" || icon.visibility === "build-preview" || this.shouldShowTownWarReadabilityInspectIcon(icon))
+      .slice(0, renderLimit);
+
+    icons.forEach((icon, index) => {
+      const hovered = this.townWarLookWorld
+        ? Phaser.Math.Distance.Between(this.townWarLookWorld.x, this.townWarLookWorld.y, icon.worldX, icon.worldY) <= 78
+        : false;
+      const selected = icon.targetType === "soldier" && icon.targetId === this.selectedTownWarSoldierId;
+      const inspectVisible = icon.visibility === "inspect";
+      const palette = this.getTownWarReadabilityColor(icon.tone);
+      const glyph = this.getTownWarReadabilityGlyph(icon.icon);
+      const radius =
+        11 +
+        (icon.pulse === "danger" ? pulse * 3 : 0) +
+        (icon.pulse === "slow" ? pulse * 1.8 : 0) +
+        (icon.pulse === "shot" ? Math.max(0, 1 - pulse) * 2.2 : 0);
+      const x = icon.worldX;
+      const y = icon.worldY - (index % 3) * 6;
+      const label = this.getTownWarReadabilityShortLabel(icon);
+      const shouldExplain = hovered || selected;
+      const detailText = icon.detailLines.slice(0, 2).join("\n");
+      const text = shouldExplain ? `${glyph} ${label}\n${icon.shortReason}${detailText ? `\n${detailText}` : ""}` : `${glyph} ${label}`;
+
+      if (icon.visibility === "normal") {
+        normalCount += 1;
+      } else if (icon.visibility === "build-preview") {
+        buildPreviewCount += 1;
+      } else if (inspectVisible) {
+        inspectCount += 1;
+      }
+
+      graphics.fillStyle(0x020617, 0.68);
+      graphics.fillCircle(x, y, radius + 4);
+      graphics.lineStyle(selected || hovered ? 3 : 2, palette.stroke, icon.visibility === "normal" ? 0.95 : 0.72);
+      graphics.fillStyle(palette.fill, icon.visibility === "normal" ? 0.92 : 0.68);
+      graphics.fillCircle(x, y, radius);
+      if (icon.pulse === "danger" || icon.pulse === "slow") {
+        graphics.lineStyle(1, palette.stroke, 0.22 + pulse * 0.28);
+        graphics.strokeCircle(x, y, radius + 9 + pulse * 5);
+      }
+      if (icon.pulse === "shot") {
+        graphics.lineStyle(2, palette.stroke, 0.22 + (1 - pulse) * 0.38);
+        graphics.lineBetween(x + 12, y - 3, x + 24 + pulse * 7, y - 8);
+      }
+
+      this.syncObjectiveLabel(this.townWarReadabilityLabels, labelCount, {
+        x,
+        y: y - radius - (shouldExplain ? 14 : 8),
+        text,
+        color: palette.text,
+        fontSize: shouldExplain ? "9px" : "8px",
+        scrollFixed: false,
+        originX: 0.5,
+        originY: 1
+      });
+      labelCount += 1;
+    });
+
+    this.townWarReadabilityIconCount = icons.length;
+    this.townWarReadabilityNormalIconCount = normalCount;
+    this.townWarReadabilityInspectIconCount = inspectCount;
+    this.townWarReadabilityBuildPreviewIconCount = buildPreviewCount;
+    this.hideUnusedObjectiveLabels(this.townWarReadabilityLabels, labelCount);
   }
 
   private drawTownWarFieldworks(snapshot: ReturnType<typeof townWarController.getSnapshot>, pulse: number): void {
@@ -10405,6 +10736,88 @@ export class RaidScene extends Phaser.Scene {
       }
       return null;
     };
+    const isAmmoCrateFeedingSlot = (
+      crate: (typeof snapshot.ammoCrates)[number],
+      slot: (typeof snapshot.aiTactics.coverSlots)[number]
+    ): boolean => {
+      if (crate.faction !== slot.faction || crate.destroyedAtSeconds !== null || crate.ammo <= 0) {
+        return false;
+      }
+      if (Phaser.Math.Distance.Between(crate.position.x, crate.position.y, slot.position.x, slot.position.y) <= TOWN_WAR_VISUAL_AMMO_FEED_DISTANCE) {
+        return true;
+      }
+      const networkId = slot.trenchNetwork?.networkId ?? null;
+      if (!networkId) {
+        return false;
+      }
+      return snapshot.aiTactics.coverSlots.some(
+        (candidate) =>
+          candidate.sourceKind === "trench" &&
+          candidate.faction === slot.faction &&
+          candidate.trenchNetwork?.networkId === networkId &&
+          Phaser.Math.Distance.Between(crate.position.x, crate.position.y, candidate.position.x, candidate.position.y) <=
+            TOWN_WAR_VISUAL_NETWORK_AMMO_FEED_DISTANCE
+      );
+    };
+    const getTrenchGroupBattleRead = (
+      slots: (typeof snapshot.aiTactics.coverSlots)[number][]
+    ): { lines: string[]; color: string } => {
+      const occupants = slots
+        .map((slot) => ({ slot, soldier: getTrenchSlotUsers(slot).occupant }))
+        .filter((entry): entry is { slot: (typeof snapshot.aiTactics.coverSlots)[number]; soldier: (typeof snapshot.soldiers)[number] } => entry.soldier !== null);
+
+      if (occupants.length <= 0) {
+        return { lines: [], color: "#cbd5e1" };
+      }
+
+      const enemyClose = slots.some((slot) => getNearestEnemyDistanceToSlot(slot) <= TOWN_WAR_VISUAL_GRENADE_DANGER_DISTANCE);
+      const outOfAmmo = occupants.every((entry) => entry.soldier.ammo.inMag + entry.soldier.ammo.reserve <= 0);
+      const pinned = occupants.some((entry) => entry.soldier.morale.pressure / Math.max(1, entry.soldier.morale.maxPressure) >= 0.72);
+      const ammoFed = occupants.some((entry) =>
+        snapshot.ammoCrates.some((crate) => isAmmoCrateFeedingSlot(crate, entry.slot))
+      );
+      const firing = occupants.some((entry) => {
+        const target =
+          entry.soldier.targetIntent.targetId !== null
+            ? snapshot.combatants.find(
+                (combatant) =>
+                  combatant.id === entry.soldier.targetIntent.targetId &&
+                  combatant.faction !== entry.soldier.faction &&
+                  combatant.health.current > 0
+              ) ?? null
+            : getNearestTownWarEnemy(entry.slot.position, entry.soldier.faction, snapshot.combatants);
+        if (!target || entry.soldier.ammo.inMag + entry.soldier.ammo.reserve <= 0) {
+          return false;
+        }
+        const fireRange = getTownWarTrenchVisualFireRange(entry.soldier, entry.slot, target.position);
+        return (
+          fireRange !== null &&
+          Phaser.Math.Distance.Between(entry.slot.position.x, entry.slot.position.y, target.position.x, target.position.y) <= fireRange
+        );
+      });
+
+      const lines: string[] = [];
+      if (enemyClose) {
+        lines.push("GRENADE DANGER");
+      }
+      if (outOfAmmo) {
+        lines.push("OUT OF AMMO");
+      }
+      if (pinned) {
+        lines.push("PINNED");
+      }
+      if (firing) {
+        lines.push("FIRING FROM TRENCH");
+      }
+      if (ammoFed && !outOfAmmo) {
+        lines.push("AMMO-FED");
+      }
+
+      return {
+        lines: lines.slice(0, 2),
+        color: enemyClose || outOfAmmo ? "#fca5a5" : pinned ? "#fde68a" : firing || ammoFed ? "#bbf7d0" : "#cbd5e1"
+      };
+    };
     const drawTrenchCombatProof = (
       slot: (typeof snapshot.aiTactics.coverSlots)[number],
       angle: number,
@@ -10422,6 +10835,9 @@ export class RaidScene extends Phaser.Scene {
       if (nearestEnemy) {
         graphics.lineStyle(2, color, proof.tone === "bad" ? 0.34 : 0.22);
         graphics.lineBetween(nearestEnemy.position.x, nearestEnemy.position.y, slot.position.x, slot.position.y);
+      }
+      if (proof.tone !== "bad") {
+        return;
       }
       if (combatProofLabels.has(groupId)) {
         return;
@@ -10556,6 +10972,38 @@ export class RaidScene extends Phaser.Scene {
         graphics.strokeCircle(x, y, 34 + pulse * 3);
         graphics.fillStyle(color, 0.76);
         graphics.fillCircle(x, y - 24, 4 + pulse * 1.5);
+        if (preview.requestedPosition && preview.trenchNetwork) {
+          const snapDistance = Phaser.Math.Distance.Between(preview.requestedPosition.x, preview.requestedPosition.y, x, y);
+          if (snapDistance > 3) {
+            graphics.lineStyle(1.5, color, 0.38 + pulse * 0.12);
+            graphics.lineBetween(preview.requestedPosition.x, preview.requestedPosition.y, x, y);
+            graphics.fillStyle(color, 0.34);
+            graphics.fillCircle(preview.requestedPosition.x, preview.requestedPosition.y, 3.5);
+          }
+          const networkText =
+            preview.trenchNetwork.placementKind === "branch"
+              ? "SNAP: BRANCH"
+              : preview.trenchNetwork.placementKind === "extend"
+                ? "SNAP: EXTEND"
+                : "NEW NETWORK";
+          const retreatText =
+            preview.trenchNetwork.retreatHint === "fallback-path"
+              ? "FALLBACK PATH"
+              : preview.trenchNetwork.retreatHint === "bad-retreat-path"
+                ? "BAD RETREAT"
+                : "OPEN LINE";
+          this.syncObjectiveLabel(this.townWarFieldworkLabels, fieldworkLabelCount, {
+            x,
+            y: y - 62,
+            text: `${networkText}\n${retreatText}`,
+            color: preview.trenchNetwork.retreatHint === "bad-retreat-path" ? "#fca5a5" : "#bbf7d0",
+            fontSize: "10px",
+            scrollFixed: false,
+            originX: 0.5,
+            originY: 1
+          });
+          fieldworkLabelCount += 1;
+        }
       } else if (preview.kind === "ammo-crate") {
         graphics.fillStyle(0x020617, 0.22);
         graphics.fillEllipse(x, y + 12, 82, 40);
@@ -10689,6 +11137,55 @@ export class RaidScene extends Phaser.Scene {
       }
     }
 
+    for (const upgrade of snapshot.fieldworkUpgrades) {
+      if (!this.isPointNearCamera(upgrade.position, 220)) {
+        continue;
+      }
+      const color = upgrade.kind === "sandbags" ? 0xd6a85a : 0x94a3b8;
+      const accent = getTownWarFactionAccent(upgrade.faction);
+      const dx = Math.cos(upgrade.facingAngleRadians);
+      const dy = Math.sin(upgrade.facingAngleRadians);
+      const nx = -dy;
+      const ny = dx;
+      if (upgrade.kind === "sandbags") {
+        graphics.lineStyle(8, 0x7c4a1e, 0.5);
+        graphics.lineBetween(upgrade.position.x - dx * 26, upgrade.position.y - dy * 26, upgrade.position.x + dx * 26, upgrade.position.y + dy * 26);
+        graphics.lineStyle(4, color, 0.82);
+        for (let offset = -22; offset <= 22; offset += 11) {
+          graphics.strokeRoundedRect(upgrade.position.x + dx * offset - 5, upgrade.position.y + dy * offset - 4, 10, 8, 3);
+        }
+      } else {
+        graphics.lineStyle(2, 0xcbd5e1, 0.74 + pulse * 0.16);
+        for (let offset = -28; offset < 28; offset += 14) {
+          graphics.lineBetween(
+            upgrade.position.x + dx * offset - nx * 8,
+            upgrade.position.y + dy * offset - ny * 8,
+            upgrade.position.x + dx * (offset + 7) + nx * 8,
+            upgrade.position.y + dy * (offset + 7) + ny * 8
+          );
+          graphics.lineBetween(
+            upgrade.position.x + dx * (offset + 7) + nx * 8,
+            upgrade.position.y + dy * (offset + 7) + ny * 8,
+            upgrade.position.x + dx * (offset + 14) - nx * 8,
+            upgrade.position.y + dy * (offset + 14) - ny * 8
+          );
+        }
+        graphics.lineStyle(1, accent, 0.5 + pulse * 0.12);
+        graphics.strokeCircle(upgrade.position.x, upgrade.position.y, 22 + pulse * 2);
+      }
+      this.syncObjectiveLabel(this.townWarFieldworkLabels, fieldworkLabelCount, {
+        x: upgrade.position.x,
+        y: upgrade.position.y + (upgrade.kind === "sandbags" ? 30 : 34),
+        text: upgrade.kind === "sandbags" ? "SANDBAGS\nFRONT STRONG" : "WIRE\nSLOWS ASSAULT",
+        color: upgrade.kind === "sandbags" ? "#fde68a" : "#cbd5e1",
+        fontSize: "10px",
+        scrollFixed: false,
+        originX: 0.5,
+        originY: 0
+      });
+      fieldworkLabelCount += 1;
+    }
+
     for (const dugout of snapshot.dugouts) {
       if (!this.isPointNearCamera(dugout.position, 260)) {
         continue;
@@ -10813,6 +11310,36 @@ export class RaidScene extends Phaser.Scene {
       }
       const callout = getTrenchSlotCallout(anchorSlot, group.angle);
       const directionRead = getTrenchDirectionRead(anchorSlot, group.angle);
+      const battleRead = getTrenchGroupBattleRead(group.slots);
+      const calloutLine = callout.text.replace(/\n/g, " ");
+      const directionLine = directionRead.text
+        .replace("TRENCH HOLD\n-", "HOLD -")
+        .replace("FRONT TRENCH\n-", "FRONT -")
+        .replace("ANGLED TRENCH\n-", "ANGLED -")
+        .replace("ENFILADED\nCOVER WEAK", "ENFILADED COVER WEAK");
+      const networkRead = anchorSlot.trenchNetwork
+        ? anchorSlot.trenchNetwork.placementKind === "branch"
+          ? "NEW BRANCH"
+          : anchorSlot.trenchNetwork.connectedSegmentIds.length > 0 || anchorSlot.trenchNetwork.placementKind === "extend"
+            ? "CONNECTED NETWORK"
+            : "NEW NETWORK"
+        : null;
+      const retreatRead =
+        anchorSlot.trenchNetwork?.retreatHint === "fallback-path"
+          ? "FALLBACK PATH"
+          : anchorSlot.trenchNetwork?.retreatHint === "bad-retreat-path"
+            ? "BAD RETREAT PATH"
+            : anchorSlot.trenchNetwork
+              ? "OPEN LINE"
+              : null;
+      const networkLine = networkRead && retreatRead ? `\n${networkRead} | ${retreatRead}` : "";
+      const networkId = anchorSlot.trenchNetwork?.networkId ?? null;
+      const comboUpgrades = networkId
+        ? snapshot.fieldworkUpgrades.filter((upgrade) => upgrade.faction === group.faction && upgrade.networkId === networkId)
+        : [];
+      const hasSandbags = comboUpgrades.some((upgrade) => upgrade.kind === "sandbags");
+      const hasWire = comboUpgrades.some((upgrade) => upgrade.kind === "wire");
+      const comboLine = hasSandbags || hasWire ? `\n${hasSandbags ? "SANDBAGS FRONT" : "FLANK OPEN"}${hasWire ? " | WIRE SET" : ""}` : "";
       const groupStatus =
         occupiedCount > 0
           ? `OCCUPIED ${group.occupied}/${group.count}`
@@ -10825,8 +11352,17 @@ export class RaidScene extends Phaser.Scene {
       this.syncObjectiveLabel(this.townWarFieldworkLabels, fieldworkLabelCount, {
         x,
         y: y - 88,
-        text: `${callout.text}\n${groupStatus}${occupiedCount > 0 ? `\n${directionRead.text}` : ""}`,
-        color: callout.state === "abandoned" ? callout.color : directionRead.text.startsWith("ENFILADED") ? "#fca5a5" : callout.color,
+        text: `${calloutLine}\n${groupStatus}${occupiedCount > 0 ? ` | ${directionLine}` : ""}${
+          battleRead.lines.length > 0 ? `\n${battleRead.lines.join(" | ")}` : ""
+        }${networkLine}${comboLine}`,
+        color:
+          battleRead.lines.length > 0
+            ? battleRead.color
+            : callout.state === "abandoned"
+              ? callout.color
+              : directionRead.text.startsWith("ENFILADED")
+                ? "#fca5a5"
+                : callout.color,
         fontSize: "10px",
         scrollFixed: false,
         originX: 0.5,
@@ -10842,19 +11378,28 @@ export class RaidScene extends Phaser.Scene {
 
       const accent = getTownWarFactionAccent(slot.faction);
       const occupied = slot.occupiedBySoldierId !== null;
-      const x = slot.position.x;
-      const y = slot.position.y;
       const angle = Number.isFinite(slot.facingAngleRadians) ? slot.facingAngleRadians : slot.facing === "camp-a" ? Math.PI : 0;
       const callout = getTrenchSlotCallout(slot, angle);
-      drawTrenchSlotStateMarker(slot, angle, callout.state, accent, callout.user);
       if (occupied) {
-        this.townWarCampGraphics.lineStyle(1.7, accent, 0.74);
-        this.townWarCampGraphics.strokeCircle(x, y, 12);
+        continue;
       }
+
+      drawTrenchSlotStateMarker(slot, angle, callout.state, accent, callout.user);
     }
 
     for (const story of snapshot.frontlineStories.slice(0, 5)) {
       if (!story.position || !this.isPointNearCamera(story.position, 360)) {
+        continue;
+      }
+      const isDuplicatedTrenchOccupyLabel =
+        story.kind === "occupy" &&
+        Array.from(trenchGroups.values()).some((group) => {
+          if (group.occupied <= 0 || group.count <= 0) {
+            return false;
+          }
+          return Phaser.Math.Distance.Between(story.position!.x, story.position!.y, group.x / group.count, group.y / group.count) <= 118;
+        });
+      if (isDuplicatedTrenchOccupyLabel) {
         continue;
       }
       const color =
@@ -10988,10 +11533,24 @@ export class RaidScene extends Phaser.Scene {
     return labelIndex + 1;
   }
 
-  private syncTownWarSoldierSprites(snapshot: ReturnType<typeof townWarController.getSnapshot>): void {
+  private syncTownWarSoldierSprites(snapshot: ReturnType<typeof townWarController.getSnapshot>, projectedSoldierIds = new Set<string>()): void {
     const liveSoldierIds = new Set(snapshot.soldiers.map((soldier) => soldier.id));
+    this.townWarVisibleSoldierSprites = [];
+    this.townWarProjectedSoldierSpriteIds = [...projectedSoldierIds].sort();
+    const namedProjectileDebug = {
+      frame: this.townWarNamedProjectileFrame + 1,
+      bursts: 0,
+      soldierIds: [] as string[],
+      trenchBursts: 0,
+      openBursts: 0
+    };
+    this.townWarNamedProjectileFrame = namedProjectileDebug.frame;
+    (window as Window & {
+      __townWarNamedProjectileDebug?: typeof namedProjectileDebug;
+    }).__townWarNamedProjectileDebug = namedProjectileDebug;
     let selectedLabelCount = 0;
     let lookLabelCount = 0;
+    let statusLabelCount = 0;
     let nearestLookSoldier:
       | {
           soldier: TownWarSoldierState;
@@ -11013,6 +11572,11 @@ export class RaidScene extends Phaser.Scene {
       if (!sprite) {
         sprite = this.add.sprite(soldier.position.x, soldier.position.y, getTownWarSoldierSpriteKey(soldier));
         this.townWarSoldierSprites.set(soldier.id, sprite);
+      }
+
+      if (projectedSoldierIds.has(soldier.id)) {
+        sprite.setVisible(false);
+        continue;
       }
 
       const visible = this.isPointNearCamera(soldier.position, 150);
@@ -11038,20 +11602,27 @@ export class RaidScene extends Phaser.Scene {
         this.time.now
       );
       const trenchOccupant = occupantSlot?.sourceKind === "trench" && occupantSlot.occupiedBySoldierId === soldier.id;
-      const nearestEnemy = trenchOccupant ? getNearestTownWarEnemy(occupantSlot.position, soldier.faction, snapshot.combatants) : null;
-      const enemyDistance = nearestEnemy && occupantSlot ? Phaser.Math.Distance.Between(occupantSlot.position.x, occupantSlot.position.y, nearestEnemy.position.x, nearestEnemy.position.y) : Number.POSITIVE_INFINITY;
-      const firingFromTrench =
-        trenchOccupant &&
-        nearestEnemy !== null &&
-        enemyDistance <= 470 &&
+      const fireOrigin = trenchOccupant && occupantSlot ? occupantSlot.position : soldier.position;
+      const nearestEnemy = getNearestTownWarEnemy(fireOrigin, soldier.faction, snapshot.combatants);
+      const intendedEnemy =
+        soldier.targetIntent.targetId
+          ? snapshot.combatants.find(
+              (combatant) => combatant.id === soldier.targetIntent.targetId && combatant.faction !== soldier.faction && combatant.health.current > 0
+            ) ?? null
+          : null;
+      const firingTarget = intendedEnemy ?? nearestEnemy;
+      const enemyDistance =
+        firingTarget
+          ? Phaser.Math.Distance.Between(fireOrigin.x, fireOrigin.y, firingTarget.position.x, firingTarget.position.y)
+          : Number.POSITIVE_INFINITY;
+      const visualFireRange = firingTarget ? getTownWarVisualFireRange(soldier, trenchOccupant ? occupantSlot : null, firingTarget.position) : null;
+      const firingVisually =
+        firingTarget !== null &&
+        visualFireRange !== null &&
+        enemyDistance <= visualFireRange &&
         soldier.health.current > 0 &&
-        soldier.ammo.inMag + soldier.ammo.reserve > 0 &&
-        (soldier.task.kind === "defend" ||
-          soldier.task.kind === "suppress" ||
-          soldier.task.kind === "attack" ||
-          soldier.tacticalIntent.state === "hold-cover" ||
-          soldier.tacticalIntent.state === "suppress-area" ||
-          soldier.tacticalIntent.state === "reload-behind-cover");
+        soldier.ammo.inMag + soldier.ammo.reserve > 0;
+      const firingFromTrench = trenchOccupant && firingVisually;
       const trenchLipOffset = trenchOccupant ? 9 : 0;
       const position = trenchOccupant
         ? {
@@ -11059,6 +11630,16 @@ export class RaidScene extends Phaser.Scene {
             y: occupantSlot.position.y + facing.y * trenchLipOffset
           }
         : soldier.position;
+      this.townWarVisibleSoldierSprites.push({
+        id: soldier.id,
+        faction: soldier.faction,
+        name: soldier.displayName,
+        role: soldier.role,
+        task: soldier.task.kind,
+        x: Number(position.x.toFixed(1)),
+        y: Number(position.y.toFixed(1)),
+        projectedIntoRaid: false
+      });
       if (this.townWarLookWorld && isTownWarPlayerFaction(soldier.faction) && soldier.health.current > 0) {
         const lookDistance = Phaser.Math.Distance.Between(
           this.townWarLookWorld.x,
@@ -11079,11 +11660,12 @@ export class RaidScene extends Phaser.Scene {
       sprite.setAlpha((healthRatio <= 0 ? 0.34 : healthRatio < 0.45 ? 0.62 : trenchOccupant ? 1 : 0.94) * pose.alphaMultiplier);
       sprite.setDepth(position.y * 0.001 + (trenchOccupant ? 0.116 : 0.086));
 
+      const fireSeed = Math.sin(this.time.now / (soldier.role === "suppressor" ? 76 : 118) + getTownWarSoldierRenderId(soldier.id) * 0.37);
+      const weaponId = getTownWarSoldierWeaponId(soldier);
+
       if (trenchOccupant) {
         const lateral = { x: -facing.y, y: facing.x };
         const accent = isTownWarPlayerFaction(soldier.faction) ? 0xfacc15 : 0x93c5fd;
-        const fireSeed = Math.sin(this.time.now / (soldier.role === "suppressor" ? 76 : 118) + getTownWarSoldierRenderId(soldier.id) * 0.37);
-        const weaponId = getTownWarSoldierWeaponId(soldier);
         this.frontlineSupportGraphics.lineStyle(3.2, 0x020617, 0.62);
         this.frontlineSupportGraphics.lineBetween(
           position.x - lateral.x * 13 - facing.x * 2,
@@ -11111,7 +11693,24 @@ export class RaidScene extends Phaser.Scene {
             weaponId,
             pose
           );
+          namedProjectileDebug.bursts += 1;
+          namedProjectileDebug.trenchBursts += 1;
+          namedProjectileDebug.soldierIds.push(soldier.id);
         }
+      } else if (firingVisually && fireSeed > (soldier.role === "suppressor" ? -0.48 : 0.04)) {
+        drawFrontlineTracerBurst(
+          this.frontlineSupportGraphics,
+          position,
+          facing,
+          isTownWarPlayerFaction(soldier.faction) ? 0xfacc15 : 0x93c5fd,
+          0.38 + Math.max(0, fireSeed) * 0.28,
+          getFrontlineTracerDrawLength(weaponId, soldier.role === "suppressor" ? 14 : 6),
+          weaponId,
+          pose
+        );
+        namedProjectileDebug.bursts += 1;
+        namedProjectileDebug.openBursts += 1;
+        namedProjectileDebug.soldierIds.push(soldier.id);
       }
 
       if (this.isPointNearCamera(position, 96)) {
@@ -11123,6 +11722,71 @@ export class RaidScene extends Phaser.Scene {
           soldier.coverIntent.state === "occupying" ? 0.94 : 0.68,
           soldier.coverIntent.state === "occupying" ? 1.04 : 0.86
         );
+      }
+
+      const ammoTotal = soldier.ammo.inMag + soldier.ammo.reserve;
+      const pressureRatio = soldier.morale.pressure / Math.max(1, soldier.morale.maxPressure);
+      const retreating = soldier.task.kind === "move" && /retreat|falling back/i.test(soldier.task.label ?? "");
+      const occupantPosition = trenchOccupant && occupantSlot ? occupantSlot.position : null;
+      const ammoFed =
+        occupantPosition !== null &&
+        occupantSlot !== null &&
+        snapshot.ammoCrates.some((crate) => {
+          if (crate.faction !== soldier.faction || crate.destroyedAtSeconds !== null || crate.ammo <= 0) {
+            return false;
+          }
+          if (Phaser.Math.Distance.Between(crate.position.x, crate.position.y, occupantPosition.x, occupantPosition.y) <= TOWN_WAR_VISUAL_AMMO_FEED_DISTANCE) {
+            return true;
+          }
+          const networkId = occupantSlot.trenchNetwork?.networkId ?? null;
+          return Boolean(
+            networkId &&
+              snapshot.aiTactics.coverSlots.some(
+                (slot) =>
+                  slot.sourceKind === "trench" &&
+                  slot.faction === soldier.faction &&
+                  slot.trenchNetwork?.networkId === networkId &&
+                  Phaser.Math.Distance.Between(crate.position.x, crate.position.y, slot.position.x, slot.position.y) <=
+                    TOWN_WAR_VISUAL_NETWORK_AMMO_FEED_DISTANCE
+              )
+          );
+        });
+      const grenadeDanger = trenchOccupant && firingTarget !== null && enemyDistance <= TOWN_WAR_VISUAL_GRENADE_DANGER_DISTANCE;
+      const fightingTask = soldier.task.kind === "attack" || soldier.task.kind === "defend" || soldier.task.kind === "suppress";
+      const statusRead =
+        soldier.health.current <= 0
+          ? null
+          : grenadeDanger
+            ? { text: "GRENADE DANGER", color: "#fca5a5" }
+            : retreating
+              ? { text: "RETREATING", color: "#fed7aa" }
+              : pressureRatio >= 0.72
+                ? { text: "PINNED", color: "#fde68a" }
+                : ammoTotal <= 0 && fightingTask
+                  ? { text: "OUT OF AMMO", color: "#fb923c" }
+                  : firingFromTrench
+                    ? { text: "FIRING FROM TRENCH", color: "#bbf7d0" }
+                    : ammoFed
+                      ? { text: "AMMO-FED", color: "#bfdbfe" }
+                      : null;
+      const shouldShowIndividualStatus = !trenchOccupant || retreating || soldier.id === this.selectedTownWarSoldierId;
+      if (
+        statusRead &&
+        shouldShowIndividualStatus &&
+        statusLabelCount < TOWN_WAR_STATUS_LABEL_LIMIT &&
+        this.isPointNearCamera(position, 156)
+      ) {
+        this.syncObjectiveLabel(this.townWarStatusLabels, statusLabelCount, {
+          x: position.x,
+          y: position.y - (soldier.id === this.selectedTownWarSoldierId ? 58 : 48),
+          text: statusRead.text,
+          color: statusRead.color,
+          fontSize: "8px",
+          scrollFixed: false,
+          originX: 0.5,
+          originY: 1
+        });
+        statusLabelCount += 1;
       }
 
       if (soldier.id === this.selectedTownWarSoldierId && isTownWarPlayerFaction(soldier.faction)) {
@@ -11168,6 +11832,7 @@ export class RaidScene extends Phaser.Scene {
     }
     this.hideUnusedObjectiveLabels(this.townWarSelectedSoldierLabels, selectedLabelCount);
     this.hideUnusedObjectiveLabels(this.townWarLookSoldierLabels, lookLabelCount);
+    this.hideUnusedObjectiveLabels(this.townWarStatusLabels, statusLabelCount);
   }
 
   private syncSprites(): void {
@@ -11197,6 +11862,13 @@ export class RaidScene extends Phaser.Scene {
     this.hideUnusedObjectiveLabels(this.squadEscortLabels, 0);
     this.hideUnusedObjectiveLabels(this.townWarSelectedSoldierLabels, 0);
     this.hideUnusedObjectiveLabels(this.townWarLookSoldierLabels, 0);
+    this.hideUnusedObjectiveLabels(this.townWarStatusLabels, 0);
+    this.hideUnusedObjectiveLabels(this.projectedTownWarNameLabels, 0);
+    this.hideUnusedObjectiveLabels(this.townWarReadabilityLabels, 0);
+    this.townWarReadabilityIconCount = 0;
+    this.townWarReadabilityNormalIconCount = 0;
+    this.townWarReadabilityInspectIconCount = 0;
+    this.townWarReadabilityBuildPreviewIconCount = 0;
     const renderedSupports = frontlineSupports.filter(
       (support) => !this.isSupportRepresentedByFriendlyCombatant(support, friendlyCombatants)
     );
@@ -11286,7 +11958,14 @@ export class RaidScene extends Phaser.Scene {
     this.syncSpriteCollection(this.friendlyCombatantSprites, friendlyCombatants, (combatant) =>
       this.add.sprite(combatant.position.x, combatant.position.y, getFriendlyCombatantKey(combatant.archetypeId))
     );
-    this.syncTownWarSoldierSprites(townWarController.getSnapshot());
+    this.syncTownWarSoldierSprites(
+      townWarController.getSnapshot(),
+      new Set(
+        friendlyCombatants
+          .filter((combatant) => combatant.ownerKind === "town-war-soldier")
+          .map((combatant) => String(combatant.ownerId))
+      )
+    );
     this.syncSpriteCollection(
       this.fallenSquadBodySprites,
       fallenSquadBodies.filter((body) => !body.recovered),
@@ -11375,6 +12054,7 @@ export class RaidScene extends Phaser.Scene {
       }
     }
 
+    let projectedTownWarNameLabelCount = 0;
     for (const combatant of friendlyCombatants) {
       const sprite = this.friendlyCombatantSprites.get(combatant.id);
       if (!sprite) {
@@ -11403,7 +12083,29 @@ export class RaidScene extends Phaser.Scene {
           this.frontlineIncidentGraphics.strokeCircle(combatant.position.x, combatant.position.y, combatant.radius + 7);
         }
       }
+      if (
+        combatant.ownerKind === "town-war-soldier" &&
+        projectedTownWarNameLabelCount < PROJECTED_TOWN_WAR_NAME_LABEL_LIMIT &&
+        this.isPointNearCamera(combatant.position, 150)
+      ) {
+        const status =
+          combatant.casualtyState === "healthy"
+            ? `${combatant.ammoInMag}/${combatant.reserveAmmo}`
+            : combatant.casualtyState.toUpperCase();
+        this.syncObjectiveLabel(this.projectedTownWarNameLabels, projectedTownWarNameLabelCount, {
+          x: combatant.position.x,
+          y: combatant.position.y - 32,
+          text: `${combatant.name.toUpperCase()}\n${status}`,
+          color: combatant.casualtyState === "healthy" ? "#fef3c7" : "#fed7aa",
+          fontSize: "8px",
+          scrollFixed: false,
+          originX: 0.5,
+          originY: 1
+        });
+        projectedTownWarNameLabelCount += 1;
+      }
     }
+    this.hideUnusedObjectiveLabels(this.projectedTownWarNameLabels, projectedTownWarNameLabelCount);
 
     if (selectedDefendAnchor && this.isPointNearCamera(selectedDefendAnchor, selectedDefendHoldRadius + 90)) {
       const pulse = (Math.sin(this.time.now / 180) + 1) * 0.5;
@@ -12553,6 +13255,12 @@ export class RaidScene extends Phaser.Scene {
   }
 
   private drawObjectiveMarkers(): void {
+    if (isTownWarOfficerHudActive()) {
+      this.hideUnusedObjectiveLabels(this.worldObjectiveLabels, 0);
+      this.hideUnusedObjectiveLabels(this.edgeObjectiveLabels, 0);
+      return;
+    }
+
     const markers = this.getObjectiveMarkers();
     let worldLabelCount = 0;
 
@@ -13201,6 +13909,8 @@ export class RaidScene extends Phaser.Scene {
     this.hideUnusedObjectiveLabels(this.worldObjectiveLabels, 0);
     this.hideUnusedObjectiveLabels(this.townWarFieldworkLabels, 0);
     this.hideUnusedObjectiveLabels(this.townWarCampLabels, 0);
+    this.hideUnusedObjectiveLabels(this.townWarStatusLabels, 0);
+    this.hideUnusedObjectiveLabels(this.townWarReadabilityLabels, 0);
     this.hideUnusedObjectiveLabels(this.edgeObjectiveLabels, 0);
   }
 
@@ -13295,6 +14005,14 @@ export class RaidScene extends Phaser.Scene {
   }
 
   private syncTelemetryPanel(): void {
+    const visible = !isTownWarOfficerHudActive();
+    this.telemetryPanelBg.setVisible(visible);
+    this.telemetryPanelTitle.setVisible(visible);
+    this.telemetryPanelBody.setVisible(visible);
+    if (!visible) {
+      return;
+    }
+
     const { enemies, friendlyCombatants, frontlineSupports, frontlineIncidents, obstacles, player, extractZone, extractionReady, extractionContested } =
       raidController.state;
     const renderedSupports = frontlineSupports.filter(
@@ -13373,6 +14091,14 @@ export class RaidScene extends Phaser.Scene {
 
   private syncNoiseDisciplinePanel(): void {
     const panel = buildSceneNoiseDisciplinePanel();
+    const visible = !isTownWarOfficerHudActive();
+
+    this.noiseDisciplinePanelBg.setVisible(visible);
+    this.noiseDisciplinePanelTitle.setVisible(visible);
+    this.noiseDisciplinePanelBody.setVisible(visible);
+    if (!visible) {
+      return;
+    }
 
     this.noiseDisciplinePanelBg.setStrokeStyle(1, panel.borderColor, 0.9);
     this.noiseDisciplinePanelTitle.setText(panel.title);
@@ -13383,7 +14109,7 @@ export class RaidScene extends Phaser.Scene {
 
   private syncPressurePosturePanel(): void {
     const panel = buildScenePressurePosturePanel();
-    const visible = panel.visible && !isRaidTacticalDrawerOpen();
+    const visible = panel.visible && !isRaidTacticalDrawerOpen() && !isTownWarOfficerHudActive();
 
     this.pressurePosturePanelBg.setVisible(visible);
     this.pressurePosturePanelTitle.setVisible(visible);
@@ -13401,7 +14127,7 @@ export class RaidScene extends Phaser.Scene {
 
   private syncFrontlineOperationPanel(): void {
     const panel = buildSceneFrontlineOperationPanel();
-    const visible = panel.visible && !isRaidTacticalDrawerOpen();
+    const visible = panel.visible && !isRaidTacticalDrawerOpen() && !isTownWarOfficerHudActive();
 
     this.frontlineOperationPanelBg.setVisible(visible);
     this.frontlineOperationPanelTitle.setVisible(visible);
@@ -13418,7 +14144,7 @@ export class RaidScene extends Phaser.Scene {
 
   private syncCombatPulsePanel(): void {
     const panel = buildSceneCombatPulsePanel();
-    const visible = panel.visible && !isRaidTacticalDrawerOpen();
+    const visible = panel.visible && !isRaidTacticalDrawerOpen() && !isTownWarOfficerHudActive();
 
     this.combatPulsePanelBg.setVisible(visible);
     this.combatPulsePanelTitle.setVisible(visible);
@@ -13435,7 +14161,7 @@ export class RaidScene extends Phaser.Scene {
 
   private syncCombatAudioPanel(): void {
     const panel = buildSceneCombatAudioPanel(this.combatAudioEngine.getMode());
-    const visible = panel.visible;
+    const visible = panel.visible && !isTownWarOfficerHudActive();
 
     this.combatAudioPanelBg.setVisible(visible);
     this.combatAudioPanelTitle.setVisible(visible);
@@ -13452,6 +14178,14 @@ export class RaidScene extends Phaser.Scene {
 
   private syncExtractPressurePanel(): void {
     const panel = buildSceneExtractPressurePanel();
+    const visible = !isTownWarOfficerHudActive();
+
+    this.extractPressurePanelBg.setVisible(visible);
+    this.extractPressurePanelTitle.setVisible(visible);
+    this.extractPressurePanelBody.setVisible(visible);
+    if (!visible) {
+      return;
+    }
 
     this.extractPressurePanelBg.setStrokeStyle(1, panel.borderColor, 0.9);
     this.extractPressurePanelTitle.setText(panel.title);
@@ -13462,7 +14196,7 @@ export class RaidScene extends Phaser.Scene {
 
   private syncSquadCommandPanel(): void {
     const panel = buildSceneSquadCommandPanel();
-    const visible = !isRaidTacticalDrawerOpen();
+    const visible = !isRaidTacticalDrawerOpen() && !isTownWarOfficerHudActive();
 
     this.squadCommandPanelBg.setVisible(visible);
     this.squadCommandPanelTitle.setVisible(visible);
@@ -13479,7 +14213,7 @@ export class RaidScene extends Phaser.Scene {
 
   private syncSquadTrafficPanel(): void {
     const panel = buildSceneSquadTrafficPanel();
-    const visible = panel.visible && !isRaidTacticalDrawerOpen();
+    const visible = panel.visible && !isRaidTacticalDrawerOpen() && !isTownWarOfficerHudActive();
 
     this.squadTrafficPanelBg.setVisible(visible);
     this.squadTrafficPanelTitle.setVisible(visible);
@@ -13496,7 +14230,7 @@ export class RaidScene extends Phaser.Scene {
 
   private syncHostileTrafficPanel(): void {
     const panel = buildSceneHostileTrafficPanel();
-    const visible = panel.visible && !isRaidTacticalDrawerOpen();
+    const visible = panel.visible && !isRaidTacticalDrawerOpen() && !isTownWarOfficerHudActive();
 
     this.hostileTrafficPanelBg.setVisible(visible);
     this.hostileTrafficPanelTitle.setVisible(visible);
@@ -13513,7 +14247,7 @@ export class RaidScene extends Phaser.Scene {
 
   private syncFrontlineAftermathPanel(): void {
     const panel = buildSceneFrontlineAftermathPanel();
-    const visible = panel.visible && !isRaidTacticalDrawerOpen();
+    const visible = panel.visible && !isRaidTacticalDrawerOpen() && !isTownWarOfficerHudActive();
 
     this.frontlineAftermathPanelBg.setVisible(visible);
     this.frontlineAftermathPanelTitle.setVisible(visible);

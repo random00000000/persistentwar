@@ -21,11 +21,40 @@ import {
   SQUAD_DIALOGUE_VOICE_PROFILES
 } from "./dialogue/storyPacks";
 import type { DialogueStoryMemoryTag, HostileStoryEventKind } from "./dialogue/storyPackSchema";
-import { TOWN_WAR_ENEMY_FACTION, TOWN_WAR_PLAYER_FACTION, townWarController } from "./townWar";
+import { TOWN_WAR_ENEMY_FACTION, TOWN_WAR_PLAYER_FACTION, townWarController, type TownWarCoverSlotState, type TownWarSoldierState } from "./townWar";
 import { WEAPONS, type WeaponDefinition, type WeaponId } from "./weapons";
 
 export type EnemyArchetypeId = "rifleman" | "rusher" | "skirmisher";
 export type EnemyTapeId = "blue" | "green" | "yellow";
+type TownWarSnapshot = ReturnType<typeof townWarController.getSnapshot>;
+type TownWarCampSnapshot = TownWarSnapshot["camps"][number];
+type TownWarUnifiedSoldierSnapshot = TownWarSnapshot["unifiedSoldiers"][number];
+type TownWarRaidProjectionMetadata = {
+  fixedCoverKind?: "trench";
+};
+type TownWarRaidLoadout = {
+  archetypeId: EnemyArchetypeId;
+  weaponId: WeaponId;
+};
+type TownWarRaidCombatantProjection = {
+  soldier: TownWarSoldierState;
+  archetypeId: EnemyArchetypeId;
+  weaponId: WeaponId;
+  weapon: WeaponDefinition;
+  archetype: EnemyArchetypeDefinition;
+  health: { current: number; max: number };
+  position: Vec2;
+  facingTarget: Vec2;
+  townWarProjection?: TownWarRaidProjectionMetadata;
+  awareness: FriendlyCombatantState["awareness"];
+  grenadeStock: number;
+};
+type LiveSquadCombatantSource = {
+  healthCurrent: number | null;
+  healthMax: number | null;
+  ammoInMag: number | null;
+  reserveAmmo: number | null;
+};
 
 export interface EnemyTapeDefinition {
   id: EnemyTapeId;
@@ -450,7 +479,7 @@ export interface EnemyState {
 
 export interface FriendlyCombatantState {
   id: number;
-  ownerKind: "squadmate" | "support" | "incident" | "camp-garrison";
+  ownerKind: "squadmate" | "support" | "incident" | "town-war-soldier";
   ownerId: string | number;
   squadMateId: string;
   name: string;
@@ -473,6 +502,7 @@ export interface FriendlyCombatantState {
   dryFireTimer: number;
   resupplyTimer: number;
   anchor: Vec2;
+  townWarProjection?: TownWarRaidProjectionMetadata;
   alert: boolean;
   awareness: "patrol" | "investigating" | "engaged";
   investigateTarget: Vec2 | null;
@@ -1051,6 +1081,21 @@ export interface SquadRosterState {
   dialogueMemories: DialogueMemory[];
 }
 
+export type OfficerOnboardingStage = "solo-survival" | "command-ready";
+export type OfficerPromotionReason = "survival" | "combat" | "objective" | "debug" | null;
+
+export interface OfficerOnboardingState {
+  stage: OfficerOnboardingStage;
+  survivedSeconds: number;
+  targetSeconds: number;
+  promotionPoints: number;
+  promotionThreshold: number;
+  promotionReason: OfficerPromotionReason;
+  promotionTitle: string;
+  promotionSummary: string;
+  squadCommandUnlocked: boolean;
+}
+
 export interface SquadRecruitCandidate {
   id: string;
   name: string;
@@ -1059,6 +1104,26 @@ export interface SquadRecruitCandidate {
   voiceSignature: string;
   readiness: number;
   hook: string;
+  stats: RecruitStatBlock;
+  trait: RecruitTrait;
+  difficulty: "easy" | "standard" | "hard";
+  rollLabel: string;
+}
+
+export interface RecruitStatBlock {
+  marksmanship: number;
+  building: number;
+  medicine: number;
+  logistics: number;
+  nerve: number;
+}
+
+export interface RecruitTrait {
+  id: string;
+  label: string;
+  upside: string;
+  downside: string;
+  readinessModifier: number;
 }
 
 export interface SquadCommsState {
@@ -2095,6 +2160,7 @@ export interface RaidState {
   activeFrontlineIncidentAction: ActiveFrontlineIncidentActionState | null;
   activeObstacleBreach: ActiveObstacleBreachState | null;
   pendingReinforcements: PendingReinforcementState[];
+  officerOnboarding: OfficerOnboardingState;
   squadMates: SquadMateState[];
   squadRoster: SquadRosterState[];
   recruitPool: SquadRecruitCandidate[];
@@ -2196,6 +2262,13 @@ const OFFICER_AMMO_CRATE_RESUPPLY_RADIUS = 104;
 const OFFICER_AMMO_CRATE_THREAT_RADIUS = 132;
 const OFFICER_AMMO_CRATE_LOSS_SECONDS = 2.6;
 const OFFICER_AMMO_CRATE_DEFAULT_STOCK = 120;
+const TOWN_WAR_RAID_PROJECTION_LIMIT = 4;
+const TOWN_WAR_RAID_TRENCH_FIRE_RANGE_MULTIPLIER = 1.2;
+const TOWN_WAR_RAID_TRENCH_DAMAGE_MULTIPLIER = 0.1;
+const ACTIVE_SQUAD_MATE_LIMIT = 3;
+const OFFICER_SOLO_SURVIVAL_SECONDS = 300;
+const OFFICER_PROMOTION_POINT_THRESHOLD = 100;
+const RECRUIT_ROLL_COST: SupplyStock = { medkits: 1, ammoPacks: 1 };
 const LOOT_INTERACT_RADIUS = 58;
 const LOOT_HOLD_RADIUS = 56;
 const LOOT_PROMPT_RADIUS = 70;
@@ -8549,6 +8622,10 @@ const getWeaponProjectileRadius = (weaponId: WeaponId): number => {
     return 3.8;
   }
 
+  if (weaponId === "rpg") {
+    return 6.6;
+  }
+
   if (weaponId === "pistol") {
     return 2.4;
   }
@@ -9104,7 +9181,19 @@ function mergeMemorialCarryoverIntoRoster(
   });
 }
 
-const createInitialSquadRoster = (): SquadRosterState[] =>
+const createInitialOfficerOnboarding = (): OfficerOnboardingState => ({
+  stage: "solo-survival",
+  survivedSeconds: 0,
+  targetSeconds: OFFICER_SOLO_SURVIVAL_SECONDS,
+  promotionPoints: 0,
+  promotionThreshold: OFFICER_PROMOTION_POINT_THRESHOLD,
+  promotionReason: null,
+  promotionTitle: "Command locked",
+  promotionSummary: "Survive the opening alone, prove the lane, then authorization opens for camp command and first recruitment.",
+  squadCommandUnlocked: false
+});
+
+const createInitialSquadRoster = (startingStatus: SquadRosterStatus = "reserve"): SquadRosterState[] =>
   SQUAD_BLUEPRINT.map((mate, index) => ({
     id: mate.id,
     name: mate.name,
@@ -9112,7 +9201,7 @@ const createInitialSquadRoster = (): SquadRosterState[] =>
     voiceTag: mate.voiceTag,
     voiceSignature: mate.voiceSignature,
     weaponId: getDefaultSquadMateWeaponId(mate.role, index),
-    status: "active",
+    status: startingStatus,
     readiness: 1,
     fatigue: 0,
     raids: 0,
@@ -9123,8 +9212,14 @@ const createInitialSquadRoster = (): SquadRosterState[] =>
     reserveDays: 0,
     rookie: false,
     bodyRecovered: true,
-    lastAssignment: "Cold standby in stash",
-    lastCallout: "Boys are cold. Pick a route and we move together.",
+    lastAssignment:
+      startingStatus === "active"
+        ? "Cold standby in stash"
+        : "Command locked until the officer survives the opening alone",
+    lastCallout:
+      startingStatus === "active"
+        ? "Boys are cold. Pick a route and we move together."
+        : "No squad authorization yet. Survive the first push, scout the town, and earn command.",
     lastOutcome: "No live raid record yet",
     casualtyRecord: null,
     memorialNote: null,
@@ -9170,15 +9265,136 @@ const buildSquadCasualtyRecord = (
 });
 
 const createRecruitPool = (count = 3): SquadRecruitCandidate[] =>
-  SQUAD_RECRUIT_BLUEPRINT.slice(0, count).map((candidate, index) => ({
-    id: candidate.id,
+  SQUAD_RECRUIT_BLUEPRINT.slice(0, count).map((candidate, index) => createRolledRecruitCandidate(candidate, index, "camp-intake"));
+
+const RECRUIT_TRAITS: RecruitTrait[] = [
+  {
+    id: "steady-hands",
+    label: "Steady hands",
+    upside: "shoots and builds cleaner under pressure",
+    downside: "slow to sprint into bad ground",
+    readinessModifier: 0.06
+  },
+  {
+    id: "trench-rat",
+    label: "Trench rat",
+    upside: "strong builder and cover holder",
+    downside: "weak open-ground confidence",
+    readinessModifier: 0.03
+  },
+  {
+    id: "good-heart",
+    label: "Good heart",
+    upside: "better rescue and medical instincts",
+    downside: "takes bad risks for wounded soldiers",
+    readinessModifier: 0.01
+  },
+  {
+    id: "ammo-mule",
+    label: "Ammo mule",
+    upside: "excellent hauling and resupply work",
+    downside: "average in direct fights",
+    readinessModifier: 0.02
+  },
+  {
+    id: "shaky-rookie",
+    label: "Shaky rookie",
+    upside: "cheap slot with room to grow",
+    downside: "low nerve makes first fights harder",
+    readinessModifier: -0.08
+  },
+  {
+    id: "hothead",
+    label: "Hothead",
+    upside: "brave assault instincts",
+    downside: "overextends without careful orders",
+    readinessModifier: -0.03
+  }
+];
+
+function rollRecruitStat(min = 2, max = 9): number {
+  return Math.floor(min + Math.random() * (max - min + 1));
+}
+
+function getRecruitDifficulty(stats: RecruitStatBlock, trait: RecruitTrait): SquadRecruitCandidate["difficulty"] {
+  const average = (stats.marksmanship + stats.building + stats.medicine + stats.logistics + stats.nerve) / 5 + trait.readinessModifier * 10;
+  if (average >= 6.7) {
+    return "easy";
+  }
+  if (average <= 4.5) {
+    return "hard";
+  }
+  return "standard";
+}
+
+function formatRecruitStatHook(stats: RecruitStatBlock, trait: RecruitTrait): string {
+  const best = [
+    ["Shoot", stats.marksmanship],
+    ["Build", stats.building],
+    ["Medic", stats.medicine],
+    ["Logi", stats.logistics],
+    ["Nerve", stats.nerve]
+  ] satisfies Array<[string, number]>;
+  const weakest = [
+    ["shooting", stats.marksmanship],
+    ["building", stats.building],
+    ["medicine", stats.medicine],
+    ["logistics", stats.logistics],
+    ["nerve", stats.nerve]
+  ] satisfies Array<[string, number]>;
+  const bestStat = [...best].sort((left, right) => right[1] - left[1])[0];
+  const weakestStat = [...weakest].sort((left, right) => left[1] - right[1])[0];
+
+  return `${trait.label}: ${trait.upside}; weak ${weakestStat[0]}. Best read ${bestStat[0]} ${bestStat[1]}/10.`;
+}
+
+function createRolledRecruitCandidate(
+  candidate: (typeof SQUAD_RECRUIT_BLUEPRINT)[number],
+  rollIndex: number,
+  rollLabel: string
+): SquadRecruitCandidate {
+  const trait = RECRUIT_TRAITS[Math.floor(Math.random() * RECRUIT_TRAITS.length)] ?? RECRUIT_TRAITS[0];
+  const stats: RecruitStatBlock = {
+    marksmanship: rollRecruitStat(),
+    building: rollRecruitStat(),
+    medicine: rollRecruitStat(),
+    logistics: rollRecruitStat(),
+    nerve: rollRecruitStat()
+  };
+  if (trait.id === "steady-hands") {
+    stats.marksmanship = Math.min(10, stats.marksmanship + 2);
+    stats.building = Math.min(10, stats.building + 1);
+  } else if (trait.id === "trench-rat") {
+    stats.building = Math.min(10, stats.building + 3);
+    stats.nerve = Math.max(1, stats.nerve - 1);
+  } else if (trait.id === "good-heart") {
+    stats.medicine = Math.min(10, stats.medicine + 3);
+  } else if (trait.id === "ammo-mule") {
+    stats.logistics = Math.min(10, stats.logistics + 3);
+    stats.marksmanship = Math.max(1, stats.marksmanship - 1);
+  } else if (trait.id === "shaky-rookie") {
+    stats.nerve = Math.max(1, stats.nerve - 3);
+  } else if (trait.id === "hothead") {
+    stats.nerve = Math.min(10, stats.nerve + 2);
+    stats.medicine = Math.max(1, stats.medicine - 1);
+  }
+  const average = (stats.marksmanship + stats.building + stats.medicine + stats.logistics + stats.nerve) / 5;
+  const readiness = clamp(0.38 + average / 14 + trait.readinessModifier + rollIndex * 0.01, 0.34, 0.94);
+  const difficulty = getRecruitDifficulty(stats, trait);
+  return {
+    id: `${candidate.id}-${rollLabel}-${rollIndex}`,
     name: candidate.name,
     role: candidate.role,
     voiceTag: candidate.voiceTag,
-    voiceSignature: candidate.voiceSignature,
-    readiness: clamp(0.66 + index * 0.04, 0.66, 0.82),
-    hook: candidate.hook
-  }));
+    voiceSignature: `${candidate.voiceSignature} // ${trait.label}`,
+    readiness,
+    hook: `${candidate.hook} ${formatRecruitStatHook(stats, trait)}`,
+    stats,
+    trait,
+    difficulty,
+    rollLabel
+  };
+}
 
 const createInitialFrontlineSectors = (): FrontlineSectorState[] =>
   RAID_ROUTES.map((route) => {
@@ -10643,7 +10859,7 @@ const createSquadMates = (
     const unresolvedMemorialPenalty = getUnresolvedMemorialPenalty(roster);
     return roster
     .filter((mate) => mate.status === "active")
-    .slice(0, 3)
+    .slice(0, ACTIVE_SQUAD_MATE_LIMIT)
     .map((mate, index) => {
       const directive = getSquadDirective(index, "advance", route, threatLabel, null, null);
       const weaponId = mate.weaponId;
@@ -14931,6 +15147,9 @@ function getFriendlyCombatantAnchor(
 }
 
 function getRussianCampNpcName(squadMate: SquadMateState): string {
+  if (isUnifiedSquadRosterId(squadMate.id)) {
+    return squadMate.name;
+  }
   if (squadMate.combatProfileId === "rusher") {
     return "Russian Assaultman";
   }
@@ -14944,6 +15163,148 @@ function getRussianCampNpcName(squadMate: SquadMateState): string {
     return "Russian Skirmisher";
   }
   return "Russian Rifleman";
+}
+
+function isUnifiedSquadRosterId(id: string): boolean {
+  return id.startsWith("unified-");
+}
+
+function getTownWarSoldierIdFromUnifiedRosterId(rosterId: string): string {
+  return rosterId.replace(/^unified-/, "");
+}
+
+function getUnifiedSquadRosterId(unifiedSoldierId: string): string {
+  return isUnifiedSquadRosterId(unifiedSoldierId) ? unifiedSoldierId : `unified-${unifiedSoldierId}`;
+}
+
+function getUnifiedSoldierReadiness(unifiedSoldier: TownWarUnifiedSoldierSnapshot): number {
+  const healthRatio = unifiedSoldier.combat.health.current / Math.max(1, unifiedSoldier.combat.health.max);
+  const needPenalty =
+    unifiedSoldier.colonist.currentNeed === "tired"
+      ? 0.12
+      : unifiedSoldier.colonist.currentNeed === "hungry" || unifiedSoldier.colonist.currentNeed === "shaken"
+        ? 0.08
+        : unifiedSoldier.colonist.currentNeed === "low-ammo"
+          ? 0.06
+          : 0;
+  return clamp(0.46 + healthRatio * 0.38 + unifiedSoldier.colonist.skills.nerve / 80 - needPenalty, 0.28, 0.92);
+}
+
+function createUnifiedSoldierRosterMate(
+  unifiedSoldier: TownWarUnifiedSoldierSnapshot,
+  status: SquadRosterState["status"]
+): SquadRosterState {
+  return {
+    id: unifiedSoldier.id,
+    name: unifiedSoldier.displayName,
+    role: `${unifiedSoldier.role} / camp soldier`,
+    voiceTag: "Russian",
+    voiceSignature: `${unifiedSoldier.colonist.identitySummary.bestSkills} // ${unifiedSoldier.colonist.currentNeed}`,
+    weaponId: unifiedSoldier.combat.weaponId,
+    status,
+    readiness: getUnifiedSoldierReadiness(unifiedSoldier),
+    fatigue: unifiedSoldier.colonist.needs.fatigue,
+    raids: unifiedSoldier.colonist.dramaArc.combatNerve > 0.7 ? 1 : 0,
+    extracts: 0,
+    survivedRaids: 0,
+    woundedRaids: unifiedSoldier.colonist.currentNeed === "wounded" ? 1 : 0,
+    criticalRaids: 0,
+    reserveDays: 0,
+    rookie: false,
+    bodyRecovered: true,
+    lastAssignment: "Assigned from camp roster through unified soldier bridge",
+    lastCallout: unifiedSoldier.readable,
+    lastOutcome: "Camp soldier attached to the boys net; still keeps colonist priorities when returned to camp.",
+    casualtyRecord: null,
+    memorialNote: null,
+    familyNotified: false,
+    wakeHeld: false,
+    dialogueMemories: []
+  };
+}
+
+function getUnifiedSoldierLiveCombatantSource(unifiedSoldier: TownWarUnifiedSoldierSnapshot | null): LiveSquadCombatantSource | null {
+  return unifiedSoldier
+    ? {
+        healthCurrent: unifiedSoldier.combat.health.current,
+        healthMax: unifiedSoldier.combat.health.max,
+        ammoInMag: unifiedSoldier.combat.ammo.inMag,
+        reserveAmmo: unifiedSoldier.combat.ammo.reserve
+      }
+    : null;
+}
+
+function getTownWarSoldierCombatArchetype(soldier: TownWarSoldierState): EnemyArchetypeId {
+  if (soldier.role === "builder" || soldier.role === "medic") {
+    return "skirmisher";
+  }
+  if (soldier.role === "suppressor" || soldier.role === "defender") {
+    return "rifleman";
+  }
+  return "rusher";
+}
+
+function getTownWarSoldierCombatWeapon(soldier: TownWarSoldierState): WeaponId {
+  if (soldier.role === "suppressor") {
+    return "pkm";
+  }
+  if (soldier.role === "defender") {
+    return "short-mosin";
+  }
+  return "worn-ak";
+}
+
+function getTownWarSoldierRaidLoadout(soldier: TownWarSoldierState): TownWarRaidLoadout {
+  return {
+    archetypeId: getTownWarSoldierCombatArchetype(soldier),
+    weaponId: getTownWarSoldierCombatWeapon(soldier)
+  };
+}
+
+function canProjectTownWarSoldierIntoRaid(soldier: TownWarSoldierState): boolean {
+  return (
+    soldier.faction === TOWN_WAR_PLAYER_FACTION &&
+    soldier.health.current > 0 &&
+    soldier.squadBridge.status !== "assigned" &&
+    (soldier.task.kind !== "hold" || soldier.role === "defender" || soldier.role === "rifleman" || soldier.role === "suppressor")
+  );
+}
+
+function getTownWarSoldierRaidGrenadeStock(soldier: TownWarSoldierState): number {
+  return soldier.role === "rifleman" || soldier.role === "defender" ? 1 : 0;
+}
+
+function getTownWarSoldierRaidAwareness(soldier: TownWarSoldierState): FriendlyCombatantState["awareness"] {
+  return soldier.task.kind === "suppress" || soldier.task.kind === "attack" ? "engaged" : "patrol";
+}
+
+function getTownWarSoldierRaidHealth(soldier: TownWarSoldierState, archetype: EnemyArchetypeDefinition): { current: number; max: number } {
+  return {
+    current: Math.min(archetype.health, soldier.health.current),
+    max: Math.max(archetype.health, soldier.health.max)
+  };
+}
+
+function scoreTownWarSoldierRaidProjection(soldier: TownWarSoldierState): number {
+  const taskWeight =
+    soldier.task.kind === "suppress"
+      ? 130
+      : soldier.task.kind === "defend" || soldier.task.kind === "attack"
+        ? 115
+        : soldier.task.kind === "build" || soldier.task.kind === "heal" || soldier.task.kind === "resupply"
+          ? 68
+          : 45;
+  const roleWeight =
+    soldier.role === "suppressor"
+      ? 36
+      : soldier.role === "rifleman" || soldier.role === "defender"
+        ? 28
+        : soldier.role === "medic" || soldier.role === "builder"
+          ? 18
+          : 10;
+  const ammoWeight = soldier.ammo.inMag + soldier.ammo.reserve > 0 ? 16 : -30;
+  const healthRatio = soldier.health.current / Math.max(1, soldier.health.max);
+  return taskWeight + roleWeight + ammoWeight + healthRatio * 24 - soldier.needs.fatigue * 18;
 }
 
 const createFriendlyCombatant = (
@@ -15004,102 +15365,6 @@ const createFriendlyCombatant = (
   };
 };
 
-const createSupportCombatant = (
-  id: number,
-  support: FrontlineSupportState
-): FriendlyCombatantState => ({
-  id,
-  ownerKind: "support",
-  ownerId: support.id,
-  squadMateId: `support-${support.id}`,
-  name: support.label,
-  voiceTag: "Support",
-  archetypeId: support.combatProfileId,
-  weaponId: support.weaponId,
-  position: { ...support.position },
-  velocity: { x: 0, y: 0 },
-  facing: length(support.facing) > 0.001 ? normalize(support.facing) : { x: 1, y: 0 },
-  health: SCAV_ARCHETYPES[support.combatProfileId].health,
-  maxHealth: SCAV_ARCHETYPES[support.combatProfileId].health,
-  radius: support.combatProfileId === "rusher" ? 17 : 16,
-  cooldown: support.fireIntervalMin + Math.random() * Math.max(0.05, support.fireIntervalMax - support.fireIntervalMin),
-  grenadeStock: support.grenadeStock > 0 ? 1 : 0,
-  grenadeCooldown: 0,
-  ammoInMag: support.ammoInMag,
-  reserveAmmo: support.reserveAmmo,
-  reloadTimer: support.reloadTimer,
-  dryFireTimer: support.dryFireTimer,
-  resupplyTimer: support.resupplyTimer,
-  anchor: { ...support.position },
-  alert: false,
-  awareness: "patrol",
-  investigateTarget: null,
-  investigateTimer: 0,
-  navigationStallTime: 0,
-  navigationRecoveryIndex: 0,
-  lastNavigationSample: { ...support.position },
-  navigationCommittedTarget: null,
-  pressureType: null,
-  pressureTimer: 0,
-  blindFireTimer: 0,
-  panicTimer: 0,
-  armorBrokenTimer: 0,
-  armorFlash: 0,
-  fleshFlash: 0,
-  casualtyState: "healthy",
-  woundSeverity: "none",
-  bleedoutTimer: 0,
-  stabilized: false
-});
-
-const createIncidentCombatant = (
-  id: number,
-  incident: FrontlineIncidentState
-): FriendlyCombatantState => ({
-  id,
-  ownerKind: "incident",
-  ownerId: incident.id,
-  squadMateId: `incident-${incident.id}`,
-  name: incident.label,
-  voiceTag: "Frontline",
-  archetypeId: incident.combatProfileId,
-  weaponId: incident.weaponId,
-  position: { ...incident.position },
-  velocity: { x: 0, y: 0 },
-  facing: length(incident.facing) > 0.001 ? normalize(incident.facing) : { x: 1, y: 0 },
-  health: SCAV_ARCHETYPES[incident.combatProfileId].health,
-  maxHealth: SCAV_ARCHETYPES[incident.combatProfileId].health,
-  radius: incident.combatProfileId === "rusher" ? 17 : 16,
-  cooldown: incident.fireIntervalMin + Math.random() * Math.max(0.05, incident.fireIntervalMax - incident.fireIntervalMin),
-  grenadeStock: incident.grenadeStock > 0 ? 1 : 0,
-  grenadeCooldown: 0,
-  ammoInMag: incident.ammoInMag,
-  reserveAmmo: incident.reserveAmmo,
-  reloadTimer: incident.reloadTimer,
-  dryFireTimer: incident.dryFireTimer,
-  resupplyTimer: incident.resupplyTimer,
-  anchor: { ...incident.position },
-  alert: false,
-  awareness: "patrol",
-  investigateTarget: null,
-  investigateTimer: 0,
-  navigationStallTime: 0,
-  navigationRecoveryIndex: 0,
-  lastNavigationSample: { ...incident.position },
-  navigationCommittedTarget: null,
-  pressureType: null,
-  pressureTimer: 0,
-  blindFireTimer: 0,
-  panicTimer: 0,
-  armorBrokenTimer: 0,
-  armorFlash: 0,
-  fleshFlash: 0,
-  casualtyState: "healthy",
-  woundSeverity: "none",
-  bleedoutTimer: 0,
-  stabilized: false
-});
-
 const createFriendlyCombatants = (
   startingId: number,
   squadMates: ReadonlyArray<SquadMateState>,
@@ -15108,22 +15373,6 @@ const createFriendlyCombatants = (
   squadMates
     .filter((mate) => mate.weaponId !== "none")
     .map((mate, index, armedMates) => createFriendlyCombatant(startingId + index, mate, player, index, armedMates.length));
-
-const createAmbientFriendlyCombatants = (
-  startingId: number,
-  supports: ReadonlyArray<FrontlineSupportState>,
-  incidents: ReadonlyArray<FrontlineIncidentState>
-): FriendlyCombatantState[] => {
-  const supportCombatants = supports
-    .filter((support) => support.kind === "fireteam" && !support.playerEscort && support.strength > 0)
-    .map((support, index) => createSupportCombatant(startingId + index, support));
-  const incidentStartId = startingId + supportCombatants.length;
-  const incidentCombatants = incidents
-    .filter((incident) => incident.kind === "firefight" && !incident.resolved && incident.strength > 0)
-    .map((incident, index) => createIncidentCombatant(incidentStartId + index, incident));
-
-  return [...supportCombatants, ...incidentCombatants];
-};
 
 function getWoundSeverityFromHealth(health: number, maxHealth: number): WoundSeverity {
   const percent = maxHealth > 0 ? health / maxHealth : 0;
@@ -15917,7 +16166,8 @@ export class RaidController {
       activeFrontlineIncidentAction: null,
       activeObstacleBreach: null,
       pendingReinforcements: [],
-      squadMates: createSquadMates(startingRoster, startingRoute, "Crossfire Nest"),
+      officerOnboarding: createInitialOfficerOnboarding(),
+      squadMates: [],
       squadRoster: startingRoster,
       recruitPool: startingRecruitPool,
       frontlineSectors,
@@ -15929,7 +16179,7 @@ export class RaidController {
       frontlineSupports: [],
       frontlineIncidents: [],
       focusedFrontlineIncidentId: null,
-      selectedSquadMateId: startingRoster.find((mate) => mate.status === "active")?.id ?? null,
+      selectedSquadMateId: null,
       activeFrontlineSupportOrderId: null,
       frontlineSupportOrderTimer: 0,
       frontlineSupportOrderCooldown: 0,
@@ -15937,23 +16187,23 @@ export class RaidController {
       activeFrontlineHoldZoneId: null,
       frontlineHoldZoneProgress: 0,
       squadComms: createSquadComms(
-        "Rook",
-        "Point rifleman",
-        "Steady hand",
+        "Command Net",
+        "Officer trial",
+        "Locked",
         "steady",
-        "Quiet Walk",
-        `Boys are cold at ${startingRoute.name}. Pick a route, then we step in together.`
+        "Solo Start",
+        `No squad is attached yet. Survive the first five minutes around ${startingRoute.name}, scout the pressure, and earn command authority.`
       ),
       squadLog: [
         createSquadLogEntry(
           this.squadLogId++,
-          "Rook",
-          "Point rifleman",
-          "Steady hand",
+          "Command Net",
+          "Officer trial",
+          "Locked",
           "steady",
-          "Quiet Walk",
-          `Boys are cold at ${startingRoute.name}. Pick a route, then we step in together.`,
-          "Standby"
+          "Solo Start",
+          `No squad is attached yet. Survive the first five minutes around ${startingRoute.name}, scout the pressure, and earn command authority.`,
+          "Locked"
         )
       ],
       hostileComms: createHostileComms(
@@ -16004,8 +16254,13 @@ export class RaidController {
       return;
     }
 
-    const activeCount = this.state.squadRoster.filter((mate) => mate.status === "active").length;
-    if (activeCount >= 3) {
+    if (!this.state.officerOnboarding.squadCommandUnlocked) {
+      this.state.message = `Squad command is still locked. Survive ${this.getOfficerSoloSurvivalMinutesRemaining()} more minute${this.getOfficerSoloSurvivalMinutesRemaining() === 1 ? "" : "s"} as the officer before recruiting.`;
+      return;
+    }
+
+    const activeCount = this.getActiveSquadRosterCount();
+    if (activeCount >= ACTIVE_SQUAD_MATE_LIMIT) {
       this.state.message = "The boys roster is already full. Stand a loss down before bringing in another replacement.";
       return;
     }
@@ -16026,6 +16281,8 @@ export class RaidController {
     }
 
     const [candidate] = this.state.recruitPool.splice(candidateIndex, 1);
+    const firstFightFatigue =
+      candidate.difficulty === "hard" ? 0.22 : candidate.difficulty === "easy" ? 0.05 : 0.12;
     this.state.squadRoster.push({
       id: candidate.id,
       name: candidate.name,
@@ -16035,7 +16292,7 @@ export class RaidController {
       weaponId: getDefaultSquadMateWeaponId(candidate.role, this.state.squadRoster.length),
       status: "active",
       readiness: candidate.readiness,
-      fatigue: 0.1,
+      fatigue: firstFightFatigue,
       raids: 0,
       extracts: 0,
       survivedRaids: 0,
@@ -16044,9 +16301,9 @@ export class RaidController {
       reserveDays: 0,
       rookie: true,
       bodyRecovered: true,
-      lastAssignment: "Fresh replacement in stash",
+      lastAssignment: `${candidate.trait.label} recruit from ${candidate.rollLabel}`,
       lastCallout: candidate.hook,
-      lastOutcome: "Newly attached to the boys net as a rookie replacement",
+      lastOutcome: `Newly attached // ${candidate.difficulty} first deployment // Shoot ${candidate.stats.marksmanship}, Build ${candidate.stats.building}, Medic ${candidate.stats.medicine}, Logi ${candidate.stats.logistics}, Nerve ${candidate.stats.nerve}`,
       casualtyRecord: null,
       memorialNote: null,
       familyNotified: false,
@@ -16055,11 +16312,312 @@ export class RaidController {
     });
     this.fillRecruitPool();
     this.state.squadMates = createSquadMates(this.state.squadRoster, this.getActiveRoute(), this.state.currentThreatLabel);
-    this.state.message = `${candidate.name} joined the boys net as ${candidate.role.toLowerCase()}. Rookie nerves will keep the read slightly lower until they survive a clean extract.`;
+    const difficultyArticle = candidate.difficulty === "easy" ? "an" : "a";
+    this.state.message = `${candidate.name} joined the boys net as ${candidate.role.toLowerCase()}. ${candidate.trait.label} makes this ${difficultyArticle} ${candidate.difficulty} first deployment: Shoot ${candidate.stats.marksmanship}, Build ${candidate.stats.building}, Medic ${candidate.stats.medicine}, Logi ${candidate.stats.logistics}, Nerve ${candidate.stats.nerve}.`;
+  }
+
+  public rollRecruitCandidates(): void {
+    if (this.state.phase !== "stash") {
+      return;
+    }
+
+    if (!this.state.officerOnboarding.squadCommandUnlocked) {
+      this.state.message = "Recruit rolls unlock after the field promotion. Survive the opening before spending camp supplies on candidates.";
+      return;
+    }
+
+    if (!canAffordSupplyStock(this.state.stashSupplies, RECRUIT_ROLL_COST)) {
+      this.state.message = `Recruit roll needs ${RECRUIT_ROLL_COST.medkits} med and ${RECRUIT_ROLL_COST.ammoPacks} ammo from camp supplies. Haul supplies or extract before rolling again.`;
+      return;
+    }
+
+    spendSupplyStock(this.state.stashSupplies, RECRUIT_ROLL_COST);
+    const rollLabel = `roll-${this.recruitCursor}`;
+    this.state.recruitPool = Array.from({ length: 3 }, (_, index) => {
+      const blueprint = SQUAD_RECRUIT_BLUEPRINT[(this.recruitCursor + index) % SQUAD_RECRUIT_BLUEPRINT.length];
+      return createRolledRecruitCandidate(blueprint, index, rollLabel);
+    });
+    this.recruitCursor += 3;
+    const best = [...this.state.recruitPool].sort((left, right) => right.readiness - left.readiness)[0];
+    this.state.message = best
+      ? `Camp candidates rolled for ${RECRUIT_ROLL_COST.medkits} med and ${RECRUIT_ROLL_COST.ammoPacks} ammo. Best read: ${best.name}, ${best.trait.label}, ${Math.round(best.readiness * 100)}% readiness.`
+      : "Camp candidates rolled, but no one usable came through the line.";
+  }
+
+  private refreshLiveSquadMates(): void {
+    this.state.squadMates = this.state.officerOnboarding.squadCommandUnlocked
+      ? createSquadMates(this.state.squadRoster, this.getActiveRoute(), this.state.currentThreatLabel)
+      : [];
+  }
+
+  private getActiveSquadRosterCount(): number {
+    return this.state.squadRoster.filter((mate) => mate.status === "active").length;
+  }
+
+  private getOfficerSoloSurvivalRemainingSeconds(): number {
+    return Math.max(0, this.state.officerOnboarding.targetSeconds - this.state.officerOnboarding.survivedSeconds);
+  }
+
+  private getOfficerSoloSurvivalMinutesRemaining(): number {
+    return Math.ceil(this.getOfficerSoloSurvivalRemainingSeconds() / 60);
+  }
+
+  private findUnifiedSoldier(unifiedSoldierId: string, townWar: TownWarSnapshot = townWarController.getSnapshot()): TownWarUnifiedSoldierSnapshot | null {
+    return townWar.unifiedSoldiers.find((soldier) => soldier.id === unifiedSoldierId || soldier.soldierId === unifiedSoldierId) ?? null;
+  }
+
+  private syncUnifiedSoldierSquadBridge(
+    rosterId: string,
+    update: {
+      status: "camp" | "assigned";
+      squadSlot: number | null;
+      assignedAtSeconds: number | null;
+      operatorMenuVisible?: boolean;
+    }
+  ): void {
+    if (!isUnifiedSquadRosterId(rosterId)) {
+      return;
+    }
+
+    townWarController.setSoldierSquadBridge(getTownWarSoldierIdFromUnifiedRosterId(rosterId), {
+      status: update.status,
+      squadSlot: update.squadSlot,
+      legacySquadMateId: update.status === "assigned" ? rosterId : null,
+      assignedAtSeconds: update.assignedAtSeconds,
+      operatorMenuVisible: update.operatorMenuVisible ?? true
+    });
+  }
+
+  private detachLiveSquadCombatant(squadMateId: string): void {
+    this.state.friendlyCombatants = this.state.friendlyCombatants.filter((combatant) => combatant.squadMateId !== squadMateId);
+  }
+
+  private detachTownWarRaidProjection(soldierId: string): void {
+    this.state.friendlyCombatants = this.state.friendlyCombatants.filter(
+      (combatant) =>
+        !(
+          combatant.ownerKind === "town-war-soldier" &&
+          (combatant.ownerId === soldierId || combatant.squadMateId === soldierId)
+        )
+    );
+  }
+
+  private detachTownWarRaidProjectionForUnifiedRosterId(rosterId: string): void {
+    if (!isUnifiedSquadRosterId(rosterId)) {
+      return;
+    }
+
+    this.detachTownWarRaidProjection(getTownWarSoldierIdFromUnifiedRosterId(rosterId));
+  }
+
+  private attachTownWarRaidProjection(soldierId: string): void {
+    if (this.state.phase !== "raid") {
+      return;
+    }
+    if (
+      this.state.friendlyCombatants.some(
+        (combatant) =>
+          combatant.ownerKind === "town-war-soldier" &&
+          (combatant.ownerId === soldierId || combatant.squadMateId === soldierId)
+      )
+    ) {
+      return;
+    }
+
+    const townWar = townWarController.getSnapshot();
+    const soldier = townWar.soldiers.find((entry) => entry.id === soldierId) ?? null;
+    const playerCamp = townWar.camps.find((camp) => camp.id === "camp-a") ?? null;
+    const enemyCamp = townWar.camps.find((camp) => camp.id === "camp-b") ?? null;
+    if (!soldier || !playerCamp || !enemyCamp || playerCamp.destroyed || !canProjectTownWarSoldierIntoRaid(soldier)) {
+      return;
+    }
+
+    this.state.friendlyCombatants.push(this.createTownWarSoldierRaidCombatant(townWar, soldier, enemyCamp));
+  }
+
+  private attachTownWarRaidProjectionForUnifiedRosterId(rosterId: string): void {
+    if (!isUnifiedSquadRosterId(rosterId)) {
+      return;
+    }
+
+    this.attachTownWarRaidProjection(getTownWarSoldierIdFromUnifiedRosterId(rosterId));
+  }
+
+  private reserveActiveSquadMateForUnifiedSwap(unifiedSoldier: TownWarUnifiedSoldierSnapshot, townWar: TownWarSnapshot): SquadRosterState | null {
+    if (this.state.phase !== "raid" || this.getActiveSquadRosterCount() < ACTIVE_SQUAD_MATE_LIMIT) {
+      return null;
+    }
+
+    const target =
+      [...this.state.squadRoster]
+        .filter((mate) => mate.status === "active")
+        .sort((left, right) => left.readiness - right.readiness)[0] ?? null;
+    if (!target) {
+      return null;
+    }
+
+    target.status = "reserve";
+    target.reserveDays = 1;
+    target.lastAssignment = `Rotated into reserve so ${unifiedSoldier.displayName} could join the live boys net`;
+    target.lastOutcome = `Raid swap reserve // ${Math.round(target.readiness * 100)}% readiness`;
+    this.detachLiveSquadCombatant(target.id);
+    this.syncUnifiedSoldierSquadBridge(target.id, {
+      status: "assigned",
+      squadSlot: null,
+      assignedAtSeconds: townWar.clock.seconds
+    });
+    return target;
+  }
+
+  private getUnifiedSoldierLiveSource(rosterId: string): TownWarUnifiedSoldierSnapshot | null {
+    if (!isUnifiedSquadRosterId(rosterId)) {
+      return null;
+    }
+
+    const soldierId = getTownWarSoldierIdFromUnifiedRosterId(rosterId);
+    return this.findUnifiedSoldier(soldierId) ?? this.findUnifiedSoldier(rosterId);
+  }
+
+  private attachUnifiedSoldierAsLiveSquadCombatant(rosterId: string, unifiedSoldier: TownWarUnifiedSoldierSnapshot | null): void {
+    this.detachTownWarRaidProjectionForUnifiedRosterId(rosterId);
+    this.attachLiveSquadCombatant(rosterId, getUnifiedSoldierLiveCombatantSource(unifiedSoldier));
+  }
+
+  private applyLiveSquadCombatantSource(combatant: FriendlyCombatantState, source: LiveSquadCombatantSource | null): void {
+    if (!source) {
+      return;
+    }
+
+    if (source.healthMax !== null && Number.isFinite(source.healthMax)) {
+      combatant.maxHealth = Math.max(combatant.maxHealth, Math.round(source.healthMax));
+    }
+    if (source.healthCurrent !== null && Number.isFinite(source.healthCurrent)) {
+      combatant.health = clamp(Math.round(source.healthCurrent), 1, combatant.maxHealth);
+    }
+    if (source.ammoInMag !== null && Number.isFinite(source.ammoInMag)) {
+      combatant.ammoInMag = clamp(Math.round(source.ammoInMag), 0, WEAPONS[combatant.weaponId].magazineSize);
+    }
+    if (source.reserveAmmo !== null && Number.isFinite(source.reserveAmmo)) {
+      combatant.reserveAmmo = Math.max(0, Math.round(source.reserveAmmo));
+    }
+  }
+
+  public assignUnifiedSoldierToSquad(unifiedSoldierId: string): void {
+    if (this.state.phase !== "stash" && this.state.phase !== "raid") {
+      return;
+    }
+
+    if (!this.state.officerOnboarding.squadCommandUnlocked) {
+      const minutesRemaining = this.getOfficerSoloSurvivalMinutesRemaining();
+      this.state.message = `Camp soldiers stay on local work until command is earned. Survive ${minutesRemaining} more minute${minutesRemaining === 1 ? "" : "s"} as the officer first.`;
+      return;
+    }
+
+    const townWar = townWarController.getSnapshot();
+    const unifiedSoldier = this.findUnifiedSoldier(unifiedSoldierId, townWar);
+    if (!unifiedSoldier || !unifiedSoldier.squad.assignable) {
+      this.state.message = "That camp soldier is not available for the boys net right now.";
+      return;
+    }
+
+    const rosterId = unifiedSoldier.id;
+    if (this.state.squadRoster.some((mate) => mate.id === rosterId)) {
+      this.state.message = `${unifiedSoldier.displayName} is already represented on the boys board.`;
+      return;
+    }
+
+    const memorialBlock = this.getMemorialReplacementBlock();
+    if (memorialBlock) {
+      this.state.message =
+        memorialBlock.reason === "family"
+          ? `${memorialBlock.mate.name}'s chair is still blocked. Call the family before ${unifiedSoldier.displayName} joins the boys net.`
+          : `${memorialBlock.mate.name}'s wake is still owed. Settle the rites before ${unifiedSoldier.displayName} joins the boys net.`;
+      return;
+    }
+
+    const raidSwapReserve = this.reserveActiveSquadMateForUnifiedSwap(unifiedSoldier, townWar);
+    const activeCount = this.getActiveSquadRosterCount();
+    const joinsAsActive = activeCount < ACTIVE_SQUAD_MATE_LIMIT;
+    const assignedSquadSlot = joinsAsActive ? activeCount : null;
+
+    this.state.squadRoster.push(createUnifiedSoldierRosterMate(unifiedSoldier, joinsAsActive ? "active" : "reserve"));
+    this.refreshLiveSquadMates();
+    if (this.state.phase === "raid") {
+      this.detachTownWarRaidProjection(unifiedSoldier.soldierId);
+    }
+    if (joinsAsActive) {
+      this.state.selectedSquadMateId = rosterId;
+      if (this.state.phase === "raid") {
+        this.attachUnifiedSoldierAsLiveSquadCombatant(rosterId, unifiedSoldier);
+      }
+    }
+    if (this.state.phase === "raid" && !joinsAsActive) {
+      this.state.selectedSquadMateId = this.state.squadMates.find((mate) => mate.id === this.state.selectedSquadMateId)?.id ?? this.state.squadMates[0]?.id ?? null;
+    }
+    this.syncUnifiedSoldierSquadBridge(rosterId, {
+      status: "assigned",
+      squadSlot: assignedSquadSlot,
+      assignedAtSeconds: townWar.clock.seconds,
+      operatorMenuVisible: true
+    });
+    this.state.message = joinsAsActive
+      ? `${unifiedSoldier.displayName} joined the boys net from camp${
+          raidSwapReserve ? ` after ${raidSwapReserve.name} rotated to reserve` : this.state.phase === "raid" ? " and is moving onto your live shoulder" : ""
+        }. He can still return to colonist work after unassignment.`
+      : `${unifiedSoldier.displayName} joined the boys net reserve from camp. Rotate him active when a combat slot opens.`;
+  }
+
+  public unassignUnifiedSoldierFromSquad(unifiedSoldierId: string): void {
+    if (this.state.phase !== "stash" && this.state.phase !== "raid") {
+      return;
+    }
+
+    const rosterId = getUnifiedSquadRosterId(unifiedSoldierId);
+    const target = this.state.squadRoster.find((mate) => mate.id === rosterId);
+    if (!target) {
+      this.state.message = "That unified soldier is not attached to the boys net.";
+      return;
+    }
+
+    this.state.squadRoster = this.state.squadRoster.filter((mate) => mate.id !== rosterId);
+    if (this.state.phase === "raid") {
+      this.detachLiveSquadCombatant(rosterId);
+    }
+    this.syncUnifiedSoldierSquadBridge(rosterId, {
+      status: "camp",
+      squadSlot: null,
+      assignedAtSeconds: null
+    });
+    this.attachTownWarRaidProjectionForUnifiedRosterId(rosterId);
+    this.refreshLiveSquadMates();
+    if (this.state.selectedSquadMateId === rosterId) {
+      this.state.selectedSquadMateId = this.state.squadMates[0]?.id ?? null;
+    }
+    this.state.message = `${target.name} returned to camp work and is no longer staged as a squadmate.`;
+  }
+
+  private attachLiveSquadCombatant(
+    squadMateId: string,
+    source: LiveSquadCombatantSource | null = null
+  ): void {
+    if (this.state.friendlyCombatants.some((combatant) => combatant.squadMateId === squadMateId)) {
+      return;
+    }
+
+    const mate = this.state.squadMates.find((entry) => entry.id === squadMateId);
+    if (!mate || mate.weaponId === "none") {
+      return;
+    }
+
+    const armedMates = this.state.squadMates.filter((entry) => entry.weaponId !== "none");
+    const slotIndex = Math.max(0, armedMates.findIndex((entry) => entry.id === squadMateId));
+    const combatant = createFriendlyCombatant(this.friendlyCombatantId++, mate, this.state.player, slotIndex, armedMates.length);
+    this.applyLiveSquadCombatantSource(combatant, source);
+    this.state.friendlyCombatants.push(combatant);
   }
 
   public rotateSquadMate(mateId: string): void {
-    if (this.state.phase !== "stash") {
+    if (this.state.phase !== "stash" && this.state.phase !== "raid") {
       return;
     }
 
@@ -16068,21 +16626,34 @@ export class RaidController {
       return;
     }
 
-    const activeCount = this.state.squadRoster.filter((mate) => mate.status === "active").length;
+    const activeCount = this.getActiveSquadRosterCount();
 
     if (target.status === "active") {
-      if (activeCount <= 1) {
-        this.state.message = "You need at least one active boy attached to the next push.";
-        return;
-      }
-
       target.status = "reserve";
       target.reserveDays = 1;
       target.lastAssignment = "Rotated into reserve for recovery";
       target.lastOutcome = `Reserve rotation // ${Math.round(target.readiness * 100)}% readiness`;
+      if (this.state.phase === "raid") {
+        this.detachLiveSquadCombatant(target.id);
+        if (this.state.selectedSquadMateId === target.id) {
+          this.state.selectedSquadMateId =
+            this.state.squadRoster.find((mate) => mate.status === "active" && mate.id !== target.id)?.id ?? null;
+        }
+      }
+      this.syncUnifiedSoldierSquadBridge(target.id, {
+        status: "assigned",
+        squadSlot: null,
+        assignedAtSeconds: townWarController.getSnapshot().clock.seconds
+      });
       this.state.message = `${target.name} rotated into reserve so the next push can spread the wear.`;
     } else if (target.status === "reserve") {
-      if (activeCount >= 3) {
+      if (!this.state.officerOnboarding.squadCommandUnlocked) {
+        const minutesRemaining = this.getOfficerSoloSurvivalMinutesRemaining();
+        this.state.message = `Reserve stays off your shoulder until the officer trial is complete. Survive ${minutesRemaining} more minute${minutesRemaining === 1 ? "" : "s"} first.`;
+        return;
+      }
+
+      if (activeCount >= ACTIVE_SQUAD_MATE_LIMIT) {
         this.state.message = "The boys net is already full. Rotate someone out before reattaching reserve.";
         return;
       }
@@ -16100,10 +16671,21 @@ export class RaidController {
       target.reserveDays = 0;
       target.lastAssignment = "Pulled back onto the live boys net";
       target.lastOutcome = `Reserve recalled // ${Math.round(target.readiness * 100)}% readiness`;
+      this.refreshLiveSquadMates();
+      if (this.state.phase === "raid") {
+        this.attachUnifiedSoldierAsLiveSquadCombatant(target.id, this.getUnifiedSoldierLiveSource(target.id));
+        this.state.selectedSquadMateId = target.id;
+      }
+      const activeSlot = this.state.squadMates.findIndex((mate) => mate.id === target.id);
+      this.syncUnifiedSoldierSquadBridge(target.id, {
+        status: "assigned",
+        squadSlot: activeSlot >= 0 ? activeSlot : null,
+        assignedAtSeconds: townWarController.getSnapshot().clock.seconds
+      });
       this.state.message = `${target.name} is back on the live boys net for the next raid.`;
     }
 
-    this.state.squadMates = createSquadMates(this.state.squadRoster, this.getActiveRoute(), this.state.currentThreatLabel);
+    this.refreshLiveSquadMates();
   }
 
   public cycleSquadMateWeapon(mateId: string, direction: 1 | -1): void {
@@ -16303,15 +16885,7 @@ export class RaidController {
   private fillRecruitPool(): void {
     while (this.state.recruitPool.length < 3 && this.recruitCursor < SQUAD_RECRUIT_BLUEPRINT.length) {
       const candidate = SQUAD_RECRUIT_BLUEPRINT[this.recruitCursor];
-      this.state.recruitPool.push({
-        id: candidate.id,
-        name: candidate.name,
-        role: candidate.role,
-        voiceTag: candidate.voiceTag,
-        voiceSignature: candidate.voiceSignature,
-        readiness: clamp(0.64 + this.recruitCursor * 0.03, 0.64, 0.84),
-        hook: candidate.hook
-      });
+      this.state.recruitPool.push(createRolledRecruitCandidate(candidate, this.state.recruitPool.length, `bench-${this.recruitCursor}`));
       this.recruitCursor += 1;
     }
   }
@@ -16671,6 +17245,9 @@ export class RaidController {
   private syncSquadRosterFromLiveState(result: RaidSummary["result"], routeId: RaidRouteId, routeName: string): string[] {
     const routeStatus = this.buildSquadAfterAction(result).squadStatusLabel;
     const liveMatesById = new Map(this.state.squadMates.map((mate) => [mate.id, mate]));
+    const liveCombatantsBySquadMateId = new Map(
+      this.state.friendlyCombatants.map((combatant) => [combatant.squadMateId, combatant])
+    );
     const recoveredBodiesByMateId = new Set(
       this.state.fallenSquadBodies.filter((body) => body.recovered).map((body) => body.squadMateId)
     );
@@ -16807,8 +17384,54 @@ export class RaidController {
       }
     }
 
+    this.syncUnifiedSquadRosterBackToTownWar(liveMatesById, liveCombatantsBySquadMateId);
     this.fillRecruitPool();
     return casualtyNames;
+  }
+
+  private syncUnifiedSquadRosterBackToTownWar(
+    liveMatesById: ReadonlyMap<string, SquadMateState>,
+    liveCombatantsBySquadMateId: ReadonlyMap<string, FriendlyCombatantState>
+  ): void {
+    for (const rosterMate of this.state.squadRoster) {
+      if (!isUnifiedSquadRosterId(rosterMate.id)) {
+        continue;
+      }
+
+      const soldierId = getTownWarSoldierIdFromUnifiedRosterId(rosterMate.id);
+      const liveMate = liveMatesById.get(rosterMate.id) ?? null;
+      const liveCombatant = liveCombatantsBySquadMateId.get(rosterMate.id) ?? null;
+      const killed = rosterMate.status === "killed";
+      const morale =
+        killed
+          ? 0.05
+          : liveMate?.condition === "critical"
+            ? 0.18
+            : liveMate?.condition === "heated"
+              ? 0.34
+              : Math.max(0.42, rosterMate.readiness * 0.72);
+      const pressure =
+        killed
+          ? 100
+          : liveMate?.condition === "critical"
+            ? 78
+            : liveMate?.condition === "heated"
+              ? 48
+              : 18;
+
+      townWarController.applySoldierSquadRaidOutcome(soldierId, {
+        healthCurrent: killed ? 0 : liveCombatant ? Math.max(1, Math.round(liveCombatant.health)) : null,
+        healthMax: liveCombatant?.maxHealth ?? null,
+        ammoInMag: liveCombatant?.ammoInMag ?? null,
+        reserveAmmo: liveCombatant?.reserveAmmo ?? null,
+        fatigue: rosterMate.fatigue,
+        morale,
+        pressure,
+        killed,
+        assigned: !killed,
+        legacySquadMateId: rosterMate.id
+      });
+    }
   }
 
   public startRaid(weaponId: WeaponId): void {
@@ -16924,7 +17547,7 @@ export class RaidController {
     this.state.frontlineIncidentExtractRelief = 0;
     this.state.activeFrontlineHoldZoneId = null;
     this.state.frontlineHoldZoneProgress = 0;
-    this.state.squadMates = createSquadMates(this.state.squadRoster, route, stagedPlan.threatLabel);
+    this.refreshLiveSquadMates();
     this.state.selectedSquadMateId = this.state.squadMates[0]?.id ?? null;
     const squadCombatants = createFriendlyCombatants(this.friendlyCombatantId, this.state.squadMates, this.state.player);
     this.friendlyCombatantId += squadCombatants.length;
@@ -16933,33 +17556,48 @@ export class RaidController {
       this.state.frontlineSupports.unshift(playerEscortSupport);
       this.syncPlayerEscortSupportToSquad();
     }
-    const ambientCombatants = createAmbientFriendlyCombatants(
-      this.friendlyCombatantId,
-      this.state.frontlineSupports,
-      this.state.frontlineIncidents
-    );
-    this.friendlyCombatantId += ambientCombatants.length;
     const campCombatants = this.createFriendlyCampGarrison(townWarSnapshot);
-    this.state.friendlyCombatants = [...squadCombatants, ...ambientCombatants, ...campCombatants];
-    this.state.squadComms = createSquadComms(
-      "Rook",
-      "Point rifleman",
-      "Steady hand",
-      "steady",
-      "Ingress",
-      `${insertion.label} ingress is live. We move on ${stagedPlan.threatLabel.toLowerCase()} and keep the haul worth the stash.`
-    );
+    this.state.friendlyCombatants = [...squadCombatants, ...campCombatants];
+    const soloOfficerStart = !this.state.officerOnboarding.squadCommandUnlocked && this.state.squadMates.length === 0;
+    this.state.squadComms = soloOfficerStart
+      ? createSquadComms(
+          "Command Net",
+          "Officer trial",
+          "Locked",
+          "steady",
+          "Solo Start",
+          `${insertion.label} ingress is live with no squad attached. Survive, loot, scout, and earn command authority.`
+        )
+      : createSquadComms(
+          "Rook",
+          "Point rifleman",
+          "Steady hand",
+          "steady",
+          "Ingress",
+          `${insertion.label} ingress is live. We move on ${stagedPlan.threatLabel.toLowerCase()} and keep the haul worth the stash.`
+        );
     this.state.squadLog = [
-      createSquadLogEntry(
-        this.squadLogId++,
-        "Rook",
-        "Point rifleman",
-        "Steady hand",
-        "steady",
-        "Ingress",
-        `${insertion.label} ingress is live. We move on ${stagedPlan.threatLabel.toLowerCase()} and keep the haul worth the stash.`,
-        "Ingress"
-      )
+      soloOfficerStart
+        ? createSquadLogEntry(
+            this.squadLogId++,
+            "Command Net",
+            "Officer trial",
+            "Locked",
+            "steady",
+            "Solo Start",
+            `${insertion.label} ingress is live with no squad attached. Survive, loot, scout, and earn command authority.`,
+            "Solo"
+          )
+        : createSquadLogEntry(
+            this.squadLogId++,
+            "Rook",
+            "Point rifleman",
+            "Steady hand",
+            "steady",
+            "Ingress",
+            `${insertion.label} ingress is live. We move on ${stagedPlan.threatLabel.toLowerCase()} and keep the haul worth the stash.`,
+            "Ingress"
+          )
     ];
     if (activeFrontlineDefinition) {
       this.state.squadLog.push(
@@ -16997,7 +17635,9 @@ export class RaidController {
     this.squadAmbientTimer = 2.8;
     this.squadLastContext = "insert";
     const activeDemand = this.getActiveDemand();
-    this.state.message = `${route.name} live. ${insertion.label} insertion is active with ${this.state.currentThreatLabel}. Quiet ingress is live, so keep the lane cold and take the first body on your terms. ${this.state.currentPocketEventLabel} is in play. ${weapon.name} deployed with ${tacticalService.name} for ${deploymentCost} credits. ${activeFrontlineDefinition ? `${activeFrontlineDefinition.title} is live: ${activeFrontlineDefinition.effectSummary} ` : ""}${activeDemand.title} pays ${activeDemand.bonusPerItem} credits per ${activeDemand.id} haul on extract.`;
+    this.state.message = soloOfficerStart
+      ? `${route.name} live. You are deploying alone for the officer trial. Survive ${Math.ceil(this.getOfficerSoloSurvivalRemainingSeconds() / 60)} minutes, loot what you can, scout the pressure, and keep the lane cold until command authority opens. ${this.state.currentPocketEventLabel} is in play. ${weapon.name} deployed with ${tacticalService.name} for ${deploymentCost} credits.`
+      : `${route.name} live. ${insertion.label} insertion is active with ${this.state.currentThreatLabel}. Quiet ingress is live, so keep the lane cold and take the first body on your terms. ${this.state.currentPocketEventLabel} is in play. ${weapon.name} deployed with ${tacticalService.name} for ${deploymentCost} credits. ${activeFrontlineDefinition ? `${activeFrontlineDefinition.title} is live: ${activeFrontlineDefinition.effectSummary} ` : ""}${activeDemand.title} pays ${activeDemand.bonusPerItem} credits per ${activeDemand.id} haul on extract.`;
     this.state.selectedWeapon = weaponId;
 
     this.moveInput = { x: 0, y: 0 };
@@ -18432,6 +19072,30 @@ export class RaidController {
     this.state.message = `${mate.name} selected. ${WEAPONS[mate.weaponId].name} is ${mate.assignmentTag.toLowerCase()} and ready for the next call.`;
   }
 
+  public selectUnifiedSquadMate(): void {
+    if (this.state.phase !== "raid") {
+      return;
+    }
+
+    const activeUnifiedMate =
+      this.state.squadMates.find((mate) => mate.id.startsWith("unified-")) ?? null;
+    if (activeUnifiedMate) {
+      this.state.selectedSquadMateId = activeUnifiedMate.id;
+      this.state.message = `${activeUnifiedMate.name} selected from the camp roster. ${WEAPONS[activeUnifiedMate.weaponId].name} is on the live boys net.`;
+      return;
+    }
+
+    const reserveUnifiedMate = this.state.squadRoster.find(
+      (mate) => mate.id.startsWith("unified-") && mate.status === "reserve"
+    );
+    if (reserveUnifiedMate) {
+      this.state.message = `${reserveUnifiedMate.name} is still in reserve. Open Squad, reserve one active member, then bring him in.`;
+      return;
+    }
+
+    this.state.message = "No camp soldier is attached to the live boys net yet.";
+  }
+
   private getSquadTacticalCommandOrigin(mate: SquadMateState, combatant: FriendlyCombatantState): Vec2 {
     if (mate.command.anchor) {
       return mate.command.anchor;
@@ -19120,6 +19784,112 @@ export class RaidController {
     this.state.message = `Secure Exfil live. ${order.effectSummary}`;
   }
 
+  private getOfficerPromotionObjectivePoints(): number {
+    return Math.min(
+      OFFICER_PROMOTION_POINT_THRESHOLD,
+      this.state.currentRaidStats.scavsKilled * 30 +
+        this.state.currentRaidStats.cachesSearched * 40 +
+        this.state.currentRaidStats.intelSecured * 75 +
+        this.state.currentRaidStats.lootRecovered * 18
+    );
+  }
+
+  private getOfficerPromotionObjectiveReason(): Exclude<OfficerPromotionReason, null> {
+    if (this.state.currentRaidStats.intelSecured > 0 || this.state.currentRaidStats.cachesSearched > 0) {
+      return "objective";
+    }
+
+    return "combat";
+  }
+
+  private syncOfficerPromotionProgress(): void {
+    if (this.state.officerOnboarding.squadCommandUnlocked) {
+      this.state.officerOnboarding.promotionPoints = this.state.officerOnboarding.promotionThreshold;
+      return;
+    }
+
+    const survivalPoints =
+      this.state.officerOnboarding.targetSeconds > 0
+        ? (this.state.officerOnboarding.survivedSeconds / this.state.officerOnboarding.targetSeconds) *
+          this.state.officerOnboarding.promotionThreshold
+        : 0;
+    const objectivePoints = this.getOfficerPromotionObjectivePoints();
+    this.state.officerOnboarding.promotionPoints = Math.min(
+      this.state.officerOnboarding.promotionThreshold,
+      Math.max(survivalPoints, objectivePoints)
+    );
+    this.state.officerOnboarding.promotionTitle = "Prove command";
+    this.state.officerOnboarding.promotionSummary =
+      objectivePoints > survivalPoints
+        ? "Objective progress is proving the officer can read the field. One more clean action can open command early."
+        : "Stay alive through the opening push. Command authority opens when the officer proves the first lane.";
+  }
+
+  private unlockOfficerSquadCommand(reason: Exclude<OfficerPromotionReason, null>, messageOverride: string | null = null): void {
+    this.state.officerOnboarding.stage = "command-ready";
+    this.state.officerOnboarding.survivedSeconds = this.state.officerOnboarding.targetSeconds;
+    this.state.officerOnboarding.promotionPoints = this.state.officerOnboarding.promotionThreshold;
+    this.state.officerOnboarding.promotionReason = reason;
+    this.state.officerOnboarding.promotionTitle = "Field promotion authorized";
+    this.state.officerOnboarding.promotionSummary =
+      reason === "survival"
+        ? "You survived the opening alone. Camp command and first-soldier recruitment are now authorized."
+        : reason === "objective"
+          ? "You proved the lane through objective work. Camp command and first-soldier recruitment are now authorized."
+          : reason === "combat"
+            ? "You proved the lane through combat. Camp command and first-soldier recruitment are now authorized."
+            : "Command authority is open for staged verification.";
+    this.state.officerOnboarding.squadCommandUnlocked = true;
+    this.state.squadRoster = this.state.squadRoster.map((mate, index) =>
+      index === 0 && mate.status === "reserve"
+        ? {
+            ...mate,
+            lastAssignment: "Command authority earned; ready for first squad attachment",
+            lastCallout: `${mate.name} is available from reserve. Extract or open the squad board to bring the first soldier onto your net.`,
+            lastOutcome: "Officer survived the solo trial"
+          }
+        : mate
+    );
+    this.state.message =
+      messageOverride ?? "Officer trial complete. Command authority is open; the first reserve soldier can now be attached to your squad.";
+    this.pushSquadLog(
+      "Command Net",
+      "steady",
+      "Five minutes survived. Command authority is open; bring one soldier onto the net when you are ready.",
+      "Rank"
+    );
+  }
+
+  private updateOfficerOnboarding(deltaSeconds: number): void {
+    if (this.state.officerOnboarding.squadCommandUnlocked) {
+      return;
+    }
+
+    this.state.officerOnboarding.survivedSeconds = Math.min(
+      this.state.officerOnboarding.targetSeconds,
+      this.state.officerOnboarding.survivedSeconds + deltaSeconds
+    );
+
+    this.syncOfficerPromotionProgress();
+
+    if (this.getOfficerPromotionObjectivePoints() >= this.state.officerOnboarding.promotionThreshold) {
+      this.unlockOfficerSquadCommand(this.getOfficerPromotionObjectiveReason());
+      return;
+    }
+
+    if (this.state.officerOnboarding.survivedSeconds >= this.state.officerOnboarding.targetSeconds) {
+      this.unlockOfficerSquadCommand("survival");
+    }
+  }
+
+  public completeOfficerSoloSurvivalForDebug(): void {
+    if (this.state.officerOnboarding.squadCommandUnlocked) {
+      return;
+    }
+
+    this.unlockOfficerSquadCommand("debug", "Debug staging complete. Command authority is open for squad assignment tests.");
+  }
+
   public update(deltaSeconds: number): void {
     if (this.state.phase !== "raid") {
       return;
@@ -19133,6 +19903,7 @@ export class RaidController {
     const playerActionAvailability = this.getPlayerActionAvailability();
 
     this.state.timerRemaining = Math.max(0, this.state.timerRemaining - deltaSeconds);
+    this.updateOfficerOnboarding(deltaSeconds);
     this.state.soundPressure = Math.max(0, this.state.soundPressure - SOUND_PRESSURE_DECAY_PER_SECOND * deltaSeconds);
     this.state.recentNoisePulse = Math.max(0, this.state.recentNoisePulse - deltaSeconds);
     this.state.quietIngressTimer = Math.max(0, this.state.quietIngressTimer - deltaSeconds);
@@ -20320,7 +21091,8 @@ export class RaidController {
     sourcePosition: Vec2,
     damage: number
   ): void {
-    const appliedDamage = Math.max(1, Math.round(damage * this.getFriendlyDamageScale("squadmate")));
+    const trenchDamageMultiplier = this.isFixedTownWarTrenchCombatant(combatant) ? TOWN_WAR_RAID_TRENCH_DAMAGE_MULTIPLIER : 1;
+    const appliedDamage = Math.max(1, Math.round(damage * this.getFriendlyDamageScale("squadmate") * trenchDamageMultiplier));
     combatant.health -= appliedDamage;
     combatant.alert = true;
     combatant.awareness = "engaged";
@@ -23432,113 +24204,205 @@ export class RaidController {
     });
   }
 
-  private createFriendlyCampGarrison(townWarSnapshot: ReturnType<typeof townWarController.getSnapshot>): FriendlyCombatantState[] {
+  private getProjectedTownWarSoldiers(townWarSnapshot: TownWarSnapshot): TownWarSoldierState[] {
+    return townWarSnapshot.soldiers
+      .filter((soldier) => canProjectTownWarSoldierIntoRaid(soldier))
+      .sort((left, right) => scoreTownWarSoldierRaidProjection(right) - scoreTownWarSoldierRaidProjection(left))
+      .slice(0, TOWN_WAR_RAID_PROJECTION_LIMIT);
+  }
+
+  private getTownWarSoldierOccupiedTrenchSlot(townWarSnapshot: TownWarSnapshot, soldier: TownWarSoldierState): TownWarCoverSlotState | null {
+    return (
+      townWarSnapshot.aiTactics.coverSlots.find(
+        (slot) => slot.sourceKind === "trench" && slot.occupiedBySoldierId === soldier.id
+      ) ?? null
+    );
+  }
+
+  private getTownWarSoldierRaidAnchor(
+    townWarSnapshot: TownWarSnapshot,
+    soldier: TownWarSoldierState,
+    archetypeId: EnemyArchetypeId,
+    enemyCamp: TownWarCampSnapshot
+  ): { position: Vec2; townWarProjection?: TownWarRaidProjectionMetadata } {
+    const occupiedTrenchSlot = this.getTownWarSoldierOccupiedTrenchSlot(townWarSnapshot, soldier);
+    const anchorPosition = occupiedTrenchSlot?.position ?? soldier.position;
+
+    if (occupiedTrenchSlot) {
+      return {
+        position: clampWorldPoint(anchorPosition),
+        townWarProjection: {
+          fixedCoverKind: "trench"
+        }
+      };
+    }
+
+    return {
+      position: findWalkableSpawnPoint(
+        clampWorldPoint(anchorPosition),
+        archetypeId === "rusher" ? 17 : 16,
+        34,
+        this.state.obstacles,
+        [this.state.player.position, enemyCamp.spawn.position],
+        96
+      )
+    };
+  }
+
+  private buildTownWarRaidCombatantProjection(
+    townWarSnapshot: TownWarSnapshot,
+    soldier: TownWarSoldierState,
+    enemyCamp: TownWarCampSnapshot
+  ): TownWarRaidCombatantProjection {
+    const { archetypeId, weaponId } = getTownWarSoldierRaidLoadout(soldier);
+    const weapon = WEAPONS[weaponId];
+    const archetype = SCAV_ARCHETYPES[archetypeId];
+    const health = getTownWarSoldierRaidHealth(soldier, archetype);
+    const { position, townWarProjection } = this.getTownWarSoldierRaidAnchor(townWarSnapshot, soldier, archetypeId, enemyCamp);
+    const facingTarget =
+      soldier.task.targetPosition ??
+      townWarSnapshot.aiThreats?.frontlineFocus?.position ??
+      enemyCamp.spawn.position;
+
+    return {
+      soldier,
+      archetypeId,
+      weaponId,
+      weapon,
+      archetype,
+      health,
+      position,
+      facingTarget,
+      townWarProjection,
+      awareness: getTownWarSoldierRaidAwareness(soldier),
+      grenadeStock: getTownWarSoldierRaidGrenadeStock(soldier)
+    };
+  }
+
+  private createTownWarSoldierRaidCombatant(
+    townWarSnapshot: TownWarSnapshot,
+    soldier: TownWarSoldierState,
+    enemyCamp: TownWarCampSnapshot
+  ): FriendlyCombatantState {
+    const projection = this.buildTownWarRaidCombatantProjection(townWarSnapshot, soldier, enemyCamp);
+    const { archetypeId, weaponId, weapon, health, position, facingTarget, townWarProjection } = projection;
+    const combatProfile = getSharedWeaponCombatProfile(weaponId, archetypeId);
+
+    return {
+      id: this.friendlyCombatantId++,
+      ownerKind: "town-war-soldier",
+      ownerId: soldier.id,
+      squadMateId: soldier.id,
+      name: soldier.displayName,
+      voiceTag: "Russian",
+      archetypeId,
+      weaponId,
+      position,
+      velocity: { x: 0, y: 0 },
+      facing: normalize(subtract(facingTarget, position)),
+      health: health.current,
+      maxHealth: health.max,
+      radius: archetypeId === "rusher" ? 17 : 16,
+      cooldown: combatProfile.fireIntervalMin + Math.random() * Math.max(0.05, combatProfile.fireIntervalMax - combatProfile.fireIntervalMin),
+      grenadeStock: projection.grenadeStock,
+      grenadeCooldown: 0,
+      ammoInMag: Math.min(weapon.magazineSize, Math.max(0, soldier.ammo.inMag)),
+      reserveAmmo: Math.max(0, soldier.ammo.reserve),
+      reloadTimer: 0,
+      dryFireTimer: 0,
+      resupplyTimer: 0,
+      anchor: { ...position },
+      townWarProjection,
+      alert: true,
+      awareness: projection.awareness,
+      investigateTarget: null,
+      investigateTimer: 0,
+      navigationStallTime: 0,
+      navigationRecoveryIndex: 0,
+      lastNavigationSample: { ...position },
+      navigationCommittedTarget: null,
+      pressureType: null,
+      pressureTimer: 0,
+      blindFireTimer: 0,
+      panicTimer: 0,
+      armorBrokenTimer: 0,
+      armorFlash: 0,
+      fleshFlash: 0,
+      casualtyState: "healthy",
+      woundSeverity: "none",
+      bleedoutTimer: 0,
+      stabilized: false
+    };
+  }
+
+  private createFriendlyCampGarrison(townWarSnapshot: TownWarSnapshot): FriendlyCombatantState[] {
     const playerCamp = townWarSnapshot.camps.find((camp) => camp.id === "camp-a") ?? null;
     const enemyCamp = townWarSnapshot.camps.find((camp) => camp.id === "camp-b") ?? null;
     if (!playerCamp || !enemyCamp || playerCamp.destroyed) {
       return [];
     }
 
-    const contactLineCenter = {
-      x: (playerCamp.spawn.position.x + enemyCamp.spawn.position.x) / 2,
-      y: (playerCamp.spawn.position.y + enemyCamp.spawn.position.y) / 2
-    };
-    const campCenter = playerCamp.spawn.position;
-    const garrisonPlan: Array<{
-      name: string;
-      offset: Vec2;
-      archetypeId: EnemyArchetypeId;
-      weaponId: WeaponId;
-      facingTarget: Vec2;
-    }> = [
-      {
-        name: "Russian Rifleman",
-        offset: { x: -128, y: -74 },
-        archetypeId: "rifleman",
-        weaponId: "rifle",
-        facingTarget: { x: contactLineCenter.x + 180, y: contactLineCenter.y - 82 }
-      },
-      {
-        name: "Russian Skirmisher",
-        offset: { x: -172, y: 64 },
-        archetypeId: "skirmisher",
-        weaponId: "worn-ak",
-        facingTarget: { x: contactLineCenter.x + 168, y: contactLineCenter.y + 72 }
-      },
-      {
-        name: "Russian Support Gunner",
-        offset: { x: -54, y: -8 },
-        archetypeId: "rifleman",
-        weaponId: "pkm",
-        facingTarget: { x: contactLineCenter.x + 178, y: contactLineCenter.y }
-      },
-      {
-        name: "Russian Assaultman",
-        offset: { x: -218, y: 128 },
-        archetypeId: "rusher",
-        weaponId: "smg",
-        facingTarget: { x: contactLineCenter.x + 160, y: contactLineCenter.y + 112 }
-      }
-    ];
+    return this.getProjectedTownWarSoldiers(townWarSnapshot).map((soldier) =>
+      this.createTownWarSoldierRaidCombatant(townWarSnapshot, soldier, enemyCamp)
+    );
+  }
 
-    return garrisonPlan.map((entry, index) => {
-      const weapon = WEAPONS[entry.weaponId];
-      const archetype = SCAV_ARCHETYPES[entry.archetypeId];
-      const combatProfile = getSharedWeaponCombatProfile(entry.weaponId, entry.archetypeId);
-      const position = findWalkableSpawnPoint(
-        clampWorldPoint(add(campCenter, entry.offset)),
-        entry.archetypeId === "rusher" ? 17 : 16,
-        42,
-        this.state.obstacles,
-        [this.state.player.position, enemyCamp.spawn.position],
-        120
-      );
+  private isFixedTownWarTrenchCombatant(combatant: FriendlyCombatantState): boolean {
+    return combatant.ownerKind === "town-war-soldier" && combatant.townWarProjection?.fixedCoverKind === "trench";
+  }
 
-      return {
-        id: this.friendlyCombatantId++,
-        ownerKind: "camp-garrison",
-        ownerId: `camp-a-frontline-${index + 1}`,
-        squadMateId: `camp-a-frontline-${index + 1}`,
-        name: entry.name,
-        voiceTag: "Russian",
-        archetypeId: entry.archetypeId,
-        weaponId: entry.weaponId,
-        position,
-        velocity: { x: 0, y: 0 },
-        facing: normalize(subtract(entry.facingTarget, position)),
-        health: archetype.health,
-        maxHealth: archetype.health,
-        radius: entry.archetypeId === "rusher" ? 17 : 16,
-        cooldown: combatProfile.fireIntervalMin + Math.random() * Math.max(0.05, combatProfile.fireIntervalMax - combatProfile.fireIntervalMin),
-        grenadeStock: index === 3 ? 1 : 0,
-        grenadeCooldown: 0,
-        ammoInMag: weapon.magazineSize,
-        reserveAmmo: Math.max(weapon.magazineSize, Math.round(weapon.reserveAmmo * 0.9)),
-        reloadTimer: 0,
-        dryFireTimer: 0,
-        resupplyTimer: 0,
-        anchor: { ...position },
-        alert: true,
-        awareness: "patrol",
-        investigateTarget: null,
-        investigateTimer: 0,
-        navigationStallTime: 0,
-        navigationRecoveryIndex: 0,
-        lastNavigationSample: { ...position },
-        navigationCommittedTarget: null,
-        pressureType: null,
-        pressureTimer: 0,
-        blindFireTimer: 0,
-        panicTimer: 0,
-        armorBrokenTimer: 0,
-        armorFlash: 0,
-        fleshFlash: 0,
-        casualtyState: "healthy",
-        woundSeverity: "none",
-        bleedoutTimer: 0,
-        stabilized: false
-      };
-    });
+  private pinTownWarTrenchCombatant(combatant: FriendlyCombatantState, visibleEnemy: EnemyState | null): FriendlyCombatantState["awareness"] {
+    combatant.position = { ...combatant.anchor };
+    combatant.velocity = { x: 0, y: 0 };
+    combatant.navigationCommittedTarget = null;
+    combatant.navigationStallTime = 0;
+    combatant.lastNavigationSample = { ...combatant.anchor };
+    return visibleEnemy ? "engaged" : "patrol";
+  }
+
+  private getTownWarRaidSourceSoldier(combatant: FriendlyCombatantState, townWarSnapshot: TownWarSnapshot): TownWarSoldierState | null {
+    if (combatant.ownerKind !== "town-war-soldier") {
+      return null;
+    }
+
+    return townWarSnapshot.soldiers.find((entry) => entry.id === combatant.ownerId) ?? null;
+  }
+
+  private shouldKeepTownWarRaidCombatant(combatant: FriendlyCombatantState, townWarSnapshot: TownWarSnapshot): boolean {
+    const soldier = this.getTownWarRaidSourceSoldier(combatant, townWarSnapshot);
+    return Boolean(soldier && soldier.faction === TOWN_WAR_PLAYER_FACTION && soldier.health.current > 0);
+  }
+
+  private syncTownWarRaidCombatantFromSource(
+    combatant: FriendlyCombatantState,
+    townWarSnapshot: TownWarSnapshot,
+    enemyCamp: TownWarCampSnapshot
+  ): void {
+    const soldier = this.getTownWarRaidSourceSoldier(combatant, townWarSnapshot);
+    if (!soldier) {
+      return;
+    }
+
+    const projection = this.buildTownWarRaidCombatantProjection(townWarSnapshot, soldier, enemyCamp);
+    const { archetypeId, weaponId, health, position, facingTarget, townWarProjection } = projection;
+
+    combatant.name = soldier.displayName;
+    combatant.archetypeId = archetypeId;
+    combatant.weaponId = weaponId;
+    combatant.maxHealth = health.max;
+    combatant.health = Math.min(combatant.health, combatant.maxHealth);
+    combatant.anchor = { ...position };
+    combatant.townWarProjection = townWarProjection;
+    combatant.awareness = projection.awareness;
+
+    if (townWarProjection?.fixedCoverKind === "trench") {
+      combatant.position = { ...position };
+      combatant.velocity = { x: 0, y: 0 };
+      combatant.facing = normalize(subtract(facingTarget, position));
+      combatant.lastNavigationSample = { ...position };
+      combatant.navigationCommittedTarget = null;
+      combatant.navigationStallTime = 0;
+    }
   }
 
   private createEnemyCampGarrison(
@@ -24345,6 +25209,11 @@ export class RaidController {
     const player = this.state.player;
 
     if (this.state.friendlyCombatants.length > 0) {
+      const hasTownWarRaidCombatants = this.state.friendlyCombatants.some((combatant) => combatant.ownerKind === "town-war-soldier");
+      const townWarSnapshotForRaidCombatants = hasTownWarRaidCombatants ? townWarController.getSnapshot() : null;
+      const townWarEnemyCampForRaidCombatants =
+        townWarSnapshotForRaidCombatants?.camps.find((camp) => camp.id === TOWN_WAR_ENEMY_FACTION) ?? null;
+
       this.state.friendlyCombatants = this.state.friendlyCombatants.filter((combatant) => {
         if (combatant.ownerKind === "support") {
           const owner = this.state.frontlineSupports.find((support) => support.id === combatant.ownerId);
@@ -24354,6 +25223,10 @@ export class RaidController {
         if (combatant.ownerKind === "incident") {
           const owner = this.state.frontlineIncidents.find((incident) => incident.id === combatant.ownerId);
           return Boolean(owner && owner.kind === "firefight" && !owner.resolved && owner.strength > 0);
+        }
+
+        if (combatant.ownerKind === "town-war-soldier" && townWarSnapshotForRaidCombatants) {
+          return this.shouldKeepTownWarRaidCombatant(combatant, townWarSnapshotForRaidCombatants);
         }
 
         return true;
@@ -24367,6 +25240,10 @@ export class RaidController {
         if (combatant.casualtyState === "downed" || combatant.casualtyState === "dead") {
           combatant.velocity = { x: 0, y: 0 };
           return combatant;
+        }
+
+        if (townWarSnapshotForRaidCombatants && townWarEnemyCampForRaidCombatants) {
+          this.syncTownWarRaidCombatantFromSource(combatant, townWarSnapshotForRaidCombatants, townWarEnemyCampForRaidCombatants);
         }
 
         const archetype = SCAV_ARCHETYPES[combatant.archetypeId];
@@ -24386,12 +25263,14 @@ export class RaidController {
         const woundMoveMultiplier = getWoundMoveMultiplier(combatant.woundSeverity);
         const woundEngageMultiplier = getWoundEngageRangeMultiplier(combatant.woundSeverity);
         const woundFireIntervalMultiplier = getWoundFireIntervalMultiplier(combatant.woundSeverity);
+        const fixedTownWarTrenchCombatant = this.isFixedTownWarTrenchCombatant(combatant);
+        const townWarTrenchFireRangeMultiplier = fixedTownWarTrenchCombatant ? TOWN_WAR_RAID_TRENCH_FIRE_RANGE_MULTIPLIER : 1;
         const engageRange =
           squadMateCommand?.orderId === "attack"
-            ? weaponCombatProfile.engageRange * 1.22 * woundEngageMultiplier
+            ? weaponCombatProfile.engageRange * 1.22 * woundEngageMultiplier * townWarTrenchFireRangeMultiplier
             : squadMateCommand?.orderId === "defend"
-              ? weaponCombatProfile.engageRange * 1.08 * woundEngageMultiplier
-              : weaponCombatProfile.engageRange * woundEngageMultiplier;
+              ? weaponCombatProfile.engageRange * 1.08 * woundEngageMultiplier * townWarTrenchFireRangeMultiplier
+              : weaponCombatProfile.engageRange * woundEngageMultiplier * townWarTrenchFireRangeMultiplier;
         const preferredMinRange =
           squadMateCommand?.orderId === "attack"
             ? weaponCombatProfile.preferredMinRange * 0.72
@@ -25188,6 +26067,11 @@ export class RaidController {
           combatant.alert = false;
           awareness = "patrol";
         }
+        if (fixedTownWarTrenchCombatant) {
+          awareness = this.pinTownWarTrenchCombatant(combatant, visibleEnemy);
+          desiredDirection = { x: 0, y: 0 };
+          moveScale = 0;
+        }
 
         const navigationGoal = steer.navigationGoal;
         const committedNavigationTarget =
@@ -25769,7 +26653,7 @@ export class RaidController {
       const bulletAngle = Math.atan2(bullet.velocity.y, bullet.velocity.x);
       const impactFaction: FrontlineImpactState["faction"] = bullet.faction;
       const impactColor = bullet.weaponId ? WEAPONS[bullet.weaponId].color : impactFaction === "friendly" ? 0xef4444 : 0x93c5fd;
-      const impactScale = bullet.weaponId === "shotgun" ? 1.18 : bullet.weaponId === "smg" ? 0.94 : bullet.weaponId === "amr" ? 1.12 : 1;
+      const impactScale = bullet.weaponId === "rpg" ? 2.35 : bullet.weaponId === "shotgun" ? 1.18 : bullet.weaponId === "smg" ? 0.94 : bullet.weaponId === "amr" ? 1.12 : 1;
 
       if (
         bullet.life <= 0 ||
@@ -25785,6 +26669,10 @@ export class RaidController {
           bullet.position.x <= WORLD_WIDTH &&
           bullet.position.y <= WORLD_HEIGHT
         ) {
+          if (bullet.weaponId === "rpg") {
+            this.explodeRocketImpact(bullet.position, bullet.origin, bullet.faction, bullet.fromPlayer);
+            continue;
+          }
           this.emitFrontlineImpact(
             bullet.position,
             bulletAngle,
@@ -25800,6 +26688,10 @@ export class RaidController {
       }
 
       if (this.state.obstacles.some((obstacle) => pointInExpandedObstacle(bullet.position, obstacle, bullet.radius))) {
+        if (bullet.weaponId === "rpg") {
+          this.explodeRocketImpact(bullet.position, bullet.origin, bullet.faction, bullet.fromPlayer);
+          continue;
+        }
         this.emitFrontlineImpact(
           bullet.position,
           bulletAngle,
@@ -25859,6 +26751,9 @@ export class RaidController {
               bullet.weaponId === "shotgun" ? 0.95 : bullet.weaponId === "smg" ? 0.9 : bullet.weaponId === "amr" ? 1.28 : 1.1
             );
           }
+          if (bullet.weaponId === "rpg") {
+            this.explodeRocketImpact(bullet.position, bullet.origin, bullet.faction, bullet.fromPlayer);
+          }
           continue;
         }
 
@@ -25878,6 +26773,9 @@ export class RaidController {
             bullet.origin,
             Math.max(1, Math.round(bullet.damage))
           );
+          if (bullet.weaponId === "rpg") {
+            this.explodeRocketImpact(bullet.position, bullet.origin, bullet.faction, bullet.fromPlayer);
+          }
           continue;
         }
 
@@ -25903,6 +26801,9 @@ export class RaidController {
           } else {
             this.updateLivingCasualtyRead(player);
           }
+          if (bullet.weaponId === "rpg") {
+            this.explodeRocketImpact(bullet.position, bullet.origin, bullet.faction, bullet.fromPlayer);
+          }
           continue;
         }
       }
@@ -25911,6 +26812,75 @@ export class RaidController {
     }
 
     this.state.bullets = remainingBullets;
+  }
+
+  private explodeRocketImpact(position: Vec2, origin: Vec2, faction: "friendly" | "hostile", fromPlayer: boolean): void {
+    const blastPosition = { ...position };
+    const blastAngle = Math.atan2(blastPosition.y - origin.y, blastPosition.x - origin.x);
+    const impactColor = faction === "friendly" ? WEAPONS.rpg.color : 0x93c5fd;
+    const blastRadius = 128;
+    const pressureRadius = 210;
+    const blastDamage = 96;
+    this.emitNoise(blastPosition, 980, faction === "friendly" ? 3.1 : 2.7, faction === "friendly" ? "RPG blast" : "Incoming rocket");
+    this.emitFrontlineImpact(blastPosition, blastAngle, impactColor, faction, "blast", 2.45, "concrete", "rpg");
+
+    if (faction === "friendly") {
+      const struckEnemies = [...this.state.enemies];
+      for (const enemy of struckEnemies) {
+        const distanceToBlast = distance(enemy.position, blastPosition);
+        if (distanceToBlast > blastRadius) {
+          if (distanceToBlast <= pressureRadius) {
+            this.applyEnemyPanic(enemy, 1.35, blastPosition);
+            this.applyEnemyPressure(enemy, "suppressed", 1.45, blastPosition);
+          }
+          continue;
+        }
+
+        const falloff = clamp(1 - distanceToBlast / blastRadius, 0.2, 1);
+        enemy.health -= Math.max(18, Math.round(blastDamage * falloff));
+        enemy.alert = true;
+        enemy.awareness = "engaged";
+        enemy.investigateTarget = { ...blastPosition };
+        enemy.investigateTimer = Math.max(enemy.investigateTimer, 2.1);
+        enemy.facing = normalize(subtract(blastPosition, enemy.position));
+        enemy.fleshFlash = Math.max(enemy.fleshFlash, 0.28);
+        this.applyEnemyPanic(enemy, 1.8 * falloff + 0.5, blastPosition);
+        this.applyEnemyPressure(enemy, distanceToBlast < blastRadius * 0.48 ? "staggered" : "suppressed", 1.35 * falloff + 0.42, blastPosition);
+        if (this.shouldEnterDownedState(enemy.health, enemy.maxHealth, "enemy")) {
+          this.downEnemy(enemy);
+        } else {
+          this.updateLivingCasualtyRead(enemy);
+        }
+      }
+
+      if (fromPlayer) {
+        this.state.message = "RPG impact landed. The camp line has a real breach window now.";
+      }
+      return;
+    }
+
+    const player = this.state.player;
+    const distanceToPlayer = distance(player.position, blastPosition);
+    if (distanceToPlayer <= blastRadius && player.casualtyState !== "downed" && player.casualtyState !== "dead") {
+      const falloff = clamp(1 - distanceToPlayer / blastRadius, 0.22, 1);
+      const appliedDamage = Math.max(
+        14,
+        Math.round(blastDamage * falloff * (1 - player.frontlineCoverMitigation * 0.45) * this.getFriendlyDamageScale("player"))
+      );
+      player.health -= appliedDamage;
+      this.state.currentRaidStats.damageTaken += appliedDamage;
+      this.state.message = player.health > 0 ? "Rocket blast hit close. Break the lane before the follow-up fire lands." : "A rocket blast dropped you in the raid.";
+      if (this.shouldEnterDownedState(player.health, player.maxHealth, "player")) {
+        this.downPlayer();
+      } else {
+        this.updateLivingCasualtyRead(player);
+      }
+    }
+
+    for (const combatant of this.state.friendlyCombatants.filter((combatant) => distance(combatant.position, blastPosition) <= blastRadius)) {
+      const falloff = clamp(1 - distance(combatant.position, blastPosition) / blastRadius, 0.24, 1);
+      this.applyHostileDamageToFriendlyCombatant(combatant, blastPosition, Math.max(10, Math.round(blastDamage * 0.62 * falloff)));
+    }
   }
 
   private updateFrontlineTracers(deltaSeconds: number): void {
@@ -26203,10 +27173,7 @@ export class RaidController {
       }
     }
 
-    this.state.message =
-      combatant.ownerKind === "camp-garrison"
-        ? `${combatant.name} was killed in the raid. The Russian side is now fighting one body lighter.`
-        : `${combatant.name} was killed in the raid. The Russian side is now fighting one body lighter.`;
+    this.state.message = `${combatant.name} was killed in the raid. The Russian side is now fighting one body lighter.`;
   }
 
   private recordPocketKill(position: Vec2): void {

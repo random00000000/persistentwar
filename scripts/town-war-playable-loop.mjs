@@ -208,6 +208,7 @@ async function runPlayableLoop() {
       const setup = await page.evaluate(() => {
         const api = window.__topdownExtractionAgentApi;
         api.stageState("town-war");
+        api.completeOfficerSoloSurvival();
         api.deployTownWarOfficer({ campId: "camp-a" });
         const focus = api.focusTownWarLane({ campId: "camp-a", lane: "mid" });
         const holdAssignment = focus.focus.assignments.find((assignment) => assignment.task?.targetPosition);

@@ -1,0 +1,1985 @@
+{
+  "origin": {
+    "x": 7476.320000000001,
+    "y": 3025
+  },
+  "badPreview": {
+    "ok": true,
+    "icons": [
+      {
+        "id": "readability:preview:trench-facing",
+        "targetType": "trench",
+        "targetId": "preview:trench",
+        "icon": "crossed-sightline",
+        "tone": "warn",
+        "priority": 94,
+        "label": "Preview trench faces away",
+        "shortReason": "Rotate before placing; firing arc points away",
+        "detailLines": [
+          "New trench network camp-a-trench-network-preview started by preview; Open line.",
+          "Ammo in range: none",
+          "Dugouts in range: none"
+        ],
+        "worldX": 7476.320000000001,
+        "worldY": 2977,
+        "visibility": "build-preview",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:preview:trench-support",
+        "targetType": "trench",
+        "targetId": "preview:trench",
+        "icon": "broken-chain",
+        "tone": "warn",
+        "priority": 82,
+        "label": "Preview lacks ammo",
+        "shortReason": "No stocked ammo crate is close enough",
+        "detailLines": [
+          "Stocked crates in range: 0",
+          "Support dugouts in range: 0",
+          "Path from camp: 394m"
+        ],
+        "worldX": 7510.320000000001,
+        "worldY": 2999,
+        "pulse": "none",
+        "visibility": "build-preview"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-3",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-3",
+        "icon": "stacked-chevrons",
+        "tone": "working",
+        "priority": 56,
+        "label": "Soldier suppressing",
+        "shortReason": "Olek Rus-3 is pinning a lane",
+        "detailLines": [
+          "Olek Rus-3 | suppressor",
+          "Task: Order: suppress mid lane",
+          "Ammo: 60/180",
+          "Pressure: 0%"
+        ],
+        "worldX": 7880.817571973268,
+        "worldY": 3125.2321840239474,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-6",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-6",
+        "icon": "stacked-chevrons",
+        "tone": "working",
+        "priority": 56,
+        "label": "Soldier suppressing",
+        "shortReason": "Nika Ukr-6 is pinning a lane",
+        "detailLines": [
+          "Nika Ukr-6 | suppressor",
+          "Task: Demo: suppress the road crossing",
+          "Ammo: 60/180",
+          "Pressure: 0%"
+        ],
+        "worldX": 3711.075654527769,
+        "worldY": 3175.3157078474674,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-1",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-1",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Vira Rus-1 is fighting",
+        "detailLines": [
+          "Vira Rus-1 | builder",
+          "Task: Order: hold mid lane",
+          "Ammo: 12/24",
+          "Pressure: 0%"
+        ],
+        "worldX": 7820.6909423571215,
+        "worldY": 3134.8624453543857,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-2",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-2",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Makar Rus-2 is fighting",
+        "detailLines": [
+          "Makar Rus-2 | rifleman",
+          "Task: Order: hold mid lane",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7794.025421778751,
+        "worldY": 3180.075942384945,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-5",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-5",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Lev Ukr-5 is fighting",
+        "detailLines": [
+          "Lev Ukr-5 | rifleman",
+          "Task: Demo: probe the road crossing",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 3754.468245142452,
+        "worldY": 3185.8192538555813,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-7",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-7",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Taran Rus-7 is fighting",
+        "detailLines": [
+          "Taran Rus-7 | medic",
+          "Task: Order: hold mid lane",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7830.674265282571,
+        "worldY": 3204.4806228825028,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-9",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-9",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Kira Rus-9 is fighting",
+        "detailLines": [
+          "Kira Rus-9 | defender",
+          "Task: Order: hold mid lane",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7876.763524867212,
+        "worldY": 3200.806023359377,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:preview:trench-path",
+        "targetType": "trench",
+        "targetId": "preview:trench",
+        "icon": "route-arrow",
+        "tone": "ok",
+        "priority": 52,
+        "label": "Preview reachable",
+        "shortReason": "Builders can reach this placement",
+        "detailLines": [
+          "Path from camp: 394m",
+          "Enemy camp distance: 3792m"
+        ],
+        "worldX": 7476.320000000001,
+        "worldY": 3061,
+        "visibility": "build-preview",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-4",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-4",
+        "icon": "hammer",
+        "tone": "working",
+        "priority": 52,
+        "label": "Soldier building",
+        "shortReason": "Kira Ukr-4 is constructing",
+        "detailLines": [
+          "Kira Ukr-4 | builder",
+          "Task: Demo: fortify market berm",
+          "Ammo: 12/24",
+          "Pressure: 0%"
+        ],
+        "worldX": 3702.7940096815596,
+        "worldY": 3092.7572676211603,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-10",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-10",
+        "icon": "ammo-box",
+        "tone": "working",
+        "priority": 50,
+        "label": "Soldier resupplying",
+        "shortReason": "Lev Rus-10 is moving ammo",
+        "detailLines": [
+          "Lev Rus-10 | rifleman",
+          "Task: Order: resupply mid lane",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7864.068712125751,
+        "worldY": 3182.811505882589,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-11",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-11",
+        "icon": "shield",
+        "tone": "ok",
+        "priority": 36,
+        "label": "Soldier in cover",
+        "shortReason": "Yara Ukr-11 is holding cover",
+        "detailLines": [
+          "Yara Ukr-11 | defender",
+          "Task: Camp work: cook rotation",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 3708.2540769762104,
+        "worldY": 3103.901942818362,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-12",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-12",
+        "icon": "shield",
+        "tone": "ok",
+        "priority": 36,
+        "label": "Soldier in cover",
+        "shortReason": "Rook Ukr-12 is holding cover",
+        "detailLines": [
+          "Rook Ukr-12 | rifleman",
+          "Task: Camp work: supply ledger",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 3734.288311279215,
+        "worldY": 3194.804769343891,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-8",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-8",
+        "icon": "shield",
+        "tone": "ok",
+        "priority": 36,
+        "label": "Soldier in cover",
+        "shortReason": "Vira Ukr-8 is holding cover",
+        "detailLines": [
+          "Vira Ukr-8 | medic",
+          "Task: Demo: rear aid ready",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 3648.167561993555,
+        "worldY": 3184.466144333262,
+        "visibility": "inspect",
+        "pulse": "none"
+      }
+    ],
+    "totals": {
+      "icons": 15,
+      "normal": 0,
+      "inspect": 12,
+      "buildPreview": 3,
+      "blockers": 2,
+      "byTargetType": {
+        "trench": 3,
+        "ammo-crate": 0,
+        "dugout": 0,
+        "soldier": 12,
+        "camp": 0
+      },
+      "byTone": {
+        "ok": 4,
+        "working": 9,
+        "warn": 2,
+        "danger": 0,
+        "disabled": 0,
+        "info": 0
+      }
+    },
+    "readable": "Readability overlay: 15 icons, no urgent blockers."
+  },
+  "supportPreview": {
+    "ok": true,
+    "icons": [
+      {
+        "id": "readability:preview:trench-facing",
+        "targetType": "trench",
+        "targetId": "preview:trench",
+        "icon": "muzzle-burst",
+        "tone": "ok",
+        "priority": 74,
+        "label": "Preview trench faces enemy",
+        "shortReason": "Firing arc points toward enemy camp",
+        "detailLines": [
+          "Connected trench network camp-a-trench-network-town-war-order-1 extended by preview; Open line.",
+          "Ammo in range: 1",
+          "Dugouts in range: none"
+        ],
+        "worldX": 7560.320000000001,
+        "worldY": 2977,
+        "visibility": "build-preview",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:preview:trench-support",
+        "targetType": "trench",
+        "targetId": "preview:trench",
+        "icon": "chain-ammo-pulse",
+        "tone": "working",
+        "priority": 70,
+        "label": "Preview ammo linked",
+        "shortReason": "A stocked crate can feed this line",
+        "detailLines": [
+          "Stocked crates in range: 1",
+          "Support dugouts in range: 0",
+          "Path from camp: 319m"
+        ],
+        "worldX": 7594.320000000001,
+        "worldY": 2999,
+        "pulse": "slow",
+        "visibility": "build-preview"
+      },
+      {
+        "id": "readability:ammo-crate:town-war-ammo-crate-1",
+        "targetType": "ammo-crate",
+        "targetId": "town-war-ammo-crate-1",
+        "icon": "chain-ammo-pulse",
+        "tone": "working",
+        "priority": 64,
+        "label": "Ammo crate feeding",
+        "shortReason": "Ammo crate is linked to trench support",
+        "detailLines": [
+          "Stock: 705/720",
+          "Linked: trench network",
+          "Health: 25/25"
+        ],
+        "worldX": 7500.320000000001,
+        "worldY": 3023,
+        "visibility": "normal",
+        "pulse": "slow"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-3",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-3",
+        "icon": "stacked-chevrons",
+        "tone": "working",
+        "priority": 56,
+        "label": "Soldier suppressing",
+        "shortReason": "Olek Rus-3 is pinning a lane",
+        "detailLines": [
+          "Olek Rus-3 | suppressor",
+          "Task: Colony cover: ammo-crate town-war-order-2",
+          "Ammo: 35/180",
+          "Pressure: 0%"
+        ],
+        "worldX": 7500.320000000001,
+        "worldY": 3019,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-6",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-6",
+        "icon": "stacked-chevrons",
+        "tone": "working",
+        "priority": 56,
+        "label": "Soldier suppressing",
+        "shortReason": "Nika Ukr-6 is pinning a lane",
+        "detailLines": [
+          "Nika Ukr-6 | suppressor",
+          "Task: Demo: suppress the road crossing",
+          "Ammo: 60/180",
+          "Pressure: 0%"
+        ],
+        "worldX": 4559.696369258327,
+        "worldY": 3182.317572623533,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-10",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-10",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Lev Rus-10 is fighting",
+        "detailLines": [
+          "Lev Rus-10 | rifleman",
+          "Task: Hold from camp-a trench 3",
+          "Ammo: 24/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7434.320000000001,
+        "worldY": 3001,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-2",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-2",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Makar Rus-2 is fighting",
+        "detailLines": [
+          "Makar Rus-2 | rifleman",
+          "Task: Hold from camp-a trench 1",
+          "Ammo: 20/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7518.320000000001,
+        "worldY": 3001,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-5",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-5",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Lev Ukr-5 is fighting",
+        "detailLines": [
+          "Lev Ukr-5 | rifleman",
+          "Task: Demo: probe the road crossing",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 4602.566084044444,
+        "worldY": 3155.2218809305205,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-7",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-7",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Taran Rus-7 is fighting",
+        "detailLines": [
+          "Taran Rus-7 | medic",
+          "Task: Hold from camp-a trench 3",
+          "Ammo: 25/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7434.320000000001,
+        "worldY": 3001,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-9",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-9",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Kira Rus-9 is fighting",
+        "detailLines": [
+          "Kira Rus-9 | defender",
+          "Task: Hold from camp-a trench 3",
+          "Ammo: 21/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7434.320000000001,
+        "worldY": 3001,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:preview:trench-path",
+        "targetType": "trench",
+        "targetId": "preview:trench",
+        "icon": "route-arrow",
+        "tone": "ok",
+        "priority": 52,
+        "label": "Preview reachable",
+        "shortReason": "Builders can reach this placement",
+        "detailLines": [
+          "Path from camp: 319m",
+          "Enemy camp distance: 3876m"
+        ],
+        "worldX": 7560.320000000001,
+        "worldY": 3061,
+        "visibility": "build-preview",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-1",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-1",
+        "icon": "hammer",
+        "tone": "working",
+        "priority": 52,
+        "label": "Soldier building",
+        "shortReason": "Vira Rus-1 is constructing",
+        "detailLines": [
+          "Vira Rus-1 | builder",
+          "Task: Building: ammo-crate",
+          "Ammo: 12/24",
+          "Pressure: 0%"
+        ],
+        "worldX": 7500.320000000001,
+        "worldY": 3019,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-4",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-4",
+        "icon": "hammer",
+        "tone": "working",
+        "priority": 52,
+        "label": "Soldier building",
+        "shortReason": "Kira Ukr-4 is constructing",
+        "detailLines": [
+          "Kira Ukr-4 | builder",
+          "Task: Demo: fortify market berm",
+          "Ammo: 12/24",
+          "Pressure: 0%"
+        ],
+        "worldX": 4548.815307672491,
+        "worldY": 3159.4963635537038,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:trench:town-war-order-1",
+        "targetType": "trench",
+        "targetId": "town-war-order-1",
+        "icon": "dim-sightline",
+        "tone": "info",
+        "priority": 42,
+        "label": "Trench idle",
+        "shortReason": "No target in arc",
+        "detailLines": [
+          "Network camp-a-trench-network-town-war-order-1",
+          "3/3 occupied",
+          "Linked ammo: town-war-ammo-crate-1",
+          "Linked dugout: none"
+        ],
+        "worldX": 7476.320000000001,
+        "worldY": 2999,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-11",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-11",
+        "icon": "shield",
+        "tone": "ok",
+        "priority": 36,
+        "label": "Soldier in cover",
+        "shortReason": "Yara Ukr-11 is holding cover",
+        "detailLines": [
+          "Yara Ukr-11 | defender",
+          "Task: Camp work: cook rotation",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 3708.2540769762104,
+        "worldY": 3103.901942818362,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-12",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-12",
+        "icon": "shield",
+        "tone": "ok",
+        "priority": 36,
+        "label": "Soldier in cover",
+        "shortReason": "Rook Ukr-12 is holding cover",
+        "detailLines": [
+          "Rook Ukr-12 | rifleman",
+          "Task: Camp work: supply ledger",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 3734.288311279215,
+        "worldY": 3194.804769343891,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-8",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-8",
+        "icon": "shield",
+        "tone": "ok",
+        "priority": 36,
+        "label": "Soldier in cover",
+        "shortReason": "Vira Ukr-8 is holding cover",
+        "detailLines": [
+          "Vira Ukr-8 | medic",
+          "Task: Demo: rear aid ready",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 3648.167561993555,
+        "worldY": 3184.466144333262,
+        "visibility": "inspect",
+        "pulse": "none"
+      }
+    ],
+    "totals": {
+      "icons": 17,
+      "normal": 1,
+      "inspect": 13,
+      "buildPreview": 3,
+      "blockers": 0,
+      "byTargetType": {
+        "trench": 4,
+        "ammo-crate": 1,
+        "dugout": 0,
+        "soldier": 12,
+        "camp": 0
+      },
+      "byTone": {
+        "ok": 5,
+        "working": 11,
+        "warn": 0,
+        "danger": 0,
+        "disabled": 0,
+        "info": 1
+      }
+    },
+    "readable": "Readability overlay: 17 icons, 0 blockers. Ammo crate feeding: Ammo crate is linked to trench support"
+  },
+  "ammoPreview": {
+    "ok": true,
+    "icons": [
+      {
+        "id": "readability:preview:ammo-feed",
+        "targetType": "ammo-crate",
+        "targetId": "preview:ammo-crate",
+        "icon": "chain-ammo-pulse",
+        "tone": "working",
+        "priority": 76,
+        "label": "Preview ammo feeds line",
+        "shortReason": "Will feed 3 trench slots",
+        "detailLines": [
+          "Trench slots in range: 3",
+          "Path from camp: 351m"
+        ],
+        "worldX": 7518.320000000001,
+        "worldY": 2995,
+        "pulse": "slow",
+        "visibility": "build-preview"
+      },
+      {
+        "id": "readability:ammo-crate:town-war-ammo-crate-1",
+        "targetType": "ammo-crate",
+        "targetId": "town-war-ammo-crate-1",
+        "icon": "chain-ammo-pulse",
+        "tone": "working",
+        "priority": 64,
+        "label": "Ammo crate feeding",
+        "shortReason": "Ammo crate is linked to trench support",
+        "detailLines": [
+          "Stock: 705/720",
+          "Linked: trench network",
+          "Health: 25/25"
+        ],
+        "worldX": 7500.320000000001,
+        "worldY": 3023,
+        "visibility": "normal",
+        "pulse": "slow"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-3",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-3",
+        "icon": "stacked-chevrons",
+        "tone": "working",
+        "priority": 56,
+        "label": "Soldier suppressing",
+        "shortReason": "Olek Rus-3 is pinning a lane",
+        "detailLines": [
+          "Olek Rus-3 | suppressor",
+          "Task: Colony cover: ammo-crate town-war-order-2",
+          "Ammo: 35/180",
+          "Pressure: 0%"
+        ],
+        "worldX": 7500.320000000001,
+        "worldY": 3019,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-6",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-6",
+        "icon": "stacked-chevrons",
+        "tone": "working",
+        "priority": 56,
+        "label": "Soldier suppressing",
+        "shortReason": "Nika Ukr-6 is pinning a lane",
+        "detailLines": [
+          "Nika Ukr-6 | suppressor",
+          "Task: Demo: suppress the road crossing",
+          "Ammo: 60/180",
+          "Pressure: 0%"
+        ],
+        "worldX": 4559.696369258327,
+        "worldY": 3182.317572623533,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:preview:ammo-exposure",
+        "targetType": "ammo-crate",
+        "targetId": "preview:ammo-crate",
+        "icon": "route-arrow",
+        "tone": "ok",
+        "priority": 54,
+        "label": "Preview crate reachable",
+        "shortReason": "Builders can reach this placement",
+        "detailLines": [
+          "Enemy camp distance: 3833m",
+          "Path from camp: 351m"
+        ],
+        "worldX": 7554.320000000001,
+        "worldY": 3019,
+        "pulse": "none",
+        "visibility": "build-preview"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-10",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-10",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Lev Rus-10 is fighting",
+        "detailLines": [
+          "Lev Rus-10 | rifleman",
+          "Task: Hold from camp-a trench 3",
+          "Ammo: 24/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7434.320000000001,
+        "worldY": 3001,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-2",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-2",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Makar Rus-2 is fighting",
+        "detailLines": [
+          "Makar Rus-2 | rifleman",
+          "Task: Hold from camp-a trench 1",
+          "Ammo: 20/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7518.320000000001,
+        "worldY": 3001,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-5",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-5",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Lev Ukr-5 is fighting",
+        "detailLines": [
+          "Lev Ukr-5 | rifleman",
+          "Task: Demo: probe the road crossing",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 4602.566084044444,
+        "worldY": 3155.2218809305205,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-7",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-7",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Taran Rus-7 is fighting",
+        "detailLines": [
+          "Taran Rus-7 | medic",
+          "Task: Hold from camp-a trench 3",
+          "Ammo: 25/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7434.320000000001,
+        "worldY": 3001,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-9",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-9",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Kira Rus-9 is fighting",
+        "detailLines": [
+          "Kira Rus-9 | defender",
+          "Task: Hold from camp-a trench 3",
+          "Ammo: 21/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7434.320000000001,
+        "worldY": 3001,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-1",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-1",
+        "icon": "hammer",
+        "tone": "working",
+        "priority": 52,
+        "label": "Soldier building",
+        "shortReason": "Vira Rus-1 is constructing",
+        "detailLines": [
+          "Vira Rus-1 | builder",
+          "Task: Building: ammo-crate",
+          "Ammo: 12/24",
+          "Pressure: 0%"
+        ],
+        "worldX": 7500.320000000001,
+        "worldY": 3019,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-4",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-4",
+        "icon": "hammer",
+        "tone": "working",
+        "priority": 52,
+        "label": "Soldier building",
+        "shortReason": "Kira Ukr-4 is constructing",
+        "detailLines": [
+          "Kira Ukr-4 | builder",
+          "Task: Demo: fortify market berm",
+          "Ammo: 12/24",
+          "Pressure: 0%"
+        ],
+        "worldX": 4548.815307672491,
+        "worldY": 3159.4963635537038,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:trench:town-war-order-1",
+        "targetType": "trench",
+        "targetId": "town-war-order-1",
+        "icon": "dim-sightline",
+        "tone": "info",
+        "priority": 42,
+        "label": "Trench idle",
+        "shortReason": "No target in arc",
+        "detailLines": [
+          "Network camp-a-trench-network-town-war-order-1",
+          "3/3 occupied",
+          "Linked ammo: town-war-ammo-crate-1",
+          "Linked dugout: none"
+        ],
+        "worldX": 7476.320000000001,
+        "worldY": 2999,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-11",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-11",
+        "icon": "shield",
+        "tone": "ok",
+        "priority": 36,
+        "label": "Soldier in cover",
+        "shortReason": "Yara Ukr-11 is holding cover",
+        "detailLines": [
+          "Yara Ukr-11 | defender",
+          "Task: Camp work: cook rotation",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 3708.2540769762104,
+        "worldY": 3103.901942818362,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-12",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-12",
+        "icon": "shield",
+        "tone": "ok",
+        "priority": 36,
+        "label": "Soldier in cover",
+        "shortReason": "Rook Ukr-12 is holding cover",
+        "detailLines": [
+          "Rook Ukr-12 | rifleman",
+          "Task: Camp work: supply ledger",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 3734.288311279215,
+        "worldY": 3194.804769343891,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-8",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-8",
+        "icon": "shield",
+        "tone": "ok",
+        "priority": 36,
+        "label": "Soldier in cover",
+        "shortReason": "Vira Ukr-8 is holding cover",
+        "detailLines": [
+          "Vira Ukr-8 | medic",
+          "Task: Demo: rear aid ready",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 3648.167561993555,
+        "worldY": 3184.466144333262,
+        "visibility": "inspect",
+        "pulse": "none"
+      }
+    ],
+    "totals": {
+      "icons": 16,
+      "normal": 1,
+      "inspect": 13,
+      "buildPreview": 2,
+      "blockers": 0,
+      "byTargetType": {
+        "trench": 1,
+        "ammo-crate": 3,
+        "dugout": 0,
+        "soldier": 12,
+        "camp": 0
+      },
+      "byTone": {
+        "ok": 4,
+        "working": 11,
+        "warn": 0,
+        "danger": 0,
+        "disabled": 0,
+        "info": 1
+      }
+    },
+    "readable": "Readability overlay: 16 icons, 0 blockers. Ammo crate feeding: Ammo crate is linked to trench support"
+  },
+  "dugoutPreview": {
+    "ok": true,
+    "icons": [
+      {
+        "id": "readability:preview:dugout-link",
+        "targetType": "dugout",
+        "targetId": "preview:dugout",
+        "icon": "chain-shield",
+        "tone": "working",
+        "priority": 76,
+        "label": "Preview dugout linked",
+        "shortReason": "Will support 3 trench slots",
+        "detailLines": [
+          "Connected trench slots: 3",
+          "Shelter radius: 300m"
+        ],
+        "worldX": 7546.320000000001,
+        "worldY": 2997,
+        "pulse": "slow",
+        "visibility": "build-preview"
+      },
+      {
+        "id": "readability:ammo-crate:town-war-ammo-crate-1",
+        "targetType": "ammo-crate",
+        "targetId": "town-war-ammo-crate-1",
+        "icon": "chain-ammo-pulse",
+        "tone": "working",
+        "priority": 64,
+        "label": "Ammo crate feeding",
+        "shortReason": "Ammo crate is linked to trench support",
+        "detailLines": [
+          "Stock: 705/720",
+          "Linked: trench network",
+          "Health: 25/25"
+        ],
+        "worldX": 7500.320000000001,
+        "worldY": 3023,
+        "visibility": "normal",
+        "pulse": "slow"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-3",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-3",
+        "icon": "stacked-chevrons",
+        "tone": "working",
+        "priority": 56,
+        "label": "Soldier suppressing",
+        "shortReason": "Olek Rus-3 is pinning a lane",
+        "detailLines": [
+          "Olek Rus-3 | suppressor",
+          "Task: Colony cover: ammo-crate town-war-order-2",
+          "Ammo: 35/180",
+          "Pressure: 0%"
+        ],
+        "worldX": 7500.320000000001,
+        "worldY": 3019,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-6",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-6",
+        "icon": "stacked-chevrons",
+        "tone": "working",
+        "priority": 56,
+        "label": "Soldier suppressing",
+        "shortReason": "Nika Ukr-6 is pinning a lane",
+        "detailLines": [
+          "Nika Ukr-6 | suppressor",
+          "Task: Demo: suppress the road crossing",
+          "Ammo: 60/180",
+          "Pressure: 0%"
+        ],
+        "worldX": 4559.696369258327,
+        "worldY": 3182.317572623533,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:preview:dugout-exposure",
+        "targetType": "dugout",
+        "targetId": "preview:dugout",
+        "icon": "route-arrow",
+        "tone": "ok",
+        "priority": 54,
+        "label": "Preview dugout reachable",
+        "shortReason": "Builders can reach this placement",
+        "detailLines": [
+          "Enemy camp distance: 3861m",
+          "Path from camp: 323m"
+        ],
+        "worldX": 7584.320000000001,
+        "worldY": 3025,
+        "pulse": "none",
+        "visibility": "build-preview"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-10",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-10",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Lev Rus-10 is fighting",
+        "detailLines": [
+          "Lev Rus-10 | rifleman",
+          "Task: Hold from camp-a trench 3",
+          "Ammo: 24/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7434.320000000001,
+        "worldY": 3001,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-2",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-2",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Makar Rus-2 is fighting",
+        "detailLines": [
+          "Makar Rus-2 | rifleman",
+          "Task: Hold from camp-a trench 1",
+          "Ammo: 20/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7518.320000000001,
+        "worldY": 3001,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-5",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-5",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Lev Ukr-5 is fighting",
+        "detailLines": [
+          "Lev Ukr-5 | rifleman",
+          "Task: Demo: probe the road crossing",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 4602.566084044444,
+        "worldY": 3155.2218809305205,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-7",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-7",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Taran Rus-7 is fighting",
+        "detailLines": [
+          "Taran Rus-7 | medic",
+          "Task: Hold from camp-a trench 3",
+          "Ammo: 25/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7434.320000000001,
+        "worldY": 3001,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-9",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-9",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Kira Rus-9 is fighting",
+        "detailLines": [
+          "Kira Rus-9 | defender",
+          "Task: Hold from camp-a trench 3",
+          "Ammo: 21/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7434.320000000001,
+        "worldY": 3001,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-1",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-1",
+        "icon": "hammer",
+        "tone": "working",
+        "priority": 52,
+        "label": "Soldier building",
+        "shortReason": "Vira Rus-1 is constructing",
+        "detailLines": [
+          "Vira Rus-1 | builder",
+          "Task: Building: ammo-crate",
+          "Ammo: 12/24",
+          "Pressure: 0%"
+        ],
+        "worldX": 7500.320000000001,
+        "worldY": 3019,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-4",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-4",
+        "icon": "hammer",
+        "tone": "working",
+        "priority": 52,
+        "label": "Soldier building",
+        "shortReason": "Kira Ukr-4 is constructing",
+        "detailLines": [
+          "Kira Ukr-4 | builder",
+          "Task: Demo: fortify market berm",
+          "Ammo: 12/24",
+          "Pressure: 0%"
+        ],
+        "worldX": 4548.815307672491,
+        "worldY": 3159.4963635537038,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:trench:town-war-order-1",
+        "targetType": "trench",
+        "targetId": "town-war-order-1",
+        "icon": "dim-sightline",
+        "tone": "info",
+        "priority": 42,
+        "label": "Trench idle",
+        "shortReason": "No target in arc",
+        "detailLines": [
+          "Network camp-a-trench-network-town-war-order-1",
+          "3/3 occupied",
+          "Linked ammo: town-war-ammo-crate-1",
+          "Linked dugout: none"
+        ],
+        "worldX": 7476.320000000001,
+        "worldY": 2999,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-11",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-11",
+        "icon": "shield",
+        "tone": "ok",
+        "priority": 36,
+        "label": "Soldier in cover",
+        "shortReason": "Yara Ukr-11 is holding cover",
+        "detailLines": [
+          "Yara Ukr-11 | defender",
+          "Task: Camp work: cook rotation",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 3708.2540769762104,
+        "worldY": 3103.901942818362,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-12",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-12",
+        "icon": "shield",
+        "tone": "ok",
+        "priority": 36,
+        "label": "Soldier in cover",
+        "shortReason": "Rook Ukr-12 is holding cover",
+        "detailLines": [
+          "Rook Ukr-12 | rifleman",
+          "Task: Camp work: supply ledger",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 3734.288311279215,
+        "worldY": 3194.804769343891,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-8",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-8",
+        "icon": "shield",
+        "tone": "ok",
+        "priority": 36,
+        "label": "Soldier in cover",
+        "shortReason": "Vira Ukr-8 is holding cover",
+        "detailLines": [
+          "Vira Ukr-8 | medic",
+          "Task: Demo: rear aid ready",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 3648.167561993555,
+        "worldY": 3184.466144333262,
+        "visibility": "inspect",
+        "pulse": "none"
+      }
+    ],
+    "totals": {
+      "icons": 16,
+      "normal": 1,
+      "inspect": 13,
+      "buildPreview": 2,
+      "blockers": 0,
+      "byTargetType": {
+        "trench": 1,
+        "ammo-crate": 1,
+        "dugout": 2,
+        "soldier": 12,
+        "camp": 0
+      },
+      "byTone": {
+        "ok": 4,
+        "working": 11,
+        "warn": 0,
+        "danger": 0,
+        "disabled": 0,
+        "info": 1
+      }
+    },
+    "readable": "Readability overlay: 16 icons, 0 blockers. Ammo crate feeding: Ammo crate is linked to trench support"
+  },
+  "inspectRuntime": {
+    "fps": 7.5,
+    "frameTimeMs": 115,
+    "townWarRealtimeEnabled": true,
+    "playerPathSamples": 24,
+    "heatmapCells": 22,
+    "clockSeconds": 23.9,
+    "soldiers": 12,
+    "combatants": 12,
+    "orders": 3,
+    "activeOrders": 0,
+    "completedOrders": 3,
+    "trenchSlots": 3,
+    "ammoCrates": 1,
+    "dugouts": 1,
+    "scene": {
+      "soldierSprites": 12,
+      "enemySprites": 33,
+      "fieldworkLabels": 10,
+      "campLabels": 2,
+      "selectedSoldierLabels": 1,
+      "lookSoldierLabels": 0,
+      "statusLabels": 0,
+      "readabilityLabels": 11,
+      "readabilityIcons": 11,
+      "readabilityNormalIcons": 1,
+      "readabilityInspectIcons": 8,
+      "readabilityBuildPreviewIcons": 2,
+      "readabilityInspectMode": true,
+      "playerCampArtObjects": 147,
+      "playerCampArtVisible": true,
+      "displayObjects": 131
+    }
+  },
+  "liveOverlay": {
+    "ok": true,
+    "icons": [
+      {
+        "id": "readability:ammo-crate:town-war-ammo-crate-1",
+        "targetType": "ammo-crate",
+        "targetId": "town-war-ammo-crate-1",
+        "icon": "crossed-ammo-box",
+        "tone": "danger",
+        "priority": 88,
+        "label": "Ammo crate empty",
+        "shortReason": "No ammo left to support firing",
+        "detailLines": [
+          "Stock: 0/720",
+          "Linked: no active trench feed",
+          "Health: 15/25"
+        ],
+        "worldX": 7500.320000000001,
+        "worldY": 3023,
+        "visibility": "normal",
+        "pulse": "slow"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-3",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-3",
+        "icon": "stacked-chevrons",
+        "tone": "working",
+        "priority": 56,
+        "label": "Soldier suppressing",
+        "shortReason": "Olek Rus-3 is pinning a lane",
+        "detailLines": [
+          "Olek Rus-3 | suppressor",
+          "Task: Colony cover: dugout town-war-order-3",
+          "Ammo: 13/180",
+          "Pressure: 0%"
+        ],
+        "worldX": 7546.320000000001,
+        "worldY": 3019,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-6",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-6",
+        "icon": "stacked-chevrons",
+        "tone": "working",
+        "priority": 56,
+        "label": "Soldier suppressing",
+        "shortReason": "Nika Ukr-6 is pinning a lane",
+        "detailLines": [
+          "Nika Ukr-6 | suppressor",
+          "Task: Demo: suppress the road crossing",
+          "Ammo: 54/180",
+          "Pressure: 0%"
+        ],
+        "worldX": 5612,
+        "worldY": 3191,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-10",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-10",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Lev Rus-10 is fighting",
+        "detailLines": [
+          "Lev Rus-10 | rifleman",
+          "Task: Hold from camp-a trench 2",
+          "Ammo: 25/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7476.320000000001,
+        "worldY": 3001,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-5",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-5",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Lev Ukr-5 is fighting",
+        "detailLines": [
+          "Lev Ukr-5 | rifleman",
+          "Task: Demo: probe the road crossing",
+          "Ammo: 28/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 5662,
+        "worldY": 3117,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-7",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-7",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Taran Rus-7 is fighting",
+        "detailLines": [
+          "Taran Rus-7 | medic",
+          "Task: Hold from camp-a trench 3",
+          "Ammo: 26/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7434.320000000001,
+        "worldY": 3001,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-9",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-9",
+        "icon": "muzzle-burst",
+        "tone": "working",
+        "priority": 54,
+        "label": "Soldier firing",
+        "shortReason": "Kira Rus-9 is fighting",
+        "detailLines": [
+          "Kira Rus-9 | defender",
+          "Task: Hold from camp-a trench 2",
+          "Ammo: 26/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7476.320000000001,
+        "worldY": 3001,
+        "visibility": "inspect",
+        "pulse": "shot"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-1",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-1",
+        "icon": "hammer",
+        "tone": "working",
+        "priority": 52,
+        "label": "Soldier building",
+        "shortReason": "Vira Rus-1 is constructing",
+        "detailLines": [
+          "Vira Rus-1 | builder",
+          "Task: Building: ammo-crate",
+          "Ammo: 12/24",
+          "Pressure: 0%"
+        ],
+        "worldX": 7500.320000000001,
+        "worldY": 3019,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-2",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-2",
+        "icon": "hammer",
+        "tone": "working",
+        "priority": 52,
+        "label": "Soldier building",
+        "shortReason": "Makar Rus-2 is constructing",
+        "detailLines": [
+          "Makar Rus-2 | rifleman",
+          "Task: Building: dugout",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 7546.320000000001,
+        "worldY": 3019,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:trench:town-war-order-1",
+        "targetType": "trench",
+        "targetId": "town-war-order-1",
+        "icon": "dim-sightline",
+        "tone": "info",
+        "priority": 42,
+        "label": "Trench idle",
+        "shortReason": "No target in arc",
+        "detailLines": [
+          "Network camp-a-trench-network-town-war-order-1",
+          "3/3 occupied",
+          "Linked ammo: none",
+          "Linked dugout: town-war-dugout-1"
+        ],
+        "worldX": 7476.320000000001,
+        "worldY": 2999,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:dugout:town-war-dugout-1",
+        "targetType": "dugout",
+        "targetId": "town-war-dugout-1",
+        "icon": "chain-shield",
+        "tone": "ok",
+        "priority": 36,
+        "label": "Dugout linked",
+        "shortReason": "Dugout supports the trench network",
+        "detailLines": [
+          "Connected slots: 3",
+          "Sheltering: 0",
+          "Status: active",
+          "Line supplied"
+        ],
+        "worldX": 7546.320000000001,
+        "worldY": 3021,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-4",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-4",
+        "icon": "shield",
+        "tone": "ok",
+        "priority": 36,
+        "label": "Soldier in cover",
+        "shortReason": "Kira Ukr-4 is holding cover",
+        "detailLines": [
+          "Kira Ukr-4 | builder",
+          "Task: Build stop",
+          "Ammo: 12/24",
+          "Pressure: 0%"
+        ],
+        "worldX": 5582,
+        "worldY": 3241,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-11",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-11",
+        "icon": "route-arrow",
+        "tone": "info",
+        "priority": 20,
+        "label": "Soldier moving",
+        "shortReason": "Following an order",
+        "detailLines": [
+          "Yara Ukr-11 | defender",
+          "Task: Camp work: cook rotation",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 3708.2540769762104,
+        "worldY": 3103.901942818362,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-12",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-12",
+        "icon": "route-arrow",
+        "tone": "info",
+        "priority": 20,
+        "label": "Soldier moving",
+        "shortReason": "Following an order",
+        "detailLines": [
+          "Rook Ukr-12 | rifleman",
+          "Task: Camp work: supply ledger",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 3734.288311279215,
+        "worldY": 3194.804769343891,
+        "visibility": "inspect",
+        "pulse": "none"
+      },
+      {
+        "id": "readability:soldier:town-war-soldier-8",
+        "targetType": "soldier",
+        "targetId": "town-war-soldier-8",
+        "icon": "route-arrow",
+        "tone": "info",
+        "priority": 20,
+        "label": "Soldier moving",
+        "shortReason": "Following an order",
+        "detailLines": [
+          "Vira Ukr-8 | medic",
+          "Task: Demo: rear aid ready",
+          "Ammo: 30/90",
+          "Pressure: 0%"
+        ],
+        "worldX": 3648.167561993555,
+        "worldY": 3184.466144333262,
+        "visibility": "inspect",
+        "pulse": "none"
+      }
+    ],
+    "totals": {
+      "icons": 15,
+      "normal": 1,
+      "inspect": 14,
+      "buildPreview": 0,
+      "blockers": 1,
+      "byTargetType": {
+        "trench": 1,
+        "ammo-crate": 1,
+        "dugout": 1,
+        "soldier": 12,
+        "camp": 0
+      },
+      "byTone": {
+        "ok": 2,
+        "working": 8,
+        "warn": 0,
+        "danger": 1,
+        "disabled": 0,
+        "info": 4
+      }
+    },
+    "readable": "Readability overlay: 15 icons, 1 blockers. Ammo crate empty: No ammo left to support firing"
+  },
+  "debrief": {
+    "operationId": 2,
+    "startedAtSeconds": 0,
+    "endedAtSeconds": 26.928500000000003,
+    "campId": "camp-a",
+    "summary": "Operation 2 ended: 6 Russian soldiers carried, 0 wounded/recovering, readiness 0.81, banked ammo 255, build 309, food 187, med 119, lost/spent ammo 165, build 111, food 33, med 21.",
+    "recommendations": [
+      "Keep the balanced stockpile and build from the right-side Russian camp toward one lane at a time.",
+      "Use the debrief to name one soldier to protect, then set priorities before ordering the next trench.",
+      "Stock the connected trench network with a closer ammo box before the next push.",
+      "Add wire to the likely Ukrainian approach, but leave one retreat mouth clear.",
+      "Send a small expedition before the next breach so the route can create warnings before casualties.",
+      "Prepare demolition and hit a Ukrainian weak point; passive camp damage is not the main win path.",
+      "Position held because dugout rallied defenders into connected trenches."
+    ],
+    "supplyRemaining": {
+      "ammo": 300,
+      "build": 364,
+      "food": 220,
+      "med": 140
+    },
+    "bankedSupply": {
+      "ammo": 255,
+      "build": 309,
+      "food": 187,
+      "med": 119
+    },
+    "lostSupply": {
+      "ammo": 165,
+      "build": 111,
+      "food": 33,
+      "med": 21
+    },
+    "carriedSoldiers": [
+      {
+        "soldierId": "town-war-soldier-1",
+        "displayName": "Vira Rus-1",
+        "faction": "camp-a",
+        "role": "builder",
+        "status": "ready",
+        "healthCurrent": 100,
+        "healthMax": 100,
+        "fatigue": 0.55,
+        "hunger": 0.12,
+        "morale": 0.5,
+        "currentNeed": "ready",
+        "operations": 2,
+        "memoryTags": [
+          "operation-2",
+          "ready",
+          "order-saved-line",
+          "officer-helped",
+          "order-exposed-builder",
+          "trench-held",
+          "arc-confidence",
+          "arc-makar-reckless",
+          "arc-trust-repair",
+          "ammo-crate-built-town-war-order-2",
+          "officer-cost"
+        ],
+        "trustInOfficer": 0.6372,
+        "resentment": 0.06620000000000001,
+        "confidence": 0.8562500000000006,
+        "lastSeenAtSeconds": 26.928500000000003
+      },
+      {
+        "soldierId": "town-war-soldier-2",
+        "displayName": "Makar Rus-2",
+        "faction": "camp-a",
+        "role": "rifleman",
+        "status": "ready",
+        "healthCurrent": 100,
+        "healthMax": 100,
+        "fatigue": 0.42,
+        "hunger": 0.18,
+        "morale": 0.59,
+        "currentNeed": "ready",
+        "operations": 2,
+        "memoryTags": [
+          "operation-2",
+          "ready",
+          "order-saved-line",
+          "officer-helped",
+          "order-exposed-builder",
+          "trench-held",
+          "arc-confidence",
+          "arc-makar-reckless",
+          "arc-protective",
+          "arc-trust-repair",
+          "dugout-built-town-war-order-3",
+          "ammo-run-town-war-ammo-crate-1"
+        ],
+        "trustInOfficer": 0.6272,
+        "resentment": 0.0632,
+        "confidence": 0.8003750000000007,
+        "lastSeenAtSeconds": 26.928500000000003
+      },
+      {
+        "soldierId": "town-war-soldier-3",
+        "displayName": "Olek Rus-3",
+        "faction": "camp-a",
+        "role": "suppressor",
+        "status": "ready",
+        "healthCurrent": 100,
+        "healthMax": 100,
+        "fatigue": 0.29,
+        "hunger": 0.24,
+        "morale": 0.68,
+        "currentNeed": "ready",
+        "operations": 2,
+        "memoryTags": [
+          "operation-2",
+          "ready",
+          "order-saved-line",
+          "officer-helped",
+          "order-exposed-builder",
+          "trench-held",
+          "arc-confidence",
+          "arc-makar-reckless",
+          "arc-protective",
+          "covered-build-town-war-order-3",
+          "ammo-run-town-war-ammo-crate-1"
+        ],
+        "trustInOfficer": 0.6172,
+        "resentment": 0.0632,
+        "confidence": 0.8180000000000001,
+        "lastSeenAtSeconds": 26.928500000000003
+      },
+      {
+        "soldierId": "town-war-soldier-7",
+        "displayName": "Taran Rus-7",
+        "faction": "camp-a",
+        "role": "medic",
+        "status": "ready",
+        "healthCurrent": 100,
+        "healthMax": 100,
+        "fatigue": 0.22,
+        "hunger": 0.24,
+        "morale": 0.54,
+        "currentNeed": "ready",
+        "operations": 2,
+        "memoryTags": [
+          "operation-2",
+          "ready",
+          "ammo-run-town-war-ammo-crate-1",
+          "order-saved-line",
+          "officer-helped",
+          "order-exposed-builder",
+          "trench-held",
+          "arc-confidence",
+          "arc-makar-reckless",
+          "arc-protective"
+        ],
+        "trustInOfficer": 0.5614,
+        "resentment": 0.0942,
+        "confidence": 0.6860000000000002,
+        "lastSeenAtSeconds": 26.928500000000003
+      },
+      {
+        "soldierId": "town-war-soldier-9",
+        "displayName": "Kira Rus-9",
+        "faction": "camp-a",
+        "role": "defender",
+        "status": "ready",
+        "healthCurrent": 100,
+        "healthMax": 100,
+        "fatigue": 0.36,
+        "hunger": 0.12,
+        "morale": 0.68,
+        "currentNeed": "ready",
+        "operations": 2,
+        "memoryTags": [
+          "operation-2",
+          "ready",
+          "order-saved-line",
+          "officer-helped",
+          "ammo-run-town-war-ammo-crate-1",
+          "held-trench-town-war-cover-trench-6"
+        ],
+        "trustInOfficer": 0.6058,
+        "resentment": 0,
+        "confidence": 0.5820000000000001,
+        "lastSeenAtSeconds": 26.928500000000003
+      },
+      {
+        "soldierId": "town-war-soldier-10",
+        "displayName": "Lev Rus-10",
+        "faction": "camp-a",
+        "role": "rifleman",
+        "status": "ready",
+        "healthCurrent": 100,
+        "healthMax": 100,
+        "fatigue": 0.08,
+        "hunger": 0.18,
+        "morale": 0.54,
+        "currentNeed": "ready",
+        "operations": 2,
+        "memoryTags": [
+          "operation-2",
+          "ready",
+          "ammo-run-town-war-ammo-crate-1"
+        ],
+        "trustInOfficer": 0.55,
+        "resentment": 0,
+        "confidence": 0.5,
+        "lastSeenAtSeconds": 26.928500000000003
+      }
+    ],
+    "soldierLines": [
+      "Vira Rus-1 (builder) carried ready; fatigue 55%, morale 50%, operations 2.",
+      "Makar Rus-2 (rifleman) carried ready; fatigue 42%, morale 59%, operations 2.",
+      "Taran Rus-7 (medic) carried ready; fatigue 22%, morale 54%, operations 2.",
+      "Kira Rus-9 (defender) carried ready; fatigue 36%, morale 68%, operations 2.",
+      "Olek Rus-3 (suppressor) carried ready; fatigue 29%, morale 68%, operations 2.",
+      "Lev Rus-10 (rifleman) carried ready; fatigue 8%, morale 54%, operations 2."
+    ],
+    "buildingComboLines": [
+      "Readability Ammo crate empty: No ammo left to support firing.",
+      "Trench camp-a-trench-network-town-war-order-1: 1 segments, 3/3 occupied, ammo missing, dugout linked, no sandbags, no wire; warnings Flank open."
+    ],
+    "workLines": [
+      "Olek Rus-3 covered Makar Rus-2 while the dugout was exposed. Cover fire support was 96%, changing build safety and tempo.",
+      "Makar Rus-2 finished the dugout at 7546,3043. Makar Rus-2 carries 42% fatigue into the next order.",
+      "Lev Rus-10 pulled 1 rounds from town-war-ammo-crate-1 and kept the line fed. Lev Rus-10 resumed with 113 rounds while the crate fell to 715.",
+      "Kira Rus-9 pulled 1 rounds from town-war-ammo-crate-1 and kept the line fed. Kira Rus-9 resumed with 109 rounds while the crate fell to 716.",
+      "Taran Rus-7 pulled 1 rounds from town-war-ammo-crate-1 and kept the line fed. Taran Rus-7 resumed with 113 rounds while the crate fell to 717.",
+      "Olek Rus-3 works Suppress. Olek Rus-3 chose Suppress because score 81.84: Suppress: priority 5, skill 21.3, urgency 12.0, safety -2.9."
+    ],
+    "routeLines": [
+      "No expedition was ordered; the next breach needs a four-soldier route read before demolition work."
+    ],
+    "campDamageLines": [
+      "No Ukrainian camp weak point was damaged; prepare demolition stock and target the ammo dump or spawn dugout."
+    ],
+    "warnings": [
+      "Rest cycle active"
+    ]
+  },
+  "screenshots": [
+    "artifacts/town-war-readability-loop/01-preview-bad-trench.png",
+    "artifacts/town-war-readability-loop/02-preview-valid-support.png",
+    "artifacts/town-war-readability-loop/03-inspect-mode-links.png",
+    "artifacts/town-war-readability-loop/04-live-blocker.png",
+    "artifacts/town-war-readability-loop/05-debrief-readability-reason.png"
+  ]
+}

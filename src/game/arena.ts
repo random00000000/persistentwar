@@ -398,18 +398,6 @@ const BASE_ARENA_OBSTACLES: ArenaObstacle[] = [
     ]
   },
   {
-    id: 9,
-    x: 1990,
-    y: 900,
-    width: 190,
-    height: 190,
-    label: "Fuel Cages",
-    doorways: [
-      { side: "left", offset: 112, width: 92, depth: 50 },
-      { side: "top", offset: 104, width: 78, depth: 46 }
-    ]
-  },
-  {
     id: 10,
     x: 1660,
     y: 1170,

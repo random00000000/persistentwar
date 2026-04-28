@@ -8,11 +8,13 @@ When dealing with bugs use GStack Investigate Skill.
 
 Before coding, read this document completely:
 
-`C:\Users\Javier\Desktop\CodexCLI\2d-game-engine\projects\frontline-officer\docs\PERSISTENT_WAR_OFFICER_FORK_INTENT.md`
+'C:\Users\Javier\Desktop\CodexCLI\2d-game-engine\projects\frontline-officer\HumanMadeNorthStar.md'
 
 That document is the current product north star for this fork.
 
 The old extraction-shooter documents still exist because this fork inherited the previous codebase and design history. Treat them as source material to mine for reusable systems, not as the active product direction.
+
+Do not read the other Docs since there are too many and will not make code better.
 
 ## Game Identity
 
@@ -46,18 +48,7 @@ The old extraction-shooter documents still exist because this fork inherited the
 - Online play is later. Single-player NPC war simulation must work first.
 - Modern Ukraine-war context should ground battlefield texture, but the setting, factions, places, and events must remain fictional.
 
-## Shipping Priority Order
 
-When choosing work without a newer human directive, move the first playable forward in this order:
-
-1. `First-town war state`: create a durable state model for one replayable town.
-2. `Two camps`: establish one camp for each side and make camp health/control inspectable.
-3. `Autonomous soldiers`: spawn NPC soldiers who can move, fight, suppress, retreat, and recover without being puppets.
-4. `Officer build order`: let the player place at least one battlefield construction order.
-5. `Construction execution`: make soldiers travel to the order and build the object under risk.
-6. `Trench or cover payoff`: completed construction must change survivability, suppression, or movement choices.
-7. `Camp destruction win condition`: the match ends when one camp is destroyed.
-8. `Protected operation banking`: preserve the stash/extraction menu as protected preparation for future pushes.
 
 ## Local Rules
 
@@ -72,48 +63,3 @@ When choosing work without a newer human directive, move the first playable forw
 - The fork has dedicated Vite ports:
   - dev: `http://127.0.0.1:5847/`
   - preview: `http://127.0.0.1:5848/`
-
-## Automation Definition Of Done
-
-Each recurring automation run should leave one clean handoff:
-
-- one useful behavior, system seam, or verification surface changed;
-- one CLI, browser, screenshot, or build proof recorded in the final answer;
-- Agile state updated when card progress changed;
-- docs updated only when the project reality changed;
-- no broad cleanup or unrelated refactor bundled into the run.
-
-## Not Yet
-
-Do not spend automation runs on these until the first-town officer-war slice works:
-
-- online multiplayer;
-- a giant persistent world map;
-- tanks-first development before infantry/build-order consequence is proven;
-- broad UI polish that does not support orders, banking, readability, or verification;
-- lore expansion without playable simulation impact;
-- extraction-only raid polish;
-- new economies or tech trees before camp destruction and operation banking are inspectable.
-
-## Current State
-
-This fork currently starts from the inherited extraction-shooter codebase. The product direction has been pivoted by documentation, but most runtime systems still need to be reshaped toward the officer-led persistent war.
-
-## Agent Surfaces
-
-- Fork north star: [docs/PERSISTENT_WAR_OFFICER_FORK_INTENT.md](docs/PERSISTENT_WAR_OFFICER_FORK_INTENT.md)
-- AgileSprints project: `C:\Users\Javier\Desktop\CodexCLI\AgileSprints\Frontline Officer`
-- Project wiki: [wiki/README.md](wiki/README.md)
-- Project CLI manual: [wiki/project-cli.md](wiki/project-cli.md)
-- Project CLI entry point: `npm run game:cli -- <command>`
-- After code changes, update and maintain relevant docs so future agents know whether a system is inherited extraction behavior or active frontline-officer behavior.
-
-## Inherited Reference Docs
-
-Use these for historical context and reusable mechanics, not as the active north star:
-
-- [Tactical Squad Extraction North Star](docs/TACTICAL_SQUAD_EXTRACTION_NORTH_STAR.md)
-- [Product Direction And Spec Intent](docs/PRODUCT_DIRECTION_AND_SPEC_INTENT.md)
-- [Infiltration Shooter Direction](docs/INFILTRATION_SHOOTER_DIRECTION.md)
-- [Combat Center Of Gravity Direction](docs/COMBAT_CENTER_OF_GRAVITY_DIRECTION.md)
-- [Systemic Reuse And Prefab Rules](docs/SYSTEMIC_REUSE_AND_PREFAB_RULES.md)

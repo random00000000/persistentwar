@@ -5,20 +5,20 @@
   "ammoSupport": "no close ammo crate",
   "aiOccupation": "3/3 slots occupied by Kira Rus-9, Vira Rus-1, Olek Rus-3",
   "holdReason": "Held because soldiers occupied the trench, the open side faced the enemy, and cover cut pressure by 54%.",
-  "buildFeedback": "Town war build report: town-war-order-1 trench completed: 100% (100/100) rate 17.86/s stall none support town-war-soldier-3 ammo steady stage complete via finished-under-suppression cause finished-under-suppression",
+  "buildFeedback": "Town war build report: town-war-order-1 trench completed: 100% (100/100) rate 3.57/s stall none support town-war-soldier-3 ammo dry stage complete via finished-under-suppression cause finished-under-suppression network free/bad-retreat-path",
   "namedStories": [
     {
       "kind": "cover",
       "soldier": "Olek Rus-3",
       "summary": "Olek Rus-3 covered Vira Rus-1 while the trench was exposed.",
-      "consequence": "Cover fire support was 96%, changing build safety and tempo.",
+      "consequence": "Cover fire support was 54%, changing build safety and tempo.",
       "memoryTag": "covered-build-town-war-order-1"
     },
     {
       "kind": "build",
       "soldier": "Vira Rus-1",
       "summary": "Vira Rus-1 finished the trench at 5912,3185.",
-      "consequence": "Vira Rus-1 carries 35% fatigue into the next order.",
+      "consequence": "Vira Rus-1 carries 34% fatigue into the next order.",
       "memoryTag": "trench-built-town-war-order-1"
     },
     {

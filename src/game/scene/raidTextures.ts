@@ -527,6 +527,45 @@ function drawPlayerTextures(scene: Phaser.Scene): void {
     6,
     "#ef4444"
   );
+
+    drawOperatorTexture(
+      scene,
+      "player-rpg",
+    [
+      "........................",
+      ".........hhhhhh.........",
+      ".......hhmmmmmmhh.......",
+      "......hhmvvvvvmmhh......",
+      "......hmvvffffvvmh......",
+      "......hmvfffffffvmh.....",
+      "......hhmffffffmhh......",
+      ".......ccccttttccuuuuu..",
+      "......ccccaattacuuuuuu..",
+      ".....cccssasssassruuuu..",
+      ".....ccsaggrrggasxruuu..",
+      "....cccsagrrrrrgaxruuu..",
+      "....cccsaarrrrraasruuu..",
+      "....ccccaakkkkaaccru....",
+      ".....cccaakyykaaccr.....",
+      ".....cccaakyykaaccc.....",
+      ".....cccakkbbkkaccc.....",
+      "......ccakbbbbkacc......",
+      "......llkbb..bbkll......",
+      ".....lllbb....bblll.....",
+      ".....dllb......blld.....",
+      ".....ddlb......bldd.....",
+      "......dd........dd......",
+      "........................"
+    ],
+    {
+      ...basePalette,
+      u: "#334155",
+      r: "#facc15"
+    },
+    17,
+    6,
+    "#ef4444"
+  );
 }
 
 function drawEnemyTextures(scene: Phaser.Scene): void {

@@ -1,4 +1,4 @@
-export type WeaponId = "none" | "knife" | "pistol" | "worn-ak" | "short-mosin" | "rifle" | "smg" | "shotgun" | "pkm" | "amr";
+export type WeaponId = "none" | "knife" | "pistol" | "worn-ak" | "short-mosin" | "rifle" | "smg" | "shotgun" | "pkm" | "amr" | "rpg";
 
 export interface WeaponDefinition {
   id: WeaponId;
@@ -320,5 +320,34 @@ export const WEAPONS: Record<WeaponId, WeaponDefinition> = {
     noiseRadius: 920,
     noiseScore: 2.55,
     color: 0xe2e8f0
+  },
+  rpg: {
+    id: "rpg",
+    name: "RPG-7 Launcher",
+    description: "Earned siege weapon for cracking camp anchors, bunker mouths, and packed trench lines. Slow, loud, expensive, and decisive.",
+    raidCost: 720,
+    damage: 150,
+    pellets: 1,
+    spread: 0.045,
+    fireInterval: 2.4,
+    bulletSpeed: 460,
+    range: 860,
+    magazineSize: 1,
+    reserveAmmo: 2,
+    ammoPackAmmo: 1,
+    reloadTime: 4.8,
+    reloadStyle: "magazine",
+    reloadInsertTime: 4.8,
+    moveSpeed: 162,
+    moveSpreadPenalty: 0.18,
+    recoilPerShot: 0.14,
+    recoilRecoveryPerSecond: 0.045,
+    maxSpreadPenalty: 0.36,
+    focusMoveMultiplier: 0.46,
+    focusSpreadMultiplier: 0.34,
+    focusRecoveryMultiplier: 1.12,
+    noiseRadius: 980,
+    noiseScore: 3.4,
+    color: 0xfacc15
   }
 };

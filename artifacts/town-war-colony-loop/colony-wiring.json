@@ -17,8 +17,8 @@
     "selectedWork": "Rescue"
   },
   "orderOk": true,
-  "orderSummary": "Town war trench order: town-war-order-1 assigned town-war-soldier-1 (camp-a) | eta 46.1s | risk high | build 225, ammo 250 | next: war-advance --seconds 6",
-  "buildFeedback": "Town war build report: town-war-order-1 trench assigned: 0% (0/100) rate 0/s stall none support town-war-soldier-3 ammo none stage builder en route cause risk-high > exposure-0.78 > order-accepted > colony-cover-town-war-soldier-3",
+  "orderSummary": "Town war trench order: town-war-order-1 assigned town-war-soldier-1 (camp-a) | eta 54.9s | risk high | build 225, ammo 250 | New trench network camp-a-trench-network-town-war-order-1 started by town-war-order-1; Bad retreat path. | next: war-advance --seconds 6",
+  "buildFeedback": "Town war build report: town-war-order-1 trench assigned: 0% (0/100) rate 0/s stall none support town-war-soldier-3 ammo none stage builder en route cause risk-high > exposure-0.78 > order-accepted > colony-cover-town-war-soldier-3 network free/bad-retreat-path",
   "supportId": "town-war-soldier-3",
   "casualtyId": "town-war-casualty-1",
   "casualtyStatus": "wounded",

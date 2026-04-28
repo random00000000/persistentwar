@@ -158,6 +158,46 @@ async function runTownWarTrenchSmoke() {
             const orderId = order.order?.orderId ?? null;
             api.advanceTownWar({ seconds: 30, tickSeconds: 0.25 });
             const midBuildReport = orderId ? api.getTownWarBuildReport({ orderId }) : null;
+            const summarizeTrenchFire = () => {
+              const fireSnapshot = api.getSnapshot().war.townWar;
+              const occupiedSlots = fireSnapshot.aiTactics.coverSlots.filter(
+                (slot) => slot.faction === "camp-a" && slot.sourceKind === "trench" && slot.occupiedBySoldierId !== null
+              );
+              const soldiers = occupiedSlots
+                .map((slot) => fireSnapshot.soldiers.find((soldier) => soldier.id === slot.occupiedBySoldierId) ?? null)
+                .filter(Boolean);
+              const targetIds = [...new Set(soldiers.map((soldier) => soldier.targetIntent?.targetId).filter(Boolean))];
+              const targets = targetIds
+                .map((targetId) => fireSnapshot.combatants.find((combatant) => combatant.id === targetId) ?? null)
+                .filter(Boolean);
+              return {
+                occupiedCount: occupiedSlots.length,
+                soldierAmmo: Object.fromEntries(soldiers.map((soldier) => [soldier.id, (soldier.ammo?.inMag ?? 0) + (soldier.ammo?.reserve ?? 0)])),
+                targetHealth: Object.fromEntries(targets.map((targetEntry) => [targetEntry.id, targetEntry.health?.current ?? 0])),
+                targetPressure: Object.fromEntries(targets.map((targetEntry) => [targetEntry.id, targetEntry.morale?.pressure ?? 0])),
+                targetIds,
+                targetReasons: soldiers.map((soldier) => soldier.targetIntent?.reason ?? null)
+              };
+            };
+            for (let step = 0; step < 24; step += 1) {
+              const occupancyRead = summarizeTrenchFire();
+              if (occupancyRead.occupiedCount >= 2) {
+                break;
+              }
+              api.advanceTownWar({ seconds: 2, tickSeconds: 0.25 });
+            }
+            const fireBefore = summarizeTrenchFire();
+            api.advanceTownWar({ seconds: 10, tickSeconds: 0.25 });
+            const fireAfter = summarizeTrenchFire();
+            const sharedShooterIds = Object.keys(fireBefore.soldierAmmo).filter((id) => Object.prototype.hasOwnProperty.call(fireAfter.soldierAmmo, id));
+            const sharedTargetIds = fireBefore.targetIds.filter((id) => Object.prototype.hasOwnProperty.call(fireBefore.targetHealth, id));
+            const trenchFireProof = {
+              before: fireBefore,
+              after: fireAfter,
+              ammoSpent: sharedShooterIds.reduce((total, id) => total + Math.max(0, (fireBefore.soldierAmmo[id] ?? 0) - (fireAfter.soldierAmmo[id] ?? 0)), 0),
+              targetHealthLoss: sharedTargetIds.reduce((total, id) => total + Math.max(0, (fireBefore.targetHealth[id] ?? 0) - (fireAfter.targetHealth[id] ?? 0)), 0),
+              targetPressureGain: sharedTargetIds.reduce((total, id) => total + Math.max(0, (fireAfter.targetPressure[id] ?? 0) - (fireBefore.targetPressure[id] ?? 0)), 0)
+            };
             let maxOccupiedTrenchPressureRatio = 0;
             for (let step = 0; step < 40; step += 1) {
               api.advanceTownWar({ seconds: 5, tickSeconds: 0.25 });
@@ -288,6 +328,7 @@ async function runTownWarTrenchSmoke() {
               unownedTrenchClaims,
               minOccupiedSlotSpacing: Number.isFinite(minOccupiedSlotSpacing) ? minOccupiedSlotSpacing : null,
               trenchReachReads,
+              trenchFireProof,
               trenchCounterplayReads: occupiedSlotReads.map((read) => ({
                 soldierId: read.occupiedBySoldierId,
                 health: read.soldierHealth,
@@ -352,9 +393,24 @@ async function runTownWarTrenchSmoke() {
         );
       }
 
+      const nonCombatOccupants = result.occupiedSlotReads.filter(
+        (read) => read.taskKind !== "attack" && read.taskKind !== "defend" && read.taskKind !== "suppress"
+      );
+      if (nonCombatOccupants.length > 0) {
+        throw new Error(`Expected NPCs to remain in combat tasks after entering a trench. Non-combat occupants: ${JSON.stringify(nonCombatOccupants)} Result: ${JSON.stringify(result)}`);
+      }
+
       const trenchReachCount = result.trenchReachReads.filter((read) => /trench .*extends|trench firing bay extends/i.test(read.targetReason ?? "")).length;
       if (trenchReachCount < 2) {
         throw new Error(`Expected occupied trench soldiers to use extended trench fire reach in target selection. Reads: ${JSON.stringify(result.trenchReachReads)} Result: ${JSON.stringify(result)}`);
+      }
+
+      if (
+        result.trenchFireProof.before.occupiedCount < 2 ||
+        result.trenchFireProof.ammoSpent <= 0 ||
+        result.trenchFireProof.targetHealthLoss + result.trenchFireProof.targetPressureGain <= 0
+      ) {
+        throw new Error(`Expected occupied trench soldiers to spend ammo and affect enemy targets, not only select them. Fire proof: ${JSON.stringify(result.trenchFireProof)} Result: ${JSON.stringify(result)}`);
       }
 
       if ((result.minCampAHealth ?? 100) >= 99.5) {
@@ -389,6 +445,7 @@ async function runTownWarTrenchSmoke() {
       console.log(`Occupied slot proof: ${result.occupiedSlotReads.map((read) => `${read.occupiedBySoldierId}@${Math.round(read.distanceToSlot ?? -1)}px/${read.coverState}`).join(", ")}`);
       console.log(`Trench spacing proof: ${Math.round(result.minOccupiedSlotSpacing ?? 0)}px minimum slot spacing; claims ${result.trenchClaimReads.map((read) => `${read.soldierId}->${read.slotId}`).join(", ")}`);
       console.log(`Trench reach proof: ${result.trenchReachReads.map((read) => `${read.soldierId} ${read.taskKind} ${Math.round(read.targetDistance ?? -1)}px/${read.baseRange}->${read.frontTrenchRange} ${read.targetReason}`).join(" | ")}`);
+      console.log(`Trench fire proof: ammo spent ${Math.round(result.trenchFireProof.ammoSpent)} | target health loss ${result.trenchFireProof.targetHealthLoss.toFixed(2)} | pressure gain ${result.trenchFireProof.targetPressureGain.toFixed(2)}`);
       console.log(`Trench counterplay proof: peak pressure ${Math.round((result.maxOccupiedTrenchPressureRatio ?? 0) * 100)}% | ${result.trenchCounterplayReads.map((read) => `${read.soldierId} hp${Math.round(read.health ?? 0)} pressure${Math.round((read.pressureRatio ?? 0) * 100)}% ${read.targetReason ?? ""}`).join(" | ")} | grenade chatter ${result.trenchGrenadeChatterCount}`);
       console.log(`Protection: ${Math.round((result.protection ?? 0) * 100)}%`);
       console.log(`Directional fit: good ${Math.round((result.directionalFit ?? 0) * 100)}% vs bad ${Math.round((badResult.directionalFit ?? 0) * 100)}%`);

@@ -15,6 +15,7 @@ const { DESKTOP_VIEWPORT } = viewportModule;
 const controlSurfaceMinUptimeSeconds = 2.5;
 const controlSurfaceStableSamples = 3;
 const controlSurfacePollMs = 250;
+const liveAgentBridgeBasePath = "/__live-agent-bridge";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
@@ -258,6 +259,225 @@ function summarizeWarTaskDecision(soldier) {
     readable: `${soldier?.displayName ?? soldier?.id ?? "soldier"} | selected ${decision?.selectedWork ?? "none"} (${decision?.selectedScore ?? 0}) | ` +
       `Build ${soldier?.workPriorities?.Build ?? "?"} Rescue ${soldier?.workPriorities?.Rescue ?? "?"} Resupply ${soldier?.workPriorities?.Resupply ?? "?"} ` +
       `Defend ${soldier?.workPriorities?.Defend ?? "?"} Suppress ${soldier?.workPriorities?.Suppress ?? "?"} Rest ${soldier?.workPriorities?.Rest ?? "?"}`
+  };
+}
+
+function roundedPosition(position) {
+  if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+    return null;
+  }
+
+  return {
+    x: Number(position.x.toFixed(1)),
+    y: Number(position.y.toFixed(1))
+  };
+}
+
+function buildNpcPresenceReport(snapshot, runtimeReport = null) {
+  const phase = snapshot?.phase ?? "unknown";
+  const war = snapshot?.war ?? null;
+  const raid = snapshot?.raid ?? null;
+  const townWarSoldiers = getTownWarSoldiers(war);
+  const townWarCampA = townWarSoldiers.filter((soldier) => soldier?.faction === "camp-a");
+  const townWarCampB = townWarSoldiers.filter((soldier) => soldier?.faction === "camp-b");
+  const unifiedSoldiers = Array.isArray(war?.townWar?.unifiedSoldiers)
+    ? war.townWar.unifiedSoldiers
+    : Array.isArray(war?.unifiedSoldiers)
+      ? war.unifiedSoldiers
+      : [];
+  const raidSquadMates = Array.isArray(raid?.squadMates) ? raid.squadMates : [];
+  const raidFriendlyCombatants = Array.isArray(raid?.friendlyCombatants) ? raid.friendlyCombatants : [];
+  const raidEnemies = Array.isArray(raid?.enemies) ? raid.enemies : [];
+  const pendingReinforcements = Array.isArray(raid?.pendingReinforcements) ? raid.pendingReinforcements : [];
+  const frontLineIncidents = Array.isArray(snapshot?.frontline?.incidents) ? snapshot.frontline.incidents : [];
+  const officerPosition = roundedPosition(phase === "raid" ? raid?.position ?? snapshot?.frontline?.metrics?.player?.position : war?.officer?.position);
+  const projectedTownWarIds = new Set(
+    raidFriendlyCombatants
+      .filter((combatant) => combatant?.ownerKind === "town-war-soldier")
+      .map((combatant) => combatant?.ownerId ?? combatant?.squadMateId)
+      .filter(Boolean)
+  );
+  const renderedTownWarSoldiers = Array.isArray(runtimeReport?.report?.scene?.visibleSoldierSprites)
+    ? runtimeReport.report.scene.visibleSoldierSprites
+    : [];
+  const projectedSoldierSpriteIds = Array.isArray(runtimeReport?.report?.scene?.projectedSoldierSpriteIds)
+    ? runtimeReport.report.scene.projectedSoldierSpriteIds
+    : [];
+
+  const russianTeam = [
+    {
+      id: "player",
+      kind: "officer",
+      faction: war?.officer?.faction ?? "camp-a",
+      name: "Player Officer",
+      role: "officer",
+      status: phase === "raid" ? raid?.casualtyState ?? "present" : "present",
+      position: officerPosition,
+      source: "player"
+    },
+    ...raidSquadMates.map((mate) => ({
+      id: mate?.id ?? null,
+      kind: "squadmate",
+      faction: "camp-a",
+      name: mate?.name ?? mate?.id ?? null,
+      role: mate?.role ?? null,
+      weaponId: mate?.weaponId ?? null,
+      status: mate?.casualtyState ?? mate?.condition ?? "present",
+      command: mate?.command?.orderId ?? null,
+      position: roundedPosition(mate?.combatant?.position ?? null),
+      source: "raid.squadMates"
+    })),
+    ...townWarCampA.map((soldier) => ({
+      id: soldier?.id ?? null,
+      kind: "town-war-soldier",
+      faction: soldier?.faction ?? null,
+      name: soldier?.displayName ?? soldier?.id ?? null,
+      role: soldier?.role ?? null,
+      task: soldier?.task?.kind ?? null,
+      taskLabel: soldier?.task?.label ?? null,
+      currentNeed: soldier?.currentNeed ?? null,
+      projectedIntoRaid: projectedTownWarIds.has(soldier?.id),
+      position: roundedPosition(soldier?.position ?? soldier?.task?.targetPosition ?? null),
+      source: "war.townWar.soldiers"
+    }))
+  ];
+
+  const sceneNpcs = {
+    russian: raidFriendlyCombatants.map((combatant) => ({
+      id: combatant?.id ?? null,
+      kind: combatant?.ownerKind ?? "friendly",
+      ownerId: combatant?.ownerId ?? null,
+      squadMateId: combatant?.squadMateId ?? null,
+      name: combatant?.name ?? null,
+      voiceTag: combatant?.voiceTag ?? null,
+      weaponId: combatant?.weaponId ?? null,
+      status: combatant?.casualtyState ?? "present",
+      health: combatant?.health ?? null,
+      position: roundedPosition(combatant?.position ?? null),
+      source: "raid.friendlyCombatants"
+    })),
+    ukrainian: raidEnemies.map((enemy) => ({
+      id: enemy?.id ?? null,
+      kind: "enemy",
+      archetypeId: enemy?.archetypeId ?? null,
+      tapeId: enemy?.tapeId ?? null,
+      weaponId: enemy?.weaponId ?? null,
+      squadId: enemy?.squadId ?? null,
+      squadRole: enemy?.squadRole ?? null,
+      status: enemy?.casualtyState ?? "present",
+      health: enemy?.health ?? null,
+      position: roundedPosition(enemy?.position ?? null),
+      source: "raid.enemies"
+    })),
+    pending: pendingReinforcements.map((pending) => ({
+      id: pending?.id ?? null,
+      kind: "pending-reinforcement",
+      sourceLabel: pending?.source ?? null,
+      label: pending?.label ?? null,
+      timer: pending?.timer ?? null,
+      position: roundedPosition(pending?.position ?? null),
+      targetPosition: roundedPosition(pending?.targetPosition ?? null),
+      source: "raid.pendingReinforcements"
+    })),
+    incidents: frontLineIncidents.map((incident) => ({
+      id: incident?.id ?? null,
+      kind: incident?.kind ?? "incident",
+      label: incident?.label ?? null,
+      resolved: incident?.resolved ?? null,
+      strength: incident?.strength ?? null,
+      position: roundedPosition(incident?.position ?? null),
+      source: "frontline.incidents"
+    }))
+  };
+
+  const townWarNpcs = {
+    russian: townWarCampA.map((soldier) => ({
+      id: soldier?.id ?? null,
+      name: soldier?.displayName ?? soldier?.id ?? null,
+      faction: soldier?.faction ?? null,
+      role: soldier?.role ?? null,
+      task: soldier?.task?.kind ?? null,
+      targetKind: soldier?.targetIntent?.targetKind ?? null,
+      pressure: Number.isFinite(soldier?.morale?.pressure) ? soldier.morale.pressure : null,
+      position: roundedPosition(soldier?.position ?? soldier?.task?.targetPosition ?? null)
+    })),
+    ukrainian: townWarCampB.map((soldier) => ({
+      id: soldier?.id ?? null,
+      name: soldier?.displayName ?? soldier?.id ?? null,
+      faction: soldier?.faction ?? null,
+      role: soldier?.role ?? null,
+      task: soldier?.task?.kind ?? null,
+      targetKind: soldier?.targetIntent?.targetKind ?? null,
+      pressure: Number.isFinite(soldier?.morale?.pressure) ? soldier.morale.pressure : null,
+      position: roundedPosition(soldier?.position ?? soldier?.task?.targetPosition ?? null)
+    }))
+  };
+
+  return {
+    ok: true,
+    summary:
+      `NPC roster (${phase}) | Russian team ${russianTeam.length}: officer 1, squadmates ${raidSquadMates.length}, town-war ${townWarCampA.length} | ` +
+      `scene NPCs: Russian ${sceneNpcs.russian.length}, Ukrainian ${sceneNpcs.ukrainian.length}, rendered town-war ${renderedTownWarSoldiers.length}, pending ${sceneNpcs.pending.length}, incidents ${sceneNpcs.incidents.length} | ` +
+      `town-war soldiers: Russian ${townWarCampA.length}, Ukrainian ${townWarCampB.length}, unified ${unifiedSoldiers.length}`,
+    phase,
+    counts: {
+      russianTeam: russianTeam.length,
+      raidSquadMates: raidSquadMates.length,
+      raidFriendlyCombatants: raidFriendlyCombatants.length,
+      raidEnemies: raidEnemies.length,
+      renderedTownWarSoldiers: renderedTownWarSoldiers.length,
+      pendingReinforcements: pendingReinforcements.length,
+      frontlineIncidents: frontLineIncidents.length,
+      townWarRussianSoldiers: townWarCampA.length,
+      townWarUkrainianSoldiers: townWarCampB.length,
+      unifiedSoldiers: unifiedSoldiers.length
+    },
+    renderedScene: {
+      townWarSoldiers: renderedTownWarSoldiers.map((soldier) => ({
+        id: soldier?.id ?? null,
+        faction: soldier?.faction ?? null,
+        name: soldier?.name ?? null,
+        role: soldier?.role ?? null,
+        task: soldier?.task ?? null,
+        position: roundedPosition(
+          Number.isFinite(soldier?.x) && Number.isFinite(soldier?.y)
+            ? {
+                x: soldier.x,
+                y: soldier.y
+              }
+            : null
+        ),
+        source: "scene.townWarSoldierSprites"
+      })),
+      projectedSoldierSpriteIds: projectedSoldierSpriteIds.map((id) => String(id)),
+      playerCampArtObjects: runtimeReport?.report?.scene?.playerCampArtObjects ?? null,
+      playerCampArtVisible: runtimeReport?.report?.scene?.playerCampArtVisible ?? null
+    },
+    russianTeam,
+    sceneNpcs,
+    townWarNpcs,
+    unifiedSoldiers: unifiedSoldiers.map((soldier) => ({
+      id: soldier?.id ?? null,
+      soldierId: soldier?.soldierId ?? null,
+      faction: soldier?.faction ?? null,
+      name: soldier?.displayName ?? soldier?.id ?? null,
+      role: soldier?.role ?? null,
+      squadStatus: soldier?.squad?.status ?? null,
+      squadSlot: soldier?.squad?.squadSlot ?? null,
+      assignable: soldier?.squad?.assignable ?? null,
+      liveBodyKind: soldier?.runtime?.liveBodyKind ?? null,
+      liveBodyId: soldier?.runtime?.liveBodyId ?? null,
+      task: soldier?.colonist?.task?.kind ?? null,
+      taskLabel: soldier?.colonist?.task?.label ?? null,
+      weaponId: soldier?.combat?.weaponId ?? null,
+      ammo: soldier?.combat?.ammo
+        ? {
+            inMag: soldier.combat.ammo.inMag ?? null,
+            reserve: soldier.combat.ammo.reserve ?? null
+          }
+        : null,
+      position: roundedPosition(soldier?.runtime?.position ?? null)
+    }))
   };
 }
 
@@ -7568,6 +7788,7 @@ Commands:
   war-loot-ammo-crate --faction <camp-a|camp-b> (--id <crate-id> | --seed <camp-a|camp-b>) [--x <n> --y <n>] [--advance-seconds <n>]
   war-roster [--camp <camp-a|camp-b>]
   war-soldier --id <soldier-id>
+  npc-roster|npcs [--live-session]
   war-priority list [--camp <camp-a|camp-b>]
   war-priority set --soldier <id> --work <Build|Rescue|Resupply|Defend|Suppress|Rest> --priority <0-5>
   war-priority preset --soldier <id> --preset <builder|medic|quartermaster|suppressor|rifleman|scout|rest-cycle>
@@ -7588,7 +7809,7 @@ Commands:
   war-operation report
   war-skill-emergence-demo
   war-skill-debrief
-  war-order-trench --id <camp-a|camp-b> [--x <n> --y <n>] [--advance-seconds <n>]
+  war-order-trench --id <camp-a|camp-b> [--x <n> --y <n>] [--advance-seconds <n>] [--live-session]
   war-order-dugout --id <camp-a|camp-b> [--x <n> --y <n>] [--facing <radians>] [--advance-seconds <n>]
   war-order-ammo-crate --id <camp-a|camp-b> [--x <n> --y <n>] [--advance-seconds <n>]
   war-dugout-report
@@ -7636,6 +7857,7 @@ showcase --id <briefing|carried-storage|squad-roster|debrief|memorial-wall|dialo
 Options:
   --url <url>       Reuse an existing dev server instead of launching one.
   --timeout <ms>    Server startup timeout when auto-launching. Default: 15000.
+  --live-session    For supported commands, route the action or read into an already-open manual play tab on the same origin.
 
 The CLI talks to window.__topdownExtractionAgentApi in the running game, so it can inspect state,
 configure raids, stage critical runtime states, start runs, hold movement/fire input, queue interactions, direct individual-boy orders including brace-watch and move-watch, queue reusable tactical actions, and trigger showcase states including briefing, next-push-gear, memorial-wall, dialogue-aftermath, boys-command, grenade-pocket, boys-frag-runtime, suppression-runtime, covering-crossing, pinned-pressure, fireteam-audit, combat-audio, combat-presentation, hardcore-start, first-session-hook, route-identity-pass, must-clear-structure-pass, stash-consequence-pass, weapon-doctrine, field-capture, broker-cashout, chair-handoff, handgun-recovery, knife-extreme, final-stronghold, final-stronghold-launch, final-stronghold-setback, true-escape, endgame-amr, amr-counter-lane, hostile-lane-chatter, noise-discipline, drone-sweep, intel-alarm, war-beat-focus, body-recovery, persistent-body-return, caravan-trap, white-van-ambush, armored-drop, armored-evac, trench-assault, bunker-foothold, cellar-counterhold, shed-hide, civilian-window, hunter-search, wounded-soldier, blue-carried-fire, blue-carried-extract-success, blue-body-extract, surrender-window, field-coffee, burner-coffee, extract-clean, extract-collapse, extract-pressure, territory-claims, territory-retake, relay-counterpush, ambulance-counterhold, mortar-bracket, retake-peel, and room-clear-chain.
@@ -7759,6 +7981,64 @@ async function callAgent(page, method, payload) {
   }
 
   throw new Error(`Unable to call agent method "${method}" after repeated control-surface recovery attempts.`);
+}
+
+async function callLiveAgent(page, method, payload, timeoutMs = 8000) {
+  return page.evaluate(
+    async ({ basePath, agentMethod, agentPayload, responseTimeoutMs }) => {
+      const issueResponse = await fetch(`${basePath}/issue`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          method: agentMethod,
+          payload: agentPayload
+        })
+      });
+
+      const issue = await issueResponse.json();
+
+      if (!issueResponse.ok || !issue?.ok || typeof issue.requestId !== "string") {
+        throw new Error(issue?.error ?? `Unable to issue live-session command for ${agentMethod}.`);
+      }
+
+      const startedAt = Date.now();
+      while (Date.now() - startedAt < responseTimeoutMs) {
+        const resultResponse = await fetch(`${basePath}/result?requestId=${encodeURIComponent(issue.requestId)}`, {
+          cache: "no-store"
+        });
+        const result = await resultResponse.json();
+
+        if (!resultResponse.ok || !result?.ok) {
+          throw new Error(result?.error ?? `Unable to read live-session result for ${agentMethod}.`);
+        }
+
+        if (result.done) {
+          if (result.response?.ok) {
+            return result.response.result ?? null;
+          }
+
+          throw new Error(
+            result.response?.error ??
+              `Live game tab rejected ${agentMethod}. Open the game in a regular browser tab on the same dev URL and retry with --live-session.`
+          );
+        }
+
+        await new Promise((resolve) => window.setTimeout(resolve, 200));
+      }
+
+      throw new Error(
+        `Timed out waiting for a live game tab to handle ${agentMethod}. Open the game in a regular browser tab on the same dev URL and retry with --live-session.`
+      );
+    },
+    {
+      basePath: liveAgentBridgeBasePath,
+      agentMethod: method,
+      agentPayload: payload,
+      responseTimeoutMs: timeoutMs
+    }
+  );
 }
 
 async function run() {
@@ -8077,6 +8357,16 @@ async function run() {
       };
     }
 
+    if (command === "npc-roster" || command === "npcs") {
+      const timeoutMs = parseNumber(options.timeout, 15000);
+      const snapshot = options["live-session"] === true ? await callLiveAgent(page, "getSnapshot", undefined, timeoutMs) : await callAgent(page, "getSnapshot");
+      const runtimeReport =
+        options["live-session"] === true
+          ? await callLiveAgent(page, "getTownWarRuntimeReport", undefined, timeoutMs)
+          : await callAgent(page, "getTownWarRuntimeReport");
+      return buildNpcPresenceReport(snapshot, runtimeReport);
+    }
+
     if (command === "war-soldier") {
       if (typeof options.id !== "string") {
         throw new Error("war-soldier requires --id <soldier-id>.");
@@ -8376,11 +8666,21 @@ async function run() {
 
       const advanceSeconds = options["advance-seconds"] === undefined ? 0 : parseNumber(options["advance-seconds"], 0);
       const tickSeconds = options["tick-seconds"] === undefined ? 0.25 : parseNumber(options["tick-seconds"], 0.25);
+      const useLiveSession = options["live-session"] === true;
+      const timeoutMs = parseNumber(options.timeout, 15000);
+      if (!useLiveSession) {
+        await callAgent(page, "stageState", "town-war");
+      }
+      const result = useLiveSession
+        ? await callLiveAgent(page, "orderTownWarTrench", { campId, x, y }, timeoutMs)
+        : await callAgent(page, "orderTownWarTrench", { campId, x, y });
 
-      await callAgent(page, "stageState", "town-war");
-      const result = await callAgent(page, "orderTownWarTrench", { campId, x, y });
-
-      const reaction = advanceSeconds > 0 ? await callAgent(page, "advanceTownWar", { seconds: advanceSeconds, tickSeconds }) : null;
+      const reaction =
+        advanceSeconds > 0
+          ? useLiveSession
+            ? await callLiveAgent(page, "advanceTownWar", { seconds: advanceSeconds, tickSeconds }, timeoutMs)
+            : await callAgent(page, "advanceTownWar", { seconds: advanceSeconds, tickSeconds })
+          : null;
       const war = reaction?.war ?? result?.war ?? null;
 
       return { ...result, reaction, war, summary: reaction?.summary ?? result.summary, brief: buildTownWarBrief(war) };

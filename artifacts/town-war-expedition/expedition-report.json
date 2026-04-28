@@ -1,0 +1,1460 @@
+{
+  "orderOk": true,
+  "orderSummary": "Town war expedition: Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 stepped off from the Russian camp toward Probe the enemy approach. A named push group is now carrying the officer order across open ground.",
+  "retreatOk": true,
+  "before": {
+    "ok": true,
+    "reason": null,
+    "campId": "camp-a",
+    "activeExpeditions": [
+      {
+        "id": "town-war-expedition-1",
+        "faction": "camp-a",
+        "objective": "probe-enemy-approach",
+        "label": "Probe the enemy approach",
+        "status": "contact",
+        "origin": {
+          "x": 7836.320000000001,
+          "y": 3185
+        },
+        "objectivePosition": {
+          "x": 7356.320000000001,
+          "y": 3185
+        },
+        "rallyPosition": {
+          "x": 7836.320000000001,
+          "y": 3185
+        },
+        "assignedSoldierIds": [
+          "town-war-soldier-1",
+          "town-war-soldier-3",
+          "town-war-soldier-2",
+          "town-war-soldier-7",
+          "town-war-soldier-9"
+        ],
+        "roleBySoldierId": {
+          "town-war-soldier-1": "builder",
+          "town-war-soldier-3": "suppressor",
+          "town-war-soldier-2": "rifleman",
+          "town-war-soldier-7": "medic",
+          "town-war-soldier-9": "hauler"
+        },
+        "beats": [
+          {
+            "id": "town-war-expedition-beat-1",
+            "expeditionId": "town-war-expedition-1",
+            "kind": "ordered",
+            "atSeconds": 0,
+            "position": {
+              "x": 7836.320000000001,
+              "y": 3185
+            },
+            "soldierIds": [
+              "town-war-soldier-1",
+              "town-war-soldier-3",
+              "town-war-soldier-2",
+              "town-war-soldier-7",
+              "town-war-soldier-9"
+            ],
+            "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 stepped off from the Russian camp toward Probe the enemy approach.",
+            "consequence": "A named push group is now carrying the officer order across open ground.",
+            "scarTag": null
+          },
+          {
+            "id": "town-war-expedition-beat-2",
+            "expeditionId": "town-war-expedition-1",
+            "kind": "spotted",
+            "atSeconds": 1.5,
+            "position": {
+              "x": 7733.034652064285,
+              "y": 3192.4450843888926
+            },
+            "soldierIds": [
+              "town-war-soldier-1",
+              "town-war-soldier-3",
+              "town-war-soldier-2",
+              "town-war-soldier-7",
+              "town-war-soldier-9"
+            ],
+            "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 was spotted crossing the road toward Probe the enemy approach.",
+            "consequence": "The route is now remembered as exposed, so future pushes should use trenches or smoke-like cover.",
+            "scarTag": "road-crossing-hot"
+          },
+          {
+            "id": "town-war-expedition-beat-3",
+            "expeditionId": "town-war-expedition-1",
+            "kind": "pinned",
+            "atSeconds": 2.75,
+            "position": {
+              "x": 7643.401574408034,
+              "y": 3191.9064517121087
+            },
+            "soldierIds": [
+              "town-war-soldier-1",
+              "town-war-soldier-3",
+              "town-war-soldier-2",
+              "town-war-soldier-7",
+              "town-war-soldier-9"
+            ],
+            "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 got pinned near the road crossing and slowed the push.",
+            "consequence": "Suppression and ammo now decide whether the group keeps moving or breaks back.",
+            "scarTag": "road-crossing-hot"
+          },
+          {
+            "id": "town-war-expedition-beat-4",
+            "expeditionId": "town-war-expedition-1",
+            "kind": "separated",
+            "atSeconds": 3.75,
+            "position": {
+              "x": 7571.642480093205,
+              "y": 3190.7473142202107
+            },
+            "soldierIds": [
+              "town-war-soldier-1",
+              "town-war-soldier-3",
+              "town-war-soldier-2",
+              "town-war-soldier-7",
+              "town-war-soldier-9"
+            ],
+            "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 stretched apart in the tree line while trying to keep formation.",
+            "consequence": "The group is readable, but scattered soldiers are easier to isolate.",
+            "scarTag": "tree-line-split"
+          },
+          {
+            "id": "town-war-expedition-beat-5",
+            "expeditionId": "town-war-expedition-1",
+            "kind": "low-ammo",
+            "atSeconds": 4,
+            "position": {
+              "x": 7553.663232372128,
+              "y": 3189.9113563343826
+            },
+            "soldierIds": [
+              "town-war-soldier-1",
+              "town-war-soldier-3",
+              "town-war-soldier-2",
+              "town-war-soldier-7",
+              "town-war-soldier-9"
+            ],
+            "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 reported low ammo before the objective was secure.",
+            "consequence": "Haulers and forward ammo crates now matter to the push.",
+            "scarTag": null
+          },
+          {
+            "id": "town-war-expedition-beat-6",
+            "expeditionId": "town-war-expedition-1",
+            "kind": "wounded",
+            "atSeconds": 4.5,
+            "position": {
+              "x": 7517.704736929972,
+              "y": 3188.239440562726
+            },
+            "soldierIds": [
+              "town-war-soldier-1",
+              "town-war-soldier-3",
+              "town-war-soldier-2",
+              "town-war-soldier-7",
+              "town-war-soldier-9"
+            ],
+            "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 took a wound on the route and the medic had to keep moving.",
+            "consequence": "The expedition stayed alive, but the next push starts with a body-cost memory.",
+            "scarTag": null
+          }
+        ],
+        "triggeredBeatKinds": [
+          "ordered",
+          "spotted",
+          "pinned",
+          "separated",
+          "low-ammo",
+          "wounded"
+        ],
+        "danger": 0.66,
+        "pressure": 0.06,
+        "progress": 0.7387025487657908,
+        "retreatRequested": false,
+        "createdAtSeconds": 0,
+        "lastUpdatedAtSeconds": 5,
+        "completedAtSeconds": null,
+        "readable": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 took a wound on the route and the medic had to keep moving. The expedition stayed alive, but the next push starts with a body-cost memory."
+      }
+    ],
+    "latestExpedition": {
+      "id": "town-war-expedition-1",
+      "faction": "camp-a",
+      "objective": "probe-enemy-approach",
+      "label": "Probe the enemy approach",
+      "status": "contact",
+      "origin": {
+        "x": 7836.320000000001,
+        "y": 3185
+      },
+      "objectivePosition": {
+        "x": 7356.320000000001,
+        "y": 3185
+      },
+      "rallyPosition": {
+        "x": 7836.320000000001,
+        "y": 3185
+      },
+      "assignedSoldierIds": [
+        "town-war-soldier-1",
+        "town-war-soldier-3",
+        "town-war-soldier-2",
+        "town-war-soldier-7",
+        "town-war-soldier-9"
+      ],
+      "roleBySoldierId": {
+        "town-war-soldier-1": "builder",
+        "town-war-soldier-3": "suppressor",
+        "town-war-soldier-2": "rifleman",
+        "town-war-soldier-7": "medic",
+        "town-war-soldier-9": "hauler"
+      },
+      "beats": [
+        {
+          "id": "town-war-expedition-beat-1",
+          "expeditionId": "town-war-expedition-1",
+          "kind": "ordered",
+          "atSeconds": 0,
+          "position": {
+            "x": 7836.320000000001,
+            "y": 3185
+          },
+          "soldierIds": [
+            "town-war-soldier-1",
+            "town-war-soldier-3",
+            "town-war-soldier-2",
+            "town-war-soldier-7",
+            "town-war-soldier-9"
+          ],
+          "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 stepped off from the Russian camp toward Probe the enemy approach.",
+          "consequence": "A named push group is now carrying the officer order across open ground.",
+          "scarTag": null
+        },
+        {
+          "id": "town-war-expedition-beat-2",
+          "expeditionId": "town-war-expedition-1",
+          "kind": "spotted",
+          "atSeconds": 1.5,
+          "position": {
+            "x": 7733.034652064285,
+            "y": 3192.4450843888926
+          },
+          "soldierIds": [
+            "town-war-soldier-1",
+            "town-war-soldier-3",
+            "town-war-soldier-2",
+            "town-war-soldier-7",
+            "town-war-soldier-9"
+          ],
+          "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 was spotted crossing the road toward Probe the enemy approach.",
+          "consequence": "The route is now remembered as exposed, so future pushes should use trenches or smoke-like cover.",
+          "scarTag": "road-crossing-hot"
+        },
+        {
+          "id": "town-war-expedition-beat-3",
+          "expeditionId": "town-war-expedition-1",
+          "kind": "pinned",
+          "atSeconds": 2.75,
+          "position": {
+            "x": 7643.401574408034,
+            "y": 3191.9064517121087
+          },
+          "soldierIds": [
+            "town-war-soldier-1",
+            "town-war-soldier-3",
+            "town-war-soldier-2",
+            "town-war-soldier-7",
+            "town-war-soldier-9"
+          ],
+          "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 got pinned near the road crossing and slowed the push.",
+          "consequence": "Suppression and ammo now decide whether the group keeps moving or breaks back.",
+          "scarTag": "road-crossing-hot"
+        },
+        {
+          "id": "town-war-expedition-beat-4",
+          "expeditionId": "town-war-expedition-1",
+          "kind": "separated",
+          "atSeconds": 3.75,
+          "position": {
+            "x": 7571.642480093205,
+            "y": 3190.7473142202107
+          },
+          "soldierIds": [
+            "town-war-soldier-1",
+            "town-war-soldier-3",
+            "town-war-soldier-2",
+            "town-war-soldier-7",
+            "town-war-soldier-9"
+          ],
+          "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 stretched apart in the tree line while trying to keep formation.",
+          "consequence": "The group is readable, but scattered soldiers are easier to isolate.",
+          "scarTag": "tree-line-split"
+        },
+        {
+          "id": "town-war-expedition-beat-5",
+          "expeditionId": "town-war-expedition-1",
+          "kind": "low-ammo",
+          "atSeconds": 4,
+          "position": {
+            "x": 7553.663232372128,
+            "y": 3189.9113563343826
+          },
+          "soldierIds": [
+            "town-war-soldier-1",
+            "town-war-soldier-3",
+            "town-war-soldier-2",
+            "town-war-soldier-7",
+            "town-war-soldier-9"
+          ],
+          "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 reported low ammo before the objective was secure.",
+          "consequence": "Haulers and forward ammo crates now matter to the push.",
+          "scarTag": null
+        },
+        {
+          "id": "town-war-expedition-beat-6",
+          "expeditionId": "town-war-expedition-1",
+          "kind": "wounded",
+          "atSeconds": 4.5,
+          "position": {
+            "x": 7517.704736929972,
+            "y": 3188.239440562726
+          },
+          "soldierIds": [
+            "town-war-soldier-1",
+            "town-war-soldier-3",
+            "town-war-soldier-2",
+            "town-war-soldier-7",
+            "town-war-soldier-9"
+          ],
+          "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 took a wound on the route and the medic had to keep moving.",
+          "consequence": "The expedition stayed alive, but the next push starts with a body-cost memory.",
+          "scarTag": null
+        }
+      ],
+      "triggeredBeatKinds": [
+        "ordered",
+        "spotted",
+        "pinned",
+        "separated",
+        "low-ammo",
+        "wounded"
+      ],
+      "danger": 0.66,
+      "pressure": 0.06,
+      "progress": 0.7387025487657908,
+      "retreatRequested": false,
+      "createdAtSeconds": 0,
+      "lastUpdatedAtSeconds": 5,
+      "completedAtSeconds": null,
+      "readable": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 took a wound on the route and the medic had to keep moving. The expedition stayed alive, but the next push starts with a body-cost memory."
+    },
+    "routeScars": [
+      {
+        "id": "grid-150-64",
+        "label": "casualty bend",
+        "kind": "body",
+        "position": {
+          "x": 7517.704736929972,
+          "y": 3188.239440562726
+        },
+        "tags": [
+          "route-wounded-here",
+          "expedition",
+          "wounded",
+          "probe-enemy-approach",
+          "contact"
+        ],
+        "createdByEventId": "town-war-drama-6",
+        "subjectNames": [
+          "Vira Rus-1",
+          "camp-a"
+        ],
+        "orderId": "town-war-expedition-1",
+        "controlSide": "camp-a",
+        "emotionalWeight": 0.74,
+        "timesReferenced": 0,
+        "createdAtSeconds": 4.5,
+        "lastChangedAt": 4.5
+      },
+      {
+        "id": "grid-151-64",
+        "label": "tree line gap",
+        "kind": "road",
+        "position": {
+          "x": 7571.642480093205,
+          "y": 3190.7473142202107
+        },
+        "tags": [
+          "tree-line-split",
+          "expedition",
+          "separated",
+          "probe-enemy-approach",
+          "contact"
+        ],
+        "createdByEventId": "town-war-drama-4",
+        "subjectNames": [
+          "Vira Rus-1",
+          "camp-a"
+        ],
+        "orderId": "town-war-expedition-1",
+        "controlSide": "camp-a",
+        "emotionalWeight": 0.58,
+        "timesReferenced": 0,
+        "createdAtSeconds": 3.75,
+        "lastChangedAt": 3.75
+      },
+      {
+        "id": "grid-153-64",
+        "label": "hot road crossing",
+        "kind": "road",
+        "position": {
+          "x": 7643.401574408034,
+          "y": 3191.9064517121087
+        },
+        "tags": [
+          "road-crossing-hot",
+          "expedition",
+          "pinned",
+          "probe-enemy-approach",
+          "contact"
+        ],
+        "createdByEventId": "town-war-drama-3",
+        "subjectNames": [
+          "Vira Rus-1",
+          "camp-a"
+        ],
+        "orderId": "town-war-expedition-1",
+        "controlSide": "camp-a",
+        "emotionalWeight": 0.72,
+        "timesReferenced": 0,
+        "createdAtSeconds": 2.75,
+        "lastChangedAt": 2.75
+      },
+      {
+        "id": "grid-155-64",
+        "label": "road crossing",
+        "kind": "road",
+        "position": {
+          "x": 7733.034652064285,
+          "y": 3192.4450843888926
+        },
+        "tags": [
+          "road-crossing-hot",
+          "expedition",
+          "spotted",
+          "probe-enemy-approach",
+          "moving"
+        ],
+        "createdByEventId": "town-war-drama-2",
+        "subjectNames": [
+          "Vira Rus-1",
+          "camp-a"
+        ],
+        "orderId": "town-war-expedition-1",
+        "controlSide": "camp-a",
+        "emotionalWeight": 0.5,
+        "timesReferenced": 0,
+        "createdAtSeconds": 1.5,
+        "lastChangedAt": 1.5
+      }
+    ],
+    "routeEvents": [
+      {
+        "id": "town-war-drama-6",
+        "atSeconds": 4.5,
+        "kind": "expedition-wounded",
+        "faction": "camp-a",
+        "campId": "camp-a",
+        "orderId": "town-war-expedition-1",
+        "orderKind": null,
+        "soldierId": "town-war-soldier-1",
+        "ammoCrateId": null,
+        "locationLabel": "casualty bend",
+        "riskTier": "high",
+        "intensity": "high",
+        "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 took a wound on the route and the medic had to keep moving.",
+        "tags": [
+          "expedition",
+          "wounded",
+          "probe-enemy-approach",
+          "contact"
+        ],
+        "speaker": "Vira Rus-1",
+        "channel": "Russian Squad Net",
+        "text": "Lev Rus-10, Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 took a wound on the route and the medic had to keep moving.",
+        "referencedMemoryTag": null
+      },
+      {
+        "id": "town-war-drama-5",
+        "atSeconds": 4,
+        "kind": "expedition-low-ammo",
+        "faction": "camp-a",
+        "campId": "camp-a",
+        "orderId": "town-war-expedition-1",
+        "orderKind": null,
+        "soldierId": "town-war-soldier-1",
+        "ammoCrateId": null,
+        "locationLabel": "forward ammo check",
+        "riskTier": "high",
+        "intensity": "high",
+        "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 reported low ammo before the objective was secure.",
+        "tags": [
+          "expedition",
+          "low-ammo",
+          "probe-enemy-approach",
+          "contact"
+        ],
+        "speaker": "Vira Rus-1",
+        "channel": "Russian Squad Net",
+        "text": "Lev Rus-10, Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 reported low ammo before the objective was secure.",
+        "referencedMemoryTag": null
+      },
+      {
+        "id": "town-war-drama-4",
+        "atSeconds": 3.75,
+        "kind": "expedition-separated",
+        "faction": "camp-a",
+        "campId": "camp-a",
+        "orderId": "town-war-expedition-1",
+        "orderKind": null,
+        "soldierId": "town-war-soldier-1",
+        "ammoCrateId": null,
+        "locationLabel": "tree line gap",
+        "riskTier": "high",
+        "intensity": "high",
+        "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 stretched apart in the tree line while trying to keep formation.",
+        "tags": [
+          "expedition",
+          "separated",
+          "probe-enemy-approach",
+          "tree-line-split",
+          "contact"
+        ],
+        "speaker": "Vira Rus-1",
+        "channel": "Russian Squad Net",
+        "text": "Lev Rus-10, Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 stretched apart in the tree line while trying to keep formation.",
+        "referencedMemoryTag": null
+      },
+      {
+        "id": "town-war-drama-3",
+        "atSeconds": 2.75,
+        "kind": "expedition-pinned",
+        "faction": "camp-a",
+        "campId": "camp-a",
+        "orderId": "town-war-expedition-1",
+        "orderKind": null,
+        "soldierId": "town-war-soldier-1",
+        "ammoCrateId": null,
+        "locationLabel": "hot road crossing",
+        "riskTier": "medium",
+        "intensity": "high",
+        "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 got pinned near the road crossing and slowed the push.",
+        "tags": [
+          "expedition",
+          "pinned",
+          "probe-enemy-approach",
+          "road-crossing-hot",
+          "contact"
+        ],
+        "speaker": "Vira Rus-1",
+        "channel": "Russian Squad Net",
+        "text": "Lev Rus-10, Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 got pinned near the road crossing and slowed the push.",
+        "referencedMemoryTag": null
+      },
+      {
+        "id": "town-war-drama-2",
+        "atSeconds": 1.5,
+        "kind": "expedition-spotted",
+        "faction": "camp-a",
+        "campId": "camp-a",
+        "orderId": "town-war-expedition-1",
+        "orderKind": null,
+        "soldierId": "town-war-soldier-1",
+        "ammoCrateId": null,
+        "locationLabel": "road crossing",
+        "riskTier": "low",
+        "intensity": "medium",
+        "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 was spotted crossing the road toward Probe the enemy approach.",
+        "tags": [
+          "expedition",
+          "spotted",
+          "probe-enemy-approach",
+          "road-crossing-hot",
+          "moving"
+        ],
+        "speaker": "Vira Rus-1",
+        "channel": "Russian Squad Net",
+        "text": "Lev Rus-10, Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 was spotted crossing the road toward Probe the enemy approach.",
+        "referencedMemoryTag": null
+      },
+      {
+        "id": "town-war-drama-1",
+        "atSeconds": 0,
+        "kind": "expedition-ordered",
+        "faction": "camp-a",
+        "campId": "camp-a",
+        "orderId": "town-war-expedition-1",
+        "orderKind": null,
+        "soldierId": "town-war-soldier-1",
+        "ammoCrateId": null,
+        "locationLabel": "Russian camp push line",
+        "riskTier": "low",
+        "intensity": "low",
+        "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 stepped off from the Russian camp toward Probe the enemy approach.",
+        "tags": [
+          "expedition",
+          "ordered",
+          "probe-enemy-approach",
+          "moving"
+        ],
+        "speaker": "Vira Rus-1",
+        "channel": "Russian Squad Net",
+        "text": "Lev Rus-10, Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 stepped off from the Russian camp toward Probe the enemy approach.",
+        "referencedMemoryTag": null
+      }
+    ],
+    "readable": "town-war-expedition-1 contact: 74% Probe the enemy approach; ordered > spotted > pinned > separated > low-ammo > wounded"
+  },
+  "after": {
+    "ok": true,
+    "reason": null,
+    "campId": "camp-a",
+    "activeExpeditions": [
+      {
+        "id": "town-war-expedition-1",
+        "faction": "camp-a",
+        "objective": "probe-enemy-approach",
+        "label": "Probe the enemy approach",
+        "status": "retreating",
+        "origin": {
+          "x": 7836.320000000001,
+          "y": 3185
+        },
+        "objectivePosition": {
+          "x": 7356.320000000001,
+          "y": 3185
+        },
+        "rallyPosition": {
+          "x": 7836.320000000001,
+          "y": 3185
+        },
+        "assignedSoldierIds": [
+          "town-war-soldier-1",
+          "town-war-soldier-3",
+          "town-war-soldier-2",
+          "town-war-soldier-7",
+          "town-war-soldier-9"
+        ],
+        "roleBySoldierId": {
+          "town-war-soldier-1": "builder",
+          "town-war-soldier-3": "suppressor",
+          "town-war-soldier-2": "rifleman",
+          "town-war-soldier-7": "medic",
+          "town-war-soldier-9": "hauler"
+        },
+        "beats": [
+          {
+            "id": "town-war-expedition-beat-1",
+            "expeditionId": "town-war-expedition-1",
+            "kind": "ordered",
+            "atSeconds": 0,
+            "position": {
+              "x": 7836.320000000001,
+              "y": 3185
+            },
+            "soldierIds": [
+              "town-war-soldier-1",
+              "town-war-soldier-3",
+              "town-war-soldier-2",
+              "town-war-soldier-7",
+              "town-war-soldier-9"
+            ],
+            "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 stepped off from the Russian camp toward Probe the enemy approach.",
+            "consequence": "A named push group is now carrying the officer order across open ground.",
+            "scarTag": null
+          },
+          {
+            "id": "town-war-expedition-beat-2",
+            "expeditionId": "town-war-expedition-1",
+            "kind": "spotted",
+            "atSeconds": 1.5,
+            "position": {
+              "x": 7733.034652064285,
+              "y": 3192.4450843888926
+            },
+            "soldierIds": [
+              "town-war-soldier-1",
+              "town-war-soldier-3",
+              "town-war-soldier-2",
+              "town-war-soldier-7",
+              "town-war-soldier-9"
+            ],
+            "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 was spotted crossing the road toward Probe the enemy approach.",
+            "consequence": "The route is now remembered as exposed, so future pushes should use trenches or smoke-like cover.",
+            "scarTag": "road-crossing-hot"
+          },
+          {
+            "id": "town-war-expedition-beat-3",
+            "expeditionId": "town-war-expedition-1",
+            "kind": "pinned",
+            "atSeconds": 2.75,
+            "position": {
+              "x": 7643.401574408034,
+              "y": 3191.9064517121087
+            },
+            "soldierIds": [
+              "town-war-soldier-1",
+              "town-war-soldier-3",
+              "town-war-soldier-2",
+              "town-war-soldier-7",
+              "town-war-soldier-9"
+            ],
+            "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 got pinned near the road crossing and slowed the push.",
+            "consequence": "Suppression and ammo now decide whether the group keeps moving or breaks back.",
+            "scarTag": "road-crossing-hot"
+          },
+          {
+            "id": "town-war-expedition-beat-4",
+            "expeditionId": "town-war-expedition-1",
+            "kind": "separated",
+            "atSeconds": 3.75,
+            "position": {
+              "x": 7571.642480093205,
+              "y": 3190.7473142202107
+            },
+            "soldierIds": [
+              "town-war-soldier-1",
+              "town-war-soldier-3",
+              "town-war-soldier-2",
+              "town-war-soldier-7",
+              "town-war-soldier-9"
+            ],
+            "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 stretched apart in the tree line while trying to keep formation.",
+            "consequence": "The group is readable, but scattered soldiers are easier to isolate.",
+            "scarTag": "tree-line-split"
+          },
+          {
+            "id": "town-war-expedition-beat-5",
+            "expeditionId": "town-war-expedition-1",
+            "kind": "low-ammo",
+            "atSeconds": 4,
+            "position": {
+              "x": 7553.663232372128,
+              "y": 3189.9113563343826
+            },
+            "soldierIds": [
+              "town-war-soldier-1",
+              "town-war-soldier-3",
+              "town-war-soldier-2",
+              "town-war-soldier-7",
+              "town-war-soldier-9"
+            ],
+            "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 reported low ammo before the objective was secure.",
+            "consequence": "Haulers and forward ammo crates now matter to the push.",
+            "scarTag": null
+          },
+          {
+            "id": "town-war-expedition-beat-6",
+            "expeditionId": "town-war-expedition-1",
+            "kind": "wounded",
+            "atSeconds": 4.5,
+            "position": {
+              "x": 7517.704736929972,
+              "y": 3188.239440562726
+            },
+            "soldierIds": [
+              "town-war-soldier-1",
+              "town-war-soldier-3",
+              "town-war-soldier-2",
+              "town-war-soldier-7",
+              "town-war-soldier-9"
+            ],
+            "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 took a wound on the route and the medic had to keep moving.",
+            "consequence": "The expedition stayed alive, but the next push starts with a body-cost memory.",
+            "scarTag": null
+          },
+          {
+            "id": "town-war-expedition-beat-7",
+            "expeditionId": "town-war-expedition-1",
+            "kind": "retreating",
+            "atSeconds": 5,
+            "position": {
+              "x": 7481.746241487815,
+              "y": 3186.5675247910685
+            },
+            "soldierIds": [
+              "town-war-soldier-1",
+              "town-war-soldier-3",
+              "town-war-soldier-2",
+              "town-war-soldier-7",
+              "town-war-soldier-9"
+            ],
+            "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 broke contact and started falling back to the Russian camp.",
+            "consequence": "The route scar remains, but the soldiers are trying to preserve the section.",
+            "scarTag": "fallback-route-marked"
+          }
+        ],
+        "triggeredBeatKinds": [
+          "ordered",
+          "spotted",
+          "pinned",
+          "separated",
+          "low-ammo",
+          "wounded",
+          "retreating"
+        ],
+        "danger": 0.72,
+        "pressure": 0.02,
+        "progress": 0.9635507022446419,
+        "retreatRequested": true,
+        "createdAtSeconds": 0,
+        "lastUpdatedAtSeconds": 7,
+        "completedAtSeconds": null,
+        "readable": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 broke contact and started falling back to the Russian camp. The route scar remains, but the soldiers are trying to preserve the section."
+      }
+    ],
+    "latestExpedition": {
+      "id": "town-war-expedition-1",
+      "faction": "camp-a",
+      "objective": "probe-enemy-approach",
+      "label": "Probe the enemy approach",
+      "status": "retreating",
+      "origin": {
+        "x": 7836.320000000001,
+        "y": 3185
+      },
+      "objectivePosition": {
+        "x": 7356.320000000001,
+        "y": 3185
+      },
+      "rallyPosition": {
+        "x": 7836.320000000001,
+        "y": 3185
+      },
+      "assignedSoldierIds": [
+        "town-war-soldier-1",
+        "town-war-soldier-3",
+        "town-war-soldier-2",
+        "town-war-soldier-7",
+        "town-war-soldier-9"
+      ],
+      "roleBySoldierId": {
+        "town-war-soldier-1": "builder",
+        "town-war-soldier-3": "suppressor",
+        "town-war-soldier-2": "rifleman",
+        "town-war-soldier-7": "medic",
+        "town-war-soldier-9": "hauler"
+      },
+      "beats": [
+        {
+          "id": "town-war-expedition-beat-1",
+          "expeditionId": "town-war-expedition-1",
+          "kind": "ordered",
+          "atSeconds": 0,
+          "position": {
+            "x": 7836.320000000001,
+            "y": 3185
+          },
+          "soldierIds": [
+            "town-war-soldier-1",
+            "town-war-soldier-3",
+            "town-war-soldier-2",
+            "town-war-soldier-7",
+            "town-war-soldier-9"
+          ],
+          "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 stepped off from the Russian camp toward Probe the enemy approach.",
+          "consequence": "A named push group is now carrying the officer order across open ground.",
+          "scarTag": null
+        },
+        {
+          "id": "town-war-expedition-beat-2",
+          "expeditionId": "town-war-expedition-1",
+          "kind": "spotted",
+          "atSeconds": 1.5,
+          "position": {
+            "x": 7733.034652064285,
+            "y": 3192.4450843888926
+          },
+          "soldierIds": [
+            "town-war-soldier-1",
+            "town-war-soldier-3",
+            "town-war-soldier-2",
+            "town-war-soldier-7",
+            "town-war-soldier-9"
+          ],
+          "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 was spotted crossing the road toward Probe the enemy approach.",
+          "consequence": "The route is now remembered as exposed, so future pushes should use trenches or smoke-like cover.",
+          "scarTag": "road-crossing-hot"
+        },
+        {
+          "id": "town-war-expedition-beat-3",
+          "expeditionId": "town-war-expedition-1",
+          "kind": "pinned",
+          "atSeconds": 2.75,
+          "position": {
+            "x": 7643.401574408034,
+            "y": 3191.9064517121087
+          },
+          "soldierIds": [
+            "town-war-soldier-1",
+            "town-war-soldier-3",
+            "town-war-soldier-2",
+            "town-war-soldier-7",
+            "town-war-soldier-9"
+          ],
+          "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 got pinned near the road crossing and slowed the push.",
+          "consequence": "Suppression and ammo now decide whether the group keeps moving or breaks back.",
+          "scarTag": "road-crossing-hot"
+        },
+        {
+          "id": "town-war-expedition-beat-4",
+          "expeditionId": "town-war-expedition-1",
+          "kind": "separated",
+          "atSeconds": 3.75,
+          "position": {
+            "x": 7571.642480093205,
+            "y": 3190.7473142202107
+          },
+          "soldierIds": [
+            "town-war-soldier-1",
+            "town-war-soldier-3",
+            "town-war-soldier-2",
+            "town-war-soldier-7",
+            "town-war-soldier-9"
+          ],
+          "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 stretched apart in the tree line while trying to keep formation.",
+          "consequence": "The group is readable, but scattered soldiers are easier to isolate.",
+          "scarTag": "tree-line-split"
+        },
+        {
+          "id": "town-war-expedition-beat-5",
+          "expeditionId": "town-war-expedition-1",
+          "kind": "low-ammo",
+          "atSeconds": 4,
+          "position": {
+            "x": 7553.663232372128,
+            "y": 3189.9113563343826
+          },
+          "soldierIds": [
+            "town-war-soldier-1",
+            "town-war-soldier-3",
+            "town-war-soldier-2",
+            "town-war-soldier-7",
+            "town-war-soldier-9"
+          ],
+          "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 reported low ammo before the objective was secure.",
+          "consequence": "Haulers and forward ammo crates now matter to the push.",
+          "scarTag": null
+        },
+        {
+          "id": "town-war-expedition-beat-6",
+          "expeditionId": "town-war-expedition-1",
+          "kind": "wounded",
+          "atSeconds": 4.5,
+          "position": {
+            "x": 7517.704736929972,
+            "y": 3188.239440562726
+          },
+          "soldierIds": [
+            "town-war-soldier-1",
+            "town-war-soldier-3",
+            "town-war-soldier-2",
+            "town-war-soldier-7",
+            "town-war-soldier-9"
+          ],
+          "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 took a wound on the route and the medic had to keep moving.",
+          "consequence": "The expedition stayed alive, but the next push starts with a body-cost memory.",
+          "scarTag": null
+        },
+        {
+          "id": "town-war-expedition-beat-7",
+          "expeditionId": "town-war-expedition-1",
+          "kind": "retreating",
+          "atSeconds": 5,
+          "position": {
+            "x": 7481.746241487815,
+            "y": 3186.5675247910685
+          },
+          "soldierIds": [
+            "town-war-soldier-1",
+            "town-war-soldier-3",
+            "town-war-soldier-2",
+            "town-war-soldier-7",
+            "town-war-soldier-9"
+          ],
+          "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 broke contact and started falling back to the Russian camp.",
+          "consequence": "The route scar remains, but the soldiers are trying to preserve the section.",
+          "scarTag": "fallback-route-marked"
+        }
+      ],
+      "triggeredBeatKinds": [
+        "ordered",
+        "spotted",
+        "pinned",
+        "separated",
+        "low-ammo",
+        "wounded",
+        "retreating"
+      ],
+      "danger": 0.72,
+      "pressure": 0.02,
+      "progress": 0.9635507022446419,
+      "retreatRequested": true,
+      "createdAtSeconds": 0,
+      "lastUpdatedAtSeconds": 7,
+      "completedAtSeconds": null,
+      "readable": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 broke contact and started falling back to the Russian camp. The route scar remains, but the soldiers are trying to preserve the section."
+    },
+    "routeScars": [
+      {
+        "id": "grid-150-64",
+        "label": "casualty bend",
+        "kind": "body",
+        "position": {
+          "x": 7517.704736929972,
+          "y": 3188.239440562726
+        },
+        "tags": [
+          "fallback-route-marked",
+          "expedition",
+          "retreating",
+          "probe-enemy-approach",
+          "route-wounded-here",
+          "wounded",
+          "contact"
+        ],
+        "createdByEventId": "town-war-drama-6",
+        "subjectNames": [
+          "Vira Rus-1",
+          "camp-a"
+        ],
+        "orderId": "town-war-expedition-1",
+        "controlSide": "camp-a",
+        "emotionalWeight": 0.74,
+        "timesReferenced": 0,
+        "createdAtSeconds": 4.5,
+        "lastChangedAt": 5
+      },
+      {
+        "id": "grid-151-64",
+        "label": "tree line gap",
+        "kind": "road",
+        "position": {
+          "x": 7571.642480093205,
+          "y": 3190.7473142202107
+        },
+        "tags": [
+          "tree-line-split",
+          "expedition",
+          "separated",
+          "probe-enemy-approach",
+          "contact"
+        ],
+        "createdByEventId": "town-war-drama-4",
+        "subjectNames": [
+          "Vira Rus-1",
+          "camp-a"
+        ],
+        "orderId": "town-war-expedition-1",
+        "controlSide": "camp-a",
+        "emotionalWeight": 0.58,
+        "timesReferenced": 0,
+        "createdAtSeconds": 3.75,
+        "lastChangedAt": 3.75
+      },
+      {
+        "id": "grid-153-64",
+        "label": "hot road crossing",
+        "kind": "road",
+        "position": {
+          "x": 7643.401574408034,
+          "y": 3191.9064517121087
+        },
+        "tags": [
+          "road-crossing-hot",
+          "expedition",
+          "pinned",
+          "probe-enemy-approach",
+          "contact"
+        ],
+        "createdByEventId": "town-war-drama-3",
+        "subjectNames": [
+          "Vira Rus-1",
+          "camp-a"
+        ],
+        "orderId": "town-war-expedition-1",
+        "controlSide": "camp-a",
+        "emotionalWeight": 0.72,
+        "timesReferenced": 0,
+        "createdAtSeconds": 2.75,
+        "lastChangedAt": 2.75
+      },
+      {
+        "id": "grid-155-64",
+        "label": "road crossing",
+        "kind": "road",
+        "position": {
+          "x": 7733.034652064285,
+          "y": 3192.4450843888926
+        },
+        "tags": [
+          "road-crossing-hot",
+          "expedition",
+          "spotted",
+          "probe-enemy-approach",
+          "moving"
+        ],
+        "createdByEventId": "town-war-drama-2",
+        "subjectNames": [
+          "Vira Rus-1",
+          "camp-a"
+        ],
+        "orderId": "town-war-expedition-1",
+        "controlSide": "camp-a",
+        "emotionalWeight": 0.5,
+        "timesReferenced": 0,
+        "createdAtSeconds": 1.5,
+        "lastChangedAt": 1.5
+      }
+    ],
+    "routeEvents": [
+      {
+        "id": "town-war-drama-7",
+        "atSeconds": 5,
+        "kind": "expedition-retreating",
+        "faction": "camp-a",
+        "campId": "camp-a",
+        "orderId": "town-war-expedition-1",
+        "orderKind": null,
+        "soldierId": "town-war-soldier-1",
+        "ammoCrateId": null,
+        "locationLabel": "fallback route",
+        "riskTier": "high",
+        "intensity": "high",
+        "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 broke contact and started falling back to the Russian camp.",
+        "tags": [
+          "expedition",
+          "retreating",
+          "probe-enemy-approach",
+          "fallback-route-marked"
+        ],
+        "speaker": "Vira Rus-1",
+        "channel": "Russian Squad Net",
+        "text": "Taran Rus-7, Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 broke contact and started falling back to the Russian camp.",
+        "referencedMemoryTag": null
+      },
+      {
+        "id": "town-war-drama-6",
+        "atSeconds": 4.5,
+        "kind": "expedition-wounded",
+        "faction": "camp-a",
+        "campId": "camp-a",
+        "orderId": "town-war-expedition-1",
+        "orderKind": null,
+        "soldierId": "town-war-soldier-1",
+        "ammoCrateId": null,
+        "locationLabel": "casualty bend",
+        "riskTier": "high",
+        "intensity": "high",
+        "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 took a wound on the route and the medic had to keep moving.",
+        "tags": [
+          "expedition",
+          "wounded",
+          "probe-enemy-approach",
+          "contact"
+        ],
+        "speaker": "Vira Rus-1",
+        "channel": "Russian Squad Net",
+        "text": "Lev Rus-10, Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 took a wound on the route and the medic had to keep moving.",
+        "referencedMemoryTag": null
+      },
+      {
+        "id": "town-war-drama-5",
+        "atSeconds": 4,
+        "kind": "expedition-low-ammo",
+        "faction": "camp-a",
+        "campId": "camp-a",
+        "orderId": "town-war-expedition-1",
+        "orderKind": null,
+        "soldierId": "town-war-soldier-1",
+        "ammoCrateId": null,
+        "locationLabel": "forward ammo check",
+        "riskTier": "high",
+        "intensity": "high",
+        "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 reported low ammo before the objective was secure.",
+        "tags": [
+          "expedition",
+          "low-ammo",
+          "probe-enemy-approach",
+          "contact"
+        ],
+        "speaker": "Vira Rus-1",
+        "channel": "Russian Squad Net",
+        "text": "Lev Rus-10, Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 reported low ammo before the objective was secure.",
+        "referencedMemoryTag": null
+      },
+      {
+        "id": "town-war-drama-4",
+        "atSeconds": 3.75,
+        "kind": "expedition-separated",
+        "faction": "camp-a",
+        "campId": "camp-a",
+        "orderId": "town-war-expedition-1",
+        "orderKind": null,
+        "soldierId": "town-war-soldier-1",
+        "ammoCrateId": null,
+        "locationLabel": "tree line gap",
+        "riskTier": "high",
+        "intensity": "high",
+        "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 stretched apart in the tree line while trying to keep formation.",
+        "tags": [
+          "expedition",
+          "separated",
+          "probe-enemy-approach",
+          "tree-line-split",
+          "contact"
+        ],
+        "speaker": "Vira Rus-1",
+        "channel": "Russian Squad Net",
+        "text": "Lev Rus-10, Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 stretched apart in the tree line while trying to keep formation.",
+        "referencedMemoryTag": null
+      },
+      {
+        "id": "town-war-drama-3",
+        "atSeconds": 2.75,
+        "kind": "expedition-pinned",
+        "faction": "camp-a",
+        "campId": "camp-a",
+        "orderId": "town-war-expedition-1",
+        "orderKind": null,
+        "soldierId": "town-war-soldier-1",
+        "ammoCrateId": null,
+        "locationLabel": "hot road crossing",
+        "riskTier": "medium",
+        "intensity": "high",
+        "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 got pinned near the road crossing and slowed the push.",
+        "tags": [
+          "expedition",
+          "pinned",
+          "probe-enemy-approach",
+          "road-crossing-hot",
+          "contact"
+        ],
+        "speaker": "Vira Rus-1",
+        "channel": "Russian Squad Net",
+        "text": "Lev Rus-10, Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 got pinned near the road crossing and slowed the push.",
+        "referencedMemoryTag": null
+      },
+      {
+        "id": "town-war-drama-2",
+        "atSeconds": 1.5,
+        "kind": "expedition-spotted",
+        "faction": "camp-a",
+        "campId": "camp-a",
+        "orderId": "town-war-expedition-1",
+        "orderKind": null,
+        "soldierId": "town-war-soldier-1",
+        "ammoCrateId": null,
+        "locationLabel": "road crossing",
+        "riskTier": "low",
+        "intensity": "medium",
+        "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 was spotted crossing the road toward Probe the enemy approach.",
+        "tags": [
+          "expedition",
+          "spotted",
+          "probe-enemy-approach",
+          "road-crossing-hot",
+          "moving"
+        ],
+        "speaker": "Vira Rus-1",
+        "channel": "Russian Squad Net",
+        "text": "Lev Rus-10, Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 was spotted crossing the road toward Probe the enemy approach.",
+        "referencedMemoryTag": null
+      },
+      {
+        "id": "town-war-drama-1",
+        "atSeconds": 0,
+        "kind": "expedition-ordered",
+        "faction": "camp-a",
+        "campId": "camp-a",
+        "orderId": "town-war-expedition-1",
+        "orderKind": null,
+        "soldierId": "town-war-soldier-1",
+        "ammoCrateId": null,
+        "locationLabel": "Russian camp push line",
+        "riskTier": "low",
+        "intensity": "low",
+        "summary": "Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 stepped off from the Russian camp toward Probe the enemy approach.",
+        "tags": [
+          "expedition",
+          "ordered",
+          "probe-enemy-approach",
+          "moving"
+        ],
+        "speaker": "Vira Rus-1",
+        "channel": "Russian Squad Net",
+        "text": "Lev Rus-10, Vira Rus-1, Olek Rus-3, Makar Rus-2 +2 stepped off from the Russian camp toward Probe the enemy approach.",
+        "referencedMemoryTag": null
+      }
+    ],
+    "readable": "town-war-expedition-1 retreating: 96% Probe the enemy approach; ordered > spotted > pinned > separated > low-ammo > wounded > retreating"
+  },
+  "assignedCount": 5,
+  "assignedNames": [
+    "Vira Rus-1",
+    "Olek Rus-3",
+    "Makar Rus-2",
+    "Taran Rus-7",
+    "Kira Rus-9"
+  ],
+  "assignedFactions": [
+    "camp-a",
+    "camp-a",
+    "camp-a",
+    "camp-a",
+    "camp-a"
+  ],
+  "tasks": [
+    {
+      "id": "town-war-soldier-1",
+      "task": {
+        "kind": "move",
+        "label": "Seek cover: market wall firing cut",
+        "targetPosition": {
+          "x": 5942,
+          "y": 3115
+        },
+        "targetEntityId": "town-war-cover-ruin-2",
+        "resumeTask": {
+          "kind": "move",
+          "label": "Seek cover: market wall firing cut",
+          "targetPosition": null,
+          "targetEntityId": "town-war-cover-ruin-2",
+          "resumeTask": null
+        }
+      }
+    },
+    {
+      "id": "town-war-soldier-3",
+      "task": {
+        "kind": "move",
+        "label": "Seek cover: market wall firing cut",
+        "targetPosition": {
+          "x": 5942,
+          "y": 3115
+        },
+        "targetEntityId": "town-war-cover-ruin-2",
+        "resumeTask": {
+          "kind": "move",
+          "label": "Seek cover: market wall firing cut",
+          "targetPosition": null,
+          "targetEntityId": "town-war-cover-ruin-2",
+          "resumeTask": null
+        }
+      }
+    },
+    {
+      "id": "town-war-soldier-2",
+      "task": {
+        "kind": "move",
+        "label": "Seek cover: market wall firing cut",
+        "targetPosition": {
+          "x": 5942,
+          "y": 3115
+        },
+        "targetEntityId": "town-war-cover-ruin-2",
+        "resumeTask": {
+          "kind": "move",
+          "label": "Seek cover: market wall firing cut",
+          "targetPosition": null,
+          "targetEntityId": "town-war-cover-ruin-2",
+          "resumeTask": null
+        }
+      }
+    },
+    {
+      "id": "town-war-soldier-7",
+      "task": {
+        "kind": "move",
+        "label": "Seek cover: market wall firing cut",
+        "targetPosition": {
+          "x": 5942,
+          "y": 3115
+        },
+        "targetEntityId": "town-war-cover-ruin-2",
+        "resumeTask": {
+          "kind": "move",
+          "label": "Seek cover: market wall firing cut",
+          "targetPosition": null,
+          "targetEntityId": "town-war-cover-ruin-2",
+          "resumeTask": null
+        }
+      }
+    },
+    {
+      "id": "town-war-soldier-9",
+      "task": {
+        "kind": "move",
+        "label": "Seek cover: market wall firing cut",
+        "targetPosition": {
+          "x": 5942,
+          "y": 3115
+        },
+        "targetEntityId": "town-war-cover-ruin-2",
+        "resumeTask": {
+          "kind": "move",
+          "label": "Seek cover: market wall firing cut",
+          "targetPosition": null,
+          "targetEntityId": "town-war-cover-ruin-2",
+          "resumeTask": null
+        }
+      }
+    }
+  ],
+  "routeScars": [
+    {
+      "label": "casualty bend",
+      "tags": [
+        "fallback-route-marked",
+        "expedition",
+        "retreating",
+        "probe-enemy-approach",
+        "route-wounded-here",
+        "wounded",
+        "contact"
+      ]
+    },
+    {
+      "label": "tree line gap",
+      "tags": [
+        "tree-line-split",
+        "expedition",
+        "separated",
+        "probe-enemy-approach",
+        "contact"
+      ]
+    },
+    {
+      "label": "hot road crossing",
+      "tags": [
+        "road-crossing-hot",
+        "expedition",
+        "pinned",
+        "probe-enemy-approach",
+        "contact"
+      ]
+    },
+    {
+      "label": "road crossing",
+      "tags": [
+        "road-crossing-hot",
+        "expedition",
+        "spotted",
+        "probe-enemy-approach",
+        "moving"
+      ]
+    }
+  ]
+}

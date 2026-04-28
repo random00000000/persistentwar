@@ -14,6 +14,8 @@ import { RaidScene } from "./game/scene/RaidScene";
 import { TOWN_WAR_ENEMY_FACTION, TOWN_WAR_PLAYER_FACTION, townWarController } from "./game/townWar";
 import type {
   TownWarCampWorkPriorityId,
+  TownWarCampWeakPointKind,
+  TownWarExpeditionObjectiveId,
   TownWarFactionId,
   TownWarFlankLaneId,
   TownWarFlankPressureLevel,
@@ -198,7 +200,7 @@ type StoryFinaleChoiceId = "sell-route" | "burn-route";
 type CommandTabId = "forecast" | "operations" | "debrief" | "ledger";
 type TopTabId = "gear" | "operator" | "health" | "skills" | "map" | "tasks";
 type GearWorkbenchTabId = "loadout" | "storage" | "planning";
-type OfficerToolsPaneId = "build" | "priorities" | "camp" | "debrief";
+type OfficerToolsPaneId = "build" | "priorities" | "push" | "camp" | "debrief";
 type OfficerWorkLensId = "all" | "build" | "fight" | "medical" | "supply";
 type PaperdollSlotId = "route" | "contract" | "support" | "weapon" | "medkits" | "ammo";
 type StorageSurfaceId = "tactical-rig" | "pockets" | "backpack" | "pouch";
@@ -208,6 +210,7 @@ const QUICK_SLOT_IDS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"] as con
 const OFFICER_TOOLS_TABS: Array<{ id: OfficerToolsPaneId; label: string }> = [
   { id: "build", label: "Build" },
   { id: "priorities", label: "Priorities" },
+  { id: "push", label: "Push" },
   { id: "camp", label: "Camp" },
   { id: "debrief", label: "Debrief" }
 ];
@@ -257,6 +260,8 @@ const officerToolsState: {
   selectedSoldierId: string | null;
   workLens: OfficerWorkLensId;
   playerCampArtVisible: boolean;
+  firstMinuteDismissed: boolean;
+  promotionRailSeenReason: string | null;
   lastAction: string;
 } = {
   open: false,
@@ -268,6 +273,8 @@ const officerToolsState: {
   selectedSoldierId: null,
   workLens: "all",
   playerCampArtVisible: true,
+  firstMinuteDismissed: false,
+  promotionRailSeenReason: null,
   lastAction: "Orders panel ready."
 };
 
@@ -381,6 +388,7 @@ interface SquadRosterRecord {
   lastCallout: string;
   familyNotified: boolean;
   wakeHeld: boolean;
+  unifiedSoldierId: string | null;
 }
 
 interface MemorialRecord {
@@ -407,6 +415,12 @@ interface RecruitCandidateRecord {
   voiceSignature: string;
   readiness: number;
   hook: string;
+  stats: SquadRecruitCandidate["stats"] | null;
+  trait: SquadRecruitCandidate["trait"] | null;
+  difficulty: SquadRecruitCandidate["difficulty"] | "camp";
+  rollLabel: string | null;
+  source: "recruit" | "unified-soldier";
+  actionLabel: string;
 }
 
 interface MemorialReplacementBlockRecord {
@@ -1619,6 +1633,8 @@ function renderWeaponPreview(weaponId: WeaponId): string {
         ? "Crude cut-down bolt rifle"
       : weaponId === "amr"
         ? "Anti-materiel overwatch platform"
+      : weaponId === "rpg"
+        ? "Earned siege rocket platform"
       : weaponId === "rifle"
       ? "Long rifle platform"
       : weaponId === "smg"
@@ -2275,6 +2291,8 @@ function formatWeaponDrawerMeta(weaponId: WeaponId): string {
         ? "desperate hard-hit bolt gun"
       : weaponId === "amr"
         ? "anti-plate overwatch"
+      : weaponId === "rpg"
+        ? "earned siege rocket"
       : weaponId === "rifle"
         ? "long-lane control"
         : weaponId === "smg"
@@ -4601,6 +4619,8 @@ function buildMissionBriefing(
         ? "The cut-down Mosin is a filthy one-shot gamble. Take one ugly hard-hit peek, then move, because the bad sight picture and late follow-up will get you killed if you linger."
       : weaponId === "amr"
         ? "AMRs are for long peeks, plate breaks, and deleting the lane anchor that is stopping the whole plan. Brace, fire with intent, and never let the room collapse onto you."
+      : weaponId === "rpg"
+        ? "The RPG is late-war siege kit. Spend it on camp anchors, bunker mouths, and packed trench lines, then move before the blast pulls every rifle onto you."
       : weaponId === "rifle"
         ? "Rifles are for longer lanes and deliberate peeks. Hold distance, brace angles, and make the other side walk into your fire."
         : weaponId === "pkm"
@@ -4643,8 +4663,10 @@ function buildMissionBriefing(
           ? "Use the cut-down Mosin for one ugly hit"
         : weaponId === "shotgun"
           ? "Use the shotgun to own rooms"
-          : weaponId === "amr"
+        : weaponId === "amr"
             ? "Use the AMR to break the lane"
+          : weaponId === "rpg"
+            ? "Use the RPG to crack the camp"
           : weaponId === "pkm"
             ? "Use the PKM to own the lane"
           : weaponId === "smg"
@@ -4794,6 +4816,10 @@ function getHardcoreWeaponRank(weaponId: WeaponId): number {
 
   if (weaponId === "amr") {
     return 5;
+  }
+
+  if (weaponId === "rpg") {
+    return 6;
   }
 
   if (weaponId === "pkm") {
@@ -9727,6 +9753,22 @@ app.innerHTML = `
           </section>
         </div>
         <div class="hud-row hud-row-bottom">
+          <section class="first-minute-rail hidden" data-first-minute-rail aria-label="First minute objective">
+            <div class="first-minute-rail-head">
+              <div>
+                <p class="eyebrow">First Minute</p>
+                <strong data-first-minute-title>Russian camp online</strong>
+              </div>
+              <button class="first-minute-dismiss" data-first-minute-dismiss type="button" aria-label="Dismiss first minute guidance">X</button>
+            </div>
+            <p data-first-minute-copy>Build a trench line, keep your soldiers alive, and push toward the Ukrainian camp.</p>
+            <div class="first-minute-steps" data-first-minute-steps></div>
+            <div class="first-minute-actions">
+              <button type="button" data-first-minute-action="place-trench">Place trench</button>
+              <button type="button" data-first-minute-action="priorities">Priorities</button>
+              <button type="button" data-first-minute-action="objective">Objective</button>
+            </div>
+          </section>
           <section class="field-strip field-strip-compact">
             <div class="field-strip-copy">
               <p class="eyebrow">Field Read</p>
@@ -9734,6 +9776,22 @@ app.innerHTML = `
               <p class="hud-inline-copy" data-extract-status>Secure both intel caches before the route out becomes worth the risk.</p>
             </div>
             <button class="hud-toggle" data-hud-toggle type="button" aria-expanded="false">Open Tactical Read</button>
+          </section>
+          <section class="raid-squad-dock" data-raid-squad-dock aria-label="Raid squad menu">
+            <button class="raid-squad-toggle" data-raid-squad-toggle type="button" aria-expanded="false">
+              <span>Squad</span>
+              <strong data-raid-squad-status>0/3</strong>
+            </button>
+            <section class="raid-squad-panel hidden" data-raid-squad-panel aria-label="Raid squad roster">
+              <div class="raid-squad-head">
+                <div>
+                  <p class="eyebrow">Squad</p>
+                  <strong data-raid-squad-title>Live boys net</strong>
+                </div>
+                <button class="raid-squad-close" data-raid-squad-close type="button" aria-label="Close squad menu">X</button>
+              </div>
+              <div class="raid-squad-body" data-raid-squad-body></div>
+            </section>
           </section>
           <section class="build-mode-dock" data-build-mode-dock aria-label="Construction mode">
             <button class="camp-art-toggle" data-camp-art-toggle type="button" aria-pressed="false">
@@ -9764,6 +9822,7 @@ app.innerHTML = `
               <div class="officer-tools-tabs" role="tablist" aria-label="Officer tool panes">
                 <button class="officer-tools-tab active" data-officer-tools-tab="build" type="button">Build</button>
                 <button class="officer-tools-tab" data-officer-tools-tab="priorities" type="button">Priorities</button>
+                <button class="officer-tools-tab" data-officer-tools-tab="push" type="button">Push</button>
                 <button class="officer-tools-tab" data-officer-tools-tab="camp" type="button">Camp</button>
                 <button class="officer-tools-tab" data-officer-tools-tab="debrief" type="button">Debrief</button>
               </div>
@@ -12230,6 +12289,13 @@ const weaponDoctrineValue = requireElement<HTMLElement>("[data-weapon-doctrine]"
 const weaponDoctrineTagsValue = requireElement<HTMLElement>("[data-weapon-doctrine-tags]");
 const hudToggleButton = requireElement<HTMLButtonElement>("[data-hud-toggle]");
 const hudDrawer = requireElement<HTMLElement>("[data-hud-drawer]");
+const raidSquadDockValue = requireElement<HTMLElement>("[data-raid-squad-dock]");
+const raidSquadToggleButton = requireElement<HTMLButtonElement>("[data-raid-squad-toggle]");
+const raidSquadStatusValue = requireElement<HTMLElement>("[data-raid-squad-status]");
+const raidSquadPanelValue = requireElement<HTMLElement>("[data-raid-squad-panel]");
+const raidSquadTitleValue = requireElement<HTMLElement>("[data-raid-squad-title]");
+const raidSquadBodyValue = requireElement<HTMLElement>("[data-raid-squad-body]");
+const raidSquadCloseButton = requireElement<HTMLButtonElement>("[data-raid-squad-close]");
 const mainMenuOverlay = requireElement<HTMLElement>("[data-main-menu]");
 const mainMenuPages = Array.from(document.querySelectorAll<HTMLElement>("[data-main-menu-page]"));
 const mainMenuPanel = requireElement<HTMLElement>(".main-menu-panel");
@@ -12643,9 +12709,54 @@ const officerToolsCampValue = requireElement<HTMLElement>("[data-officer-tools-c
 const officerToolsTitleValue = requireElement<HTMLElement>("[data-officer-tools-title]");
 const officerToolsBodyValue = requireElement<HTMLElement>("[data-officer-tools-body]");
 const officerToolsTabButtons = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-officer-tools-tab]"));
+const firstMinuteRail = requireElement<HTMLElement>("[data-first-minute-rail]");
+const firstMinuteTitleValue = requireElement<HTMLElement>("[data-first-minute-title]");
+const firstMinuteCopyValue = requireElement<HTMLElement>("[data-first-minute-copy]");
+const firstMinuteStepsValue = requireElement<HTMLElement>("[data-first-minute-steps]");
 
 app.addEventListener("click", (event) => {
   const target = event.target instanceof HTMLElement ? event.target : null;
+
+  if (target?.closest("[data-first-minute-dismiss]")) {
+    officerToolsState.firstMinuteDismissed = true;
+    renderOfficerTools();
+    return;
+  }
+
+  const firstMinuteActionButton = target?.closest<HTMLButtonElement>("[data-first-minute-action]");
+  const firstMinuteAction = firstMinuteActionButton?.dataset.firstMinuteAction;
+  if (firstMinuteAction === "place-trench") {
+    officerToolsState.placementMode = "trench";
+    officerToolsState.buildModeOpen = true;
+    officerToolsState.open = false;
+    officerToolsState.pane = "build";
+    officerToolsState.lastAction = "Trench placement armed. Move the ghost, scroll to rotate, then click the ground.";
+    syncOfficerBuildPlacementPreview();
+    renderOfficerTools();
+    return;
+  }
+  if (firstMinuteAction === "priorities") {
+    officerToolsState.open = true;
+    officerToolsState.pane = "priorities";
+    officerToolsState.workLens = "all";
+    officerToolsState.lastAction = "Priority board open. Pick who builds, defends, suppresses, rescues, or hauls.";
+    renderOfficerTools();
+    return;
+  }
+  if (firstMinuteAction === "objective") {
+    officerToolsState.open = true;
+    officerToolsState.pane = "camp";
+    officerToolsState.lastAction = "Objective: protect the Russian camp, build a line, and break the Ukrainian camp.";
+    renderOfficerTools();
+    return;
+  }
+  if (firstMinuteAction === "squad") {
+    raidHudState.squadMenuOpen = true;
+    officerToolsState.open = false;
+    officerToolsState.lastAction = "Command authority received. Pick one camp soldier for the live squad.";
+    updateUi();
+    return;
+  }
 
   if (target?.closest("[data-officer-tools-toggle]")) {
     officerToolsState.open = !officerToolsState.open;
@@ -12689,6 +12800,58 @@ app.addEventListener("click", (event) => {
     officerToolsState.pane = tabId;
     officerToolsState.open = true;
     renderOfficerTools();
+    return;
+  }
+
+  const expeditionButton = target?.closest<HTMLButtonElement>("[data-officer-expedition]");
+  const expeditionObjective = expeditionButton?.dataset.officerExpedition as TownWarExpeditionObjectiveId | undefined;
+  if (expeditionObjective) {
+    const campId = getOfficerCamp(townWarController.getSnapshot());
+    const result = townWarController.orderExpedition(campId, expeditionObjective);
+    officerToolsState.open = true;
+    officerToolsState.pane = "push";
+    officerToolsState.lastAction = result.ok ? result.readable : `Expedition failed: ${result.reason ?? "unknown"}.`;
+    updateUi();
+    return;
+  }
+
+  const expeditionRetreatButton = target?.closest<HTMLButtonElement>("[data-officer-expedition-retreat]");
+  const expeditionRetreatId = expeditionRetreatButton?.dataset.officerExpeditionRetreat;
+  if (expeditionRetreatId) {
+    const result = townWarController.requestExpeditionRetreat(expeditionRetreatId);
+    officerToolsState.open = true;
+    officerToolsState.pane = "push";
+    officerToolsState.lastAction = result.ok ? result.readable : `Retreat failed: ${result.reason ?? "unknown"}.`;
+    updateUi();
+    return;
+  }
+
+  const demolitionPrepButton = target?.closest<HTMLButtonElement>("[data-officer-demolition-prep]");
+  if (demolitionPrepButton) {
+    const campId = getOfficerCamp(townWarController.getSnapshot());
+    const result = townWarController.prepareDemolition(campId);
+    officerToolsState.open = true;
+    officerToolsState.pane = "push";
+    officerToolsState.lastAction = result.ok ? result.readable : `Demolition prep failed: ${result.reason ?? "unknown"}.`;
+    updateUi();
+    return;
+  }
+
+  const campBreachButton = target?.closest<HTMLButtonElement>("[data-officer-camp-breach]");
+  const weakPointId = campBreachButton?.dataset.officerCampBreach;
+  if (weakPointId) {
+    const townWar = townWarController.getSnapshot();
+    const campId = getOfficerCamp(townWar);
+    const targetCampId = campId === "camp-a" ? "camp-b" : "camp-a";
+    const result = townWarController.orderCampBreach({
+      attackerCampId: campId,
+      targetCampId,
+      weakPointId
+    });
+    officerToolsState.open = true;
+    officerToolsState.pane = "push";
+    officerToolsState.lastAction = result.ok ? result.readable : `Breach failed: ${result.reason ?? "unknown"}.`;
+    updateUi();
     return;
   }
 
@@ -13064,6 +13227,32 @@ stashOverlay.addEventListener("click", (event) => {
     return;
   }
 
+  const rollRecruitButton = target?.closest<HTMLButtonElement>("[data-camp-roll-recruits]");
+  if (rollRecruitButton) {
+    raidController.rollRecruitCandidates();
+    closeStashContextMenu();
+    updateUi();
+    return;
+  }
+
+  const unifiedAssignButton = target?.closest<HTMLButtonElement>("[data-unified-squad-assign]");
+  const unifiedAssignId = unifiedAssignButton?.dataset.unifiedSquadAssign;
+  if (unifiedAssignId && raidController.state.phase === "raid") {
+    raidController.assignUnifiedSoldierToSquad(unifiedAssignId);
+    closeStashContextMenu();
+    updateUi();
+    return;
+  }
+
+  const unifiedUnassignButton = target?.closest<HTMLButtonElement>("[data-unified-squad-unassign]");
+  const unifiedUnassignId = unifiedUnassignButton?.dataset.unifiedSquadUnassign;
+  if (unifiedUnassignId && raidController.state.phase === "raid") {
+    raidController.unassignUnifiedSoldierFromSquad(unifiedUnassignId);
+    closeStashContextMenu();
+    updateUi();
+    return;
+  }
+
   const rotateButton = target?.closest<HTMLButtonElement>("[data-squad-rotate]");
   const rotateId = rotateButton?.dataset.squadRotate;
   if (rotateId) {
@@ -13262,7 +13451,9 @@ const storyFinaleState = {
 };
 
 const raidHudState = {
-  tacticalDrawerOpen: false
+  tacticalDrawerOpen: false,
+  squadMenuOpen: false,
+  squadMenuRenderKey: ""
 };
 
 const frontDoorState = {
@@ -14214,6 +14405,39 @@ const SURVIVOR_TEST_SHOT_PROFILES: Record<WeaponId, SurvivorTestShotProfile> = {
     noiseGain: 0.028,
     reloadPitchHz: 280,
     dryFirePitchHz: 160
+  },
+  rpg: {
+    id: "marksman",
+    weaponId: "rpg",
+    projectileSpeedPxPerMs: 3.4,
+    tracerLengthScale: 0.72,
+    tracerLengthMinPx: 62,
+    tracerWidthPx: 3.2,
+    nearStreakLengthPx: 82,
+    nearStreakWidthPx: 4.6,
+    projectileHeadSizePx: 14,
+    tracerCore: "rgba(254, 243, 199, 1)",
+    tracerFade: "rgba(250, 204, 21, 0.1)",
+    tracerGlow: "rgba(250, 204, 21, 0.54)",
+    projectileHeadGlow: "rgba(254, 249, 195, 1)",
+    muzzleFlashScale: 1.36,
+    recoilKickPx: 10.8,
+    weaponKickPx: 13.2,
+    cameraPunchPx: 9.6,
+    cadencePenaltyPx: 1.8,
+    recoilDurationMs: 210,
+    muzzleSmokeScale: 1.42,
+    muzzleSmokeDurationMs: 340,
+    reloadDurationMs: 1680,
+    shotBodyHz: 92,
+    shotBodyType: "sawtooth",
+    shotTailHz: 46,
+    shotTailMs: 340,
+    crackHz: 1180,
+    crackGain: 0.048,
+    noiseGain: 0.038,
+    reloadPitchHz: 220,
+    dryFirePitchHz: 130
   }
 };
 
@@ -18583,8 +18807,10 @@ window.addEventListener(
           typeof result.etaSeconds === "number" && Number.isFinite(result.etaSeconds)
             ? `${Math.round(result.etaSeconds)}s`
             : "unknown ETA";
+        const placedAt = result.task?.targetPosition ?? pointerWorld;
+        const networkRead = result.trenchNetwork?.readable ? ` ${result.trenchNetwork.readable}` : "";
         placementRead = result.ok
-          ? `Trench order ${orderId} queued at ${Math.round(pointerWorld.x)},${Math.round(pointerWorld.y)}; ${builder} moving to dig (${eta}).`
+          ? `Trench order ${orderId} queued at ${Math.round(placedAt.x)},${Math.round(placedAt.y)}; ${builder} moving to dig (${eta}).${networkRead}`
           : `Trench placement failed: ${result.reason ?? "unknown"}.`;
       } else if (mode === "dugout") {
         const result = townWarController.orderDugout(campId, pointerWorld, 45, officerToolsState.placementAngleRadians);
@@ -18977,7 +19203,47 @@ hudToggleButton.addEventListener("click", () => {
   updateUi();
 });
 
+raidSquadToggleButton.addEventListener("click", () => {
+  raidHudState.squadMenuOpen = !raidHudState.squadMenuOpen;
+  updateUi();
+});
+
+raidSquadCloseButton.addEventListener("click", () => {
+  raidHudState.squadMenuOpen = false;
+  updateUi();
+});
+
 app.addEventListener("click", (event) => {
+  const unifiedAssignButton =
+    event.target instanceof HTMLElement ? event.target.closest<HTMLButtonElement>("[data-unified-squad-assign]") : null;
+  const unifiedAssignId = unifiedAssignButton?.dataset.unifiedSquadAssign;
+
+  if (unifiedAssignId) {
+    raidController.assignUnifiedSoldierToSquad(unifiedAssignId);
+    updateUi();
+    return;
+  }
+
+  const unifiedUnassignButton =
+    event.target instanceof HTMLElement ? event.target.closest<HTMLButtonElement>("[data-unified-squad-unassign]") : null;
+  const unifiedUnassignId = unifiedUnassignButton?.dataset.unifiedSquadUnassign;
+
+  if (unifiedUnassignId) {
+    raidController.unassignUnifiedSoldierFromSquad(unifiedUnassignId);
+    updateUi();
+    return;
+  }
+
+  const squadRotateTarget =
+    event.target instanceof HTMLElement ? event.target.closest<HTMLButtonElement>("[data-squad-rotate]") : null;
+  const squadRotateId = squadRotateTarget?.dataset.squadRotate;
+
+  if (squadRotateId && raidController.state.phase === "raid") {
+    raidController.rotateSquadMate(squadRotateId);
+    updateUi();
+    return;
+  }
+
   const squadCommandTarget =
     event.target instanceof HTMLElement ? event.target.closest<HTMLButtonElement>("[data-squad-command]") : null;
   const squadCommandId = squadCommandTarget?.dataset.squadCommand as SquadCommandId | undefined;
@@ -19681,7 +19947,8 @@ function buildSquadRosterRecords(squadRoster: SquadRosterState[], squadMates: Sq
       lastSeen: record.lastOutcome,
       lastCallout: record.casualtyRecord?.summary ?? record.memorialNote ?? record.lastCallout,
       familyNotified: record.familyNotified,
-      wakeHeld: record.wakeHeld
+      wakeHeld: record.wakeHeld,
+      unifiedSoldierId: record.id.startsWith("unified-") ? record.id : null
     };
   });
 }
@@ -19718,7 +19985,7 @@ function getSquadRosterActionLabel(
     return activeCount >= 3 ? "Fireteam Full" : "Attach To Raid";
   }
 
-  return activeCount <= 1 ? "Last Active" : "Rotate To Reserve";
+  return "Rotate To Reserve";
 }
 
 function getSquadRosterWeaponPlan(record: SquadRosterRecord): string {
@@ -19822,13 +20089,13 @@ function renderSquadRoster(records: SquadRosterRecord[]): string {
             ${
               record.status === "killed"
                 ? ""
-                : `<button class="stash-button squad-recruit-button squad-roster-action" data-squad-rotate="${escapeHtml(record.id)}" ${
-                    record.status === "active" && activeCount <= 1
-                      ? "disabled"
-                      : record.status === "reserve" && (activeCount >= 3 || memorialBlock)
-                        ? "disabled"
-                        : ""
-                  }>${getSquadRosterActionLabel(record, activeCount, memorialBlock)}</button>`
+                : record.unifiedSoldierId
+                  ? `<button class="stash-button squad-recruit-button squad-roster-action" data-unified-squad-unassign="${escapeHtml(record.unifiedSoldierId)}">Return To Camp</button>`
+                  : `<button class="stash-button squad-recruit-button squad-roster-action" data-squad-rotate="${escapeHtml(record.id)}" ${
+                      record.status === "reserve" && (activeCount >= 3 || memorialBlock)
+                          ? "disabled"
+                          : ""
+                    }>${getSquadRosterActionLabel(record, activeCount, memorialBlock)}</button>`
             }
           </div>
         </article>
@@ -19837,16 +20104,68 @@ function renderSquadRoster(records: SquadRosterRecord[]): string {
     .join("");
 }
 
-function buildRecruitRecords(recruitPool: SquadRecruitCandidate[]): RecruitCandidateRecord[] {
-  return recruitPool.map((candidate) => ({
+function buildRecruitRecords(recruitPool: SquadRecruitCandidate[], unifiedSoldiers: TownWarState["unifiedSoldiers"] = []): RecruitCandidateRecord[] {
+  const recruitRecords = recruitPool.map((candidate) => ({
     id: candidate.id,
     name: candidate.name,
     role: candidate.role,
     voiceTag: candidate.voiceTag,
     voiceSignature: candidate.voiceSignature,
     readiness: candidate.readiness,
-    hook: candidate.hook
+    hook: candidate.hook,
+    stats: candidate.stats,
+    trait: candidate.trait,
+    difficulty: candidate.difficulty,
+    rollLabel: candidate.rollLabel,
+    source: "recruit" as const,
+    actionLabel: "Attach As Rookie"
   }));
+  const unifiedRecords = unifiedSoldiers
+    .filter((soldier) => soldier.squad.operatorMenuVisible && soldier.squad.assignable)
+    .slice(0, 6)
+    .map((soldier) => ({
+      id: soldier.id,
+      name: soldier.displayName,
+      role: `${soldier.role} / camp soldier`,
+      voiceTag: "Russian",
+      voiceSignature: `${soldier.colonist.identitySummary.bestSkills} // ${soldier.colonist.currentNeed}`,
+      readiness: Math.max(0.25, Math.min(0.95, soldier.combat.health.current / Math.max(1, soldier.combat.health.max) - soldier.colonist.needs.fatigue * 0.2)),
+      hook: `${soldier.colonist.task.label ?? soldier.colonist.task.kind}. Build ${soldier.colonist.workPriorities.Build}, Fight ${Math.max(soldier.colonist.workPriorities.Defend, soldier.colonist.workPriorities.Suppress, soldier.colonist.workPriorities.Assault)}. ${soldier.readable}`,
+      stats: null,
+      trait: null,
+      difficulty: "camp" as const,
+      rollLabel: null,
+      source: "unified-soldier" as const,
+      actionLabel: "Assign From Camp"
+    }));
+  return [...unifiedRecords, ...recruitRecords];
+}
+
+function createStaticRecruitCandidate(
+  candidate: Omit<SquadRecruitCandidate, "stats" | "trait" | "difficulty" | "rollLabel">,
+  index: number,
+  rollLabel: string
+): SquadRecruitCandidate {
+  const stats = {
+    marksmanship: Math.max(3, Math.min(9, Math.round(candidate.readiness * 10) - (index % 2))),
+    building: Math.max(3, Math.min(9, 5 + index)),
+    medicine: Math.max(3, Math.min(9, candidate.role.toLowerCase().includes("medic") ? 8 : 4 + index)),
+    logistics: Math.max(3, Math.min(9, candidate.role.toLowerCase().includes("grenadier") ? 6 : 5)),
+    nerve: Math.max(3, Math.min(9, Math.round(candidate.readiness * 9)))
+  };
+  return {
+    ...candidate,
+    stats,
+    trait: {
+      id: `${rollLabel}-steady`,
+      label: "Showcase steady",
+      upside: "predictable camp intake",
+      downside: "no special edge",
+      readinessModifier: 0
+    },
+    difficulty: "standard",
+    rollLabel: `${rollLabel}-${index + 1}`
+  };
 }
 
 function renderRecruitRoster(
@@ -19854,24 +20173,56 @@ function renderRecruitRoster(
   activeCount: number,
   memorialBlock: MemorialReplacementBlockRecord | null
 ): string {
+  const rollAction = `
+    <article class="squad-recruit-roll-card">
+      <div>
+        <strong>Roll camp candidates</strong>
+        <span>Costs 1 med + 1 ammo. Stats change how easy the first deployment feels.</span>
+      </div>
+      <button class="stash-button squad-recruit-button" type="button" data-camp-roll-recruits>Roll</button>
+    </article>
+  `;
+
   if (records.length === 0) {
-    return `<p class="squad-log-empty">No replacement candidates are waiting on the line right now.</p>`;
+    return `${rollAction}<p class="squad-log-empty">No replacement candidates are waiting on the line right now.</p>`;
   }
 
-  return records
+  return (
+    rollAction +
+    records
     .map(
-      (record) => `
+      (record) => {
+        const statsMarkup = record.stats
+          ? `
+            <div class="squad-recruit-stat-grid">
+              <span>Shoot <strong>${record.stats.marksmanship}</strong></span>
+              <span>Build <strong>${record.stats.building}</strong></span>
+              <span>Medic <strong>${record.stats.medicine}</strong></span>
+              <span>Logi <strong>${record.stats.logistics}</strong></span>
+              <span>Nerve <strong>${record.stats.nerve}</strong></span>
+            </div>
+          `
+          : "";
+        const traitLine = record.trait
+          ? `${record.trait.label} // ${record.trait.upside}; ${record.trait.downside}.`
+          : record.voiceSignature;
+        return `
         <article class="squad-recruit-card">
           <div class="squad-card-head">
             <div>
               <strong>${escapeHtml(record.name)}</strong>
               <span>${escapeHtml(`${record.role} // ${record.voiceTag}`)}</span>
             </div>
-            <span class="squad-card-condition">${Math.round(record.readiness * 100)}%</span>
+            <span class="squad-card-condition">${escapeHtml(record.difficulty === "camp" ? `${Math.round(record.readiness * 100)}%` : `${record.difficulty} // ${Math.round(record.readiness * 100)}%`)}</span>
           </div>
-          <p>${escapeHtml(`${record.voiceTag} // ${record.voiceSignature}`)}</p>
+          <p>${escapeHtml(traitLine)}</p>
+          ${statsMarkup}
           <p>${escapeHtml(record.hook)} Rookie deployment starts slightly shaky until they survive a clean extract.</p>
-          <button class="stash-button squad-recruit-button" data-squad-recruit="${escapeHtml(record.id)}" ${
+          <button class="stash-button squad-recruit-button" ${
+            record.source === "unified-soldier"
+              ? `data-unified-squad-assign="${escapeHtml(record.id)}"`
+              : `data-squad-recruit="${escapeHtml(record.id)}"`
+          } ${
             activeCount >= 3 || memorialBlock ? "disabled" : ""
           }>
             ${
@@ -19881,13 +20232,123 @@ function renderRecruitRoster(
                   : "Wake Owed"
                 : activeCount >= 3
                   ? "Roster Full"
-                  : "Attach As Rookie"
+                  : escapeHtml(record.actionLabel)
             }
           </button>
         </article>
-      `
+      `;
+      }
     )
-    .join("");
+    .join("")
+  );
+}
+
+function renderRaidSquadMenu(
+  squadRecords: SquadRosterRecord[],
+  recruitRecords: RecruitCandidateRecord[],
+  activeCount: number,
+  memorialBlock: MemorialReplacementBlockRecord | null
+): string {
+  const activeRecords = squadRecords.filter((record) => record.status === "active");
+  const reserveRecords = squadRecords.filter((record) => record.status === "reserve");
+  const campCandidates = recruitRecords.filter((record) => record.source === "unified-soldier").slice(0, 4);
+  const activeMarkup =
+    activeRecords.length === 0
+      ? `<p class="raid-squad-empty">No active squadmate is attached.</p>`
+      : activeRecords
+          .map(
+            (record) => `
+              <article class="raid-squad-row raid-squad-row-${record.condition}">
+                <div>
+                  <strong>${escapeHtml(record.name)}</strong>
+                  <span>${escapeHtml(`${WEAPONS[record.weaponId].name} // ${record.condition}`)}</span>
+                </div>
+                ${
+                  record.unifiedSoldierId
+                    ? `<button type="button" data-unified-squad-unassign="${escapeHtml(record.unifiedSoldierId)}" ${
+                        activeCount <= 1 ? "disabled" : ""
+                      }>Return</button>`
+                    : `<button type="button" data-squad-rotate="${escapeHtml(record.id)}" ${activeCount <= 1 ? "disabled" : ""}>Reserve</button>`
+                }
+              </article>
+            `
+          )
+          .join("");
+  const reserveMarkup =
+    reserveRecords.length === 0
+      ? ""
+      : `<div class="raid-squad-reserve">${reserveRecords
+          .slice(0, 4)
+          .map(
+            (record) => `
+              <article class="raid-squad-row raid-squad-reserve-row">
+                <div>
+                  <strong>${escapeHtml(record.name)}</strong>
+                  <span>${escapeHtml(`${WEAPONS[record.weaponId].name} // reserve`)}</span>
+                </div>
+                <button type="button" data-squad-rotate="${escapeHtml(record.id)}" ${activeCount >= 3 || memorialBlock ? "disabled" : ""}>Bring In</button>
+              </article>
+            `
+          )
+          .join("")}</div>`;
+  const candidatesMarkup =
+    campCandidates.length === 0
+      ? `<p class="raid-squad-empty">No camp NPC is free for squad assignment.</p>`
+      : campCandidates
+          .map((record) => {
+            const disabled = memorialBlock !== null;
+            const label = memorialBlock
+              ? memorialBlock.reason === "family"
+                ? "Family"
+                : "Wake"
+              : activeCount >= 3
+                ? "Swap In"
+                : "Assign";
+            return `
+              <article class="raid-squad-row raid-squad-candidate">
+                <div>
+                  <strong>${escapeHtml(record.name)}</strong>
+                  <span>${escapeHtml(`${record.role} // ${Math.round(record.readiness * 100)}%`)}</span>
+                </div>
+                <button type="button" data-unified-squad-assign="${escapeHtml(record.id)}" ${disabled ? "disabled" : ""}>${label}</button>
+              </article>
+            `;
+          })
+          .join("");
+
+  return `
+    <div class="raid-squad-summary">
+      <span>${activeCount}/3 active</span>
+      <span>${reserveRecords.length} reserve</span>
+      <span>${campCandidates.length} camp</span>
+    </div>
+    <div class="raid-squad-section">
+      <span class="raid-squad-section-label">Attached</span>
+      ${activeMarkup}
+      ${reserveMarkup}
+    </div>
+    <div class="raid-squad-section">
+      <span class="raid-squad-section-label">Camp NPCs</span>
+      ${candidatesMarkup}
+    </div>
+  `;
+}
+
+function buildRaidSquadMenuRenderKey(
+  squadRecords: SquadRosterRecord[],
+  recruitRecords: RecruitCandidateRecord[],
+  activeCount: number,
+  memorialBlock: MemorialReplacementBlockRecord | null
+): string {
+  const squadKey = squadRecords
+    .map((record) => `${record.id}:${record.status}:${record.condition}:${record.weaponId}:${Math.round(record.readiness * 100)}`)
+    .join("|");
+  const campKey = recruitRecords
+    .filter((record) => record.source === "unified-soldier")
+    .slice(0, 4)
+    .map((record) => `${record.id}:${Math.round(record.readiness * 100)}:${record.actionLabel}`)
+    .join("|");
+  return `${activeCount}:${memorialBlock?.reason ?? "clear"}:${squadKey}:${campKey}`;
 }
 
 function buildMemorialRecords(squadRoster: SquadRosterState[]): MemorialRecord[] {
@@ -20766,6 +21227,42 @@ function renderOfficerPrioritySummary(soldiers: TownWarSoldierState[]): string {
   `;
 }
 
+function renderOfficerWorkQueueBridge(campId: TownWarFactionId): string {
+  const report = townWarController.getWorkQueueReport(campId);
+  const activeEntries = report.entries.filter((entry) => entry.state !== "idle").slice(0, 5);
+  const rowMarkup =
+    activeEntries.length > 0
+      ? activeEntries
+          .map(
+            (entry) => `
+              <article class="officer-tools-row officer-work-queue-row">
+                <div>
+                  <strong>${escapeHtml(entry.ownerRead)}</strong>
+                  <span>${escapeHtml(entry.consequenceRead)}</span>
+                </div>
+                <em>${escapeHtml(entry.warning ?? entry.state)}</em>
+              </article>
+            `
+          )
+          .join("")
+      : `<p class="officer-tools-empty">No live colony work yet. Place a trench, stage a casualty, or focus a lane.</p>`;
+  const debrief =
+    report.debriefLines.length > 0
+      ? report.debriefLines.slice(0, 2).map((line) => `<span>${escapeHtml(line)}</span>`).join("")
+      : `<span>No named work consequence recorded yet.</span>`;
+
+  return `
+    <article class="officer-priority-bridge officer-work-queue-bridge">
+      <div class="officer-priority-bridge-head">
+        <span>Work queue</span>
+        <strong>${report.activeCount} active</strong>
+      </div>
+      ${rowMarkup}
+      <div class="officer-work-queue-debrief">${debrief}</div>
+    </article>
+  `;
+}
+
 function getSoldierConditionRead(soldier: TownWarSoldierState): string {
   const healthRatio = soldier.health.max > 0 ? soldier.health.current / soldier.health.max : 0;
   const pressureRatio = soldier.morale.maxPressure > 0 ? soldier.morale.pressure / soldier.morale.maxPressure : 0;
@@ -21151,9 +21648,199 @@ function renderOfficerPrioritiesPane(townWar: TownWarState): string {
         <strong>${soldiers.length}/${liveSoldiers.length} shown</strong>
       </div>
       ${renderOfficerPrioritySummary(liveSoldiers)}
+      ${renderOfficerWorkQueueBridge(campId)}
       ${renderOfficerSelectedSoldierCard(townWar, soldiers)}
       ${soldierMarkup}
     </div>
+    <p class="officer-tools-action-read">${escapeHtml(officerToolsState.lastAction)}</p>
+  `;
+}
+
+function renderOfficerPushPane(townWar: TownWarState): string {
+  const campId = getOfficerCamp(townWar);
+  const targetCampId = campId === "camp-a" ? "camp-b" : "camp-a";
+  const targetCamp = townWar.camps.find((camp) => camp.id === targetCampId) ?? null;
+  const demolitionStock = townWar.demolitionStock.find((stock) => stock.faction === campId) ?? null;
+  const targetWeakPoints = townWar.campWeakPoints.filter((weakPoint) => weakPoint.campId === targetCampId);
+  const playerSoldiers = townWar.soldiers.filter((soldier) => soldier.faction === campId && soldier.health.current > 0);
+  const activeExpeditions = townWar.expeditions.filter(
+    (expedition) => expedition.faction === campId && expedition.status !== "completed" && expedition.status !== "failed"
+  );
+  const activeBreaches = townWar.campBreaches.filter(
+    (breach) => breach.attackerFaction === campId && breach.status !== "completed" && breach.status !== "failed"
+  );
+  const latestExpedition =
+    activeExpeditions[0] ?? townWar.expeditions.find((expedition) => expedition.faction === campId) ?? null;
+  const latestBreach = townWar.campBreaches.find((breach) => breach.attackerFaction === campId) ?? null;
+  const objectiveButtons: Array<{ id: TownWarExpeditionObjectiveId; label: string; read: string }> = [
+    { id: "extend-trench", label: "Extend trench", read: "builder-led push toward school ruins" },
+    { id: "stock-forward-line", label: "Stock line", read: "hauler-led ammo check for the forward trench" },
+    { id: "probe-enemy-approach", label: "Probe approach", read: "small team tests the Ukrainian route" }
+  ];
+  const objectiveMarkup = objectiveButtons
+    .map(
+      (objective) => `
+        <article class="officer-tools-row">
+          <div>
+            <strong>${escapeHtml(objective.label)}</strong>
+            <span>${escapeHtml(objective.read)}</span>
+          </div>
+          <button type="button" data-officer-expedition="${objective.id}">Order</button>
+        </article>
+      `
+    )
+    .join("");
+  const activeMarkup =
+    activeExpeditions.length > 0
+      ? activeExpeditions
+          .map((expedition) => {
+            const names = expedition.assignedSoldierIds
+              .map((soldierId) => townWar.soldiers.find((soldier) => soldier.id === soldierId)?.displayName ?? soldierId)
+              .join(", ");
+            return `
+              <article class="officer-tools-row">
+                <div>
+                  <strong>${escapeHtml(`${expedition.label} | ${expedition.status}`)}</strong>
+                  <span>${escapeHtml(`${Math.round(expedition.progress * 100)}% route | danger ${Math.round(expedition.danger * 100)}% | ${names}`)}</span>
+                  <span>${escapeHtml(expedition.readable)}</span>
+                </div>
+                <button type="button" data-officer-expedition-retreat="${escapeHtml(expedition.id)}">Retreat</button>
+              </article>
+            `;
+          })
+          .join("")
+      : `<p class="officer-tools-empty">No active push group. Order four or five named Russian soldiers into one objective.</p>`;
+  const beatMarkup =
+    latestExpedition && latestExpedition.beats.length > 0
+      ? latestExpedition.beats
+          .slice(-6)
+          .reverse()
+          .map(
+            (beat) => `
+              <article class="officer-tools-row officer-tools-row-compact">
+                <div>
+                  <strong>${escapeHtml(beat.kind)}</strong>
+                  <span>${escapeHtml(beat.summary)}</span>
+                  <span>${escapeHtml(beat.consequence)}</span>
+                </div>
+                <em>${escapeHtml(beat.scarTag ?? "route")}</em>
+              </article>
+            `
+          )
+          .join("")
+      : `<p class="officer-tools-empty">Route beats will appear here: spotted, pinned, low ammo, retreating, or reached line.</p>`;
+  const routeScars = townWar.locationScars
+    .filter((scar) => scar.controlSide === campId && scar.tags.some((tag) => tag.includes("route") || tag.includes("road") || tag.includes("tree") || tag.includes("contested")))
+    .slice(0, 4);
+  const scarMarkup =
+    routeScars.length > 0
+      ? routeScars.map((scar) => `<span>${escapeHtml(`${scar.label}: ${scar.tags.slice(0, 2).join(", ")}`)}</span>`).join("")
+      : `<span>No route scar yet.</span>`;
+  const weakPointMarkup =
+    targetWeakPoints.length > 0
+      ? targetWeakPoints
+          .map((weakPoint) => {
+            const healthRead = `${Math.round(weakPoint.health)}/${weakPoint.maxHealth}`;
+            const disabled = weakPoint.status === "destroyed" ? " disabled" : "";
+            const buttonLabel = weakPoint.status === "destroyed" ? "Down" : "Breach";
+            return `
+              <article class="officer-tools-row">
+                <div>
+                  <strong>${escapeHtml(`${weakPoint.label} | ${weakPoint.status}`)}</strong>
+                  <span>${escapeHtml(`${healthRead} | ${weakPoint.effects.join(", ")}`)}</span>
+                  <span>${escapeHtml(weakPoint.readable)}</span>
+                </div>
+                <button type="button" data-officer-camp-breach="${escapeHtml(weakPoint.id)}"${disabled}>${buttonLabel}</button>
+              </article>
+            `;
+          })
+          .join("")
+      : `<p class="officer-tools-empty">No enemy camp weak points registered.</p>`;
+  const breachMarkup =
+    activeBreaches.length > 0
+      ? activeBreaches
+          .map((breach) => {
+            const weakPoint = targetWeakPoints.find((entry) => entry.id === breach.weakPointId) ?? null;
+            const names = breach.assignedSoldierIds
+              .map((soldierId) => townWar.soldiers.find((soldier) => soldier.id === soldierId)?.displayName ?? soldierId)
+              .join(", ");
+            return `
+              <article class="officer-tools-row">
+                <div>
+                  <strong>${escapeHtml(`${weakPoint?.label ?? breach.weakPointId} | ${breach.status}`)}</strong>
+                  <span>${escapeHtml(`${Math.round(breach.progress * 100)}% route | ${breach.tool} | suppression ${Math.round(breach.suppression * 100)}%`)}</span>
+                  <span>${escapeHtml(`${names} | ${breach.readable}`)}</span>
+                </div>
+                <em>${escapeHtml(`${Math.round(breach.damageApplied)} dmg`)}</em>
+              </article>
+            `;
+          })
+          .join("")
+      : `<p class="officer-tools-empty">No active camp breach. Prepare stock, choose a weak point, and send a small team.</p>`;
+
+  return `
+    <article class="officer-tools-note officer-colony-status-card">
+      <strong>Small push group</strong>
+      <span>${escapeHtml(`${playerSoldiers.length} Russian soldiers available. Expeditions auto-fill builder, suppressor, rifleman, medic, and hauler roles without turning them into RTS puppets.`)}</span>
+      <div class="officer-colony-meter-grid">
+        <span>Active ${activeExpeditions.length}</span>
+        <span>Latest ${latestExpedition ? latestExpedition.status : "none"}</span>
+        <span>Breach ${latestBreach ? latestBreach.status : "none"}</span>
+        <span>Stock ${demolitionStock ? demolitionStock.grenades + demolitionStock.satchels + demolitionStock.demoCharges + demolitionStock.rpgRounds : 0}</span>
+      </div>
+    </article>
+    <div class="officer-tools-section">
+      <div class="officer-tools-section-head">
+        <span>Demolition stock</span>
+        <strong>${escapeHtml(demolitionStock?.readable ?? "none")}</strong>
+      </div>
+      <article class="officer-tools-row">
+        <div>
+          <strong>Prep demo package</strong>
+          <span>${escapeHtml("Uses Russian camp ammo/build supply to stage grenades, one satchel, one demo charge, and one RPG round.")}</span>
+        </div>
+        <button type="button" data-officer-demolition-prep="1">Prep</button>
+      </article>
+    </div>
+    <div class="officer-tools-section">
+      <div class="officer-tools-section-head">
+        <span>Enemy weak points</span>
+        <strong>${escapeHtml(targetCamp?.label ?? targetCampId)}</strong>
+      </div>
+      ${weakPointMarkup}
+    </div>
+    <div class="officer-tools-section">
+      <div class="officer-tools-section-head">
+        <span>Active breach</span>
+        <strong>${activeBreaches.length}</strong>
+      </div>
+      ${breachMarkup}
+    </div>
+    <div class="officer-tools-section">
+      <div class="officer-tools-section-head">
+        <span>Order expedition</span>
+        <strong>${escapeHtml(getOfficerCampLabel(townWar))}</strong>
+      </div>
+      ${objectiveMarkup}
+    </div>
+    <div class="officer-tools-section">
+      <div class="officer-tools-section-head">
+        <span>Active push</span>
+        <strong>${activeExpeditions.length}</strong>
+      </div>
+      ${activeMarkup}
+    </div>
+    <div class="officer-tools-section">
+      <div class="officer-tools-section-head">
+        <span>Route story</span>
+        <strong>${latestExpedition ? latestExpedition.id.replace("town-war-", "") : "standby"}</strong>
+      </div>
+      ${beatMarkup}
+    </div>
+    <article class="officer-tools-note officer-colony-status-card">
+      <strong>Route scars</strong>
+      <div class="officer-tools-mini-list">${scarMarkup}</div>
+    </article>
     <p class="officer-tools-action-read">${escapeHtml(officerToolsState.lastAction)}</p>
   `;
 }
@@ -21397,6 +22084,22 @@ function renderOfficerDebriefPane(townWar: TownWarState): string {
   const campId = getOfficerCamp(townWar);
   const operationDebrief = townWar.operation.lastDebrief;
   const operationRecommendations = (operationDebrief?.recommendations ?? townWar.operation.recommendations).slice(0, 4);
+  const renderOperationRows = (rows: string[], empty: string, label: string): string =>
+    rows.length > 0
+      ? rows
+          .slice(0, 5)
+          .map(
+            (row) => `
+              <article class="officer-tools-row">
+                <div>
+                  <strong>${escapeHtml(label)}</strong>
+                  <span>${escapeHtml(row)}</span>
+                </div>
+              </article>
+            `
+          )
+          .join("")
+      : `<p class="officer-tools-empty">${escapeHtml(empty)}</p>`;
   const operationRecommendationMarkup =
     operationRecommendations.length > 0
       ? operationRecommendations
@@ -21412,6 +22115,24 @@ function renderOfficerDebriefPane(townWar: TownWarState): string {
           )
           .join("")
       : `<p class="officer-tools-empty">No operation recommendations yet.</p>`;
+  const operationSupplyMarkup = operationDebrief
+    ? `
+      <div class="officer-tools-grid">
+        <article class="officer-tools-stat">
+          <span>Banked ammo</span>
+          <strong>${operationDebrief.bankedSupply.ammo}</strong>
+        </article>
+        <article class="officer-tools-stat">
+          <span>Banked build</span>
+          <strong>${operationDebrief.bankedSupply.build}</strong>
+        </article>
+        <article class="officer-tools-stat">
+          <span>Lost/spent</span>
+          <strong>${operationDebrief.lostSupply.ammo + operationDebrief.lostSupply.build + operationDebrief.lostSupply.food + operationDebrief.lostSupply.med}</strong>
+        </article>
+      </div>
+    `
+    : "";
   const namedStories = townWar.frontlineStories.filter((story) => story.faction === campId).slice(0, 6);
   const namedStoryMarkup =
     namedStories.length > 0
@@ -21474,12 +22195,34 @@ function renderOfficerDebriefPane(townWar: TownWarState): string {
         <button type="button" data-officer-operation="start">Start next op</button>
       </div>
     </article>
+    ${operationSupplyMarkup}
     <div class="officer-tools-section">
       <div class="officer-tools-section-head">
         <span>Operation recommendations</span>
         <strong>${operationRecommendations.length}</strong>
       </div>
       ${operationRecommendationMarkup}
+    </div>
+    <div class="officer-tools-section">
+      <div class="officer-tools-section-head">
+        <span>Building combo</span>
+        <strong>${operationDebrief?.buildingComboLines.length ?? 0}</strong>
+      </div>
+      ${renderOperationRows(operationDebrief?.buildingComboLines ?? [], "End an operation to see which trench, ammo, dugout, wire, and sandbag choices mattered.", "Position")}
+    </div>
+    <div class="officer-tools-section">
+      <div class="officer-tools-section-head">
+        <span>Work and soldiers</span>
+        <strong>${(operationDebrief?.workLines.length ?? 0) + (operationDebrief?.soldierLines.length ?? 0)}</strong>
+      </div>
+      ${renderOperationRows([...(operationDebrief?.workLines ?? []), ...(operationDebrief?.soldierLines ?? [])], "End an operation to carry named worker and casualty records forward.", "Carryover")}
+    </div>
+    <div class="officer-tools-section">
+      <div class="officer-tools-section-head">
+        <span>Route and camp damage</span>
+        <strong>${(operationDebrief?.routeLines.length ?? 0) + (operationDebrief?.campDamageLines.length ?? 0)}</strong>
+      </div>
+      ${renderOperationRows([...(operationDebrief?.routeLines ?? []), ...(operationDebrief?.campDamageLines ?? [])], "Order an expedition or breach to create route and weak-point debrief lines.", "After-action")}
     </div>
     <div class="officer-tools-section">
       <div class="officer-tools-section-head">
@@ -21509,12 +22252,184 @@ function renderOfficerDebriefPane(townWar: TownWarState): string {
   `;
 }
 
+function renderFirstMinuteRail(townWar: TownWarState): void {
+  const onboarding = raidController.state.officerOnboarding;
+  if (
+    onboarding.squadCommandUnlocked &&
+    onboarding.promotionReason !== null &&
+    officerToolsState.promotionRailSeenReason !== onboarding.promotionReason
+  ) {
+    officerToolsState.firstMinuteDismissed = false;
+    officerToolsState.promotionRailSeenReason = onboarding.promotionReason;
+  }
+  const promotionVisible =
+    raidController.state.phase === "raid" && !officerToolsState.firstMinuteDismissed && !onboarding.squadCommandUnlocked;
+  const commandReadyVisible =
+    raidController.state.phase === "raid" &&
+    !officerToolsState.firstMinuteDismissed &&
+    onboarding.squadCommandUnlocked &&
+    raidController.state.squadMates.length === 0;
+  const active = raidController.state.phase === "raid" && !officerToolsState.firstMinuteDismissed;
+  firstMinuteRail.classList.toggle("hidden", !active);
+  firstMinuteRail.classList.toggle("first-minute-rail-promotion", promotionVisible || commandReadyVisible);
+  document.body.classList.toggle("town-war-first-minute", active);
+  if (!active) {
+    return;
+  }
+
+  if (promotionVisible || commandReadyVisible) {
+    const progressPercent = Math.round((onboarding.promotionPoints / Math.max(1, onboarding.promotionThreshold)) * 100);
+    const remainingMinutes = Math.ceil(Math.max(0, onboarding.targetSeconds - onboarding.survivedSeconds) / 60);
+    const title = commandReadyVisible ? onboarding.promotionTitle : `Promotion ${progressPercent}%`;
+    const copy = commandReadyVisible
+      ? "Authorization received. Open Squad and assign one camp soldier to your live shoulder, then start shaping the camp."
+      : `${onboarding.promotionSummary} ${remainingMinutes > 0 ? `${remainingMinutes} minute${remainingMinutes === 1 ? "" : "s"} left by survival, or earn it faster through kills, caches, intel, and loot.` : ""}`;
+    const steps = [
+      {
+        label: "Survive",
+        done: onboarding.survivedSeconds >= Math.min(90, onboarding.targetSeconds),
+        text: `${Math.floor(onboarding.survivedSeconds)}s`
+      },
+      {
+        label: "Combat",
+        done: raidController.state.currentRaidStats.scavsKilled > 0,
+        text: `${raidController.state.currentRaidStats.scavsKilled} kills`
+      },
+      {
+        label: "Scout",
+        done: raidController.state.currentRaidStats.cachesSearched > 0 || raidController.state.currentRaidStats.intelSecured > 0,
+        text: `${raidController.state.currentRaidStats.cachesSearched + raidController.state.currentRaidStats.intelSecured} finds`
+      },
+      {
+        label: "Command",
+        done: onboarding.squadCommandUnlocked,
+        text: onboarding.squadCommandUnlocked ? "open" : `${progressPercent}%`
+      }
+    ];
+
+    setTextIfChanged(firstMinuteTitleValue, title);
+    setTextIfChanged(firstMinuteCopyValue, copy);
+    setHtmlIfChanged(
+      firstMinuteStepsValue,
+      steps
+        .map(
+          (step) => `
+            <span class="${step.done ? "done" : ""}">
+              <strong>${escapeHtml(step.label)}</strong>
+              ${escapeHtml(step.text)}
+            </span>
+          `
+        )
+        .join("")
+    );
+    const actionMarkup = commandReadyVisible
+      ? `
+        <button type="button" data-first-minute-action="squad">Open Squad</button>
+        <button type="button" data-first-minute-action="priorities">Priorities</button>
+        <button type="button" data-first-minute-action="objective">Camp Read</button>
+      `
+      : `
+      `;
+    const actions = firstMinuteRail.querySelector<HTMLElement>(".first-minute-actions");
+    if (actions) {
+      setHtmlIfChanged(actions, actionMarkup);
+    }
+    return;
+  }
+
+  const campId = getOfficerCamp(townWar);
+  const friendlyCamp = townWar.camps.find((camp) => camp.id === campId);
+  const enemyCamp = townWar.camps.find((camp) => camp.id !== campId);
+  const activeTrenchOrders = townWar.orders.filter((order) => order.faction === campId && order.kind === "trench" && order.status !== "completed");
+  const trenchSlots = townWar.aiTactics.coverSlots.filter((slot) => slot.faction === campId && slot.sourceKind === "trench");
+  const occupiedTrenchSlots = trenchSlots.filter((slot) => slot.occupiedBySoldierId !== null);
+  const liveSoldiers = townWar.soldiers.filter((soldier) => soldier.faction === campId && soldier.health.current > 0);
+  const builder = liveSoldiers.find((soldier) => soldier.role === "builder") ?? liveSoldiers[0] ?? null;
+  const title =
+    trenchSlots.length > 0
+      ? `${occupiedTrenchSlots.length}/${trenchSlots.length} trench bays occupied`
+      : activeTrenchOrders.length > 0
+        ? "Builder is moving to the trench order"
+        : "Russian camp online";
+  const copy =
+    officerToolsState.placementMode === "trench"
+      ? "Move the trench ghost near the road, scroll to rotate the firing side, then left-click to order construction."
+      : trenchSlots.length > 0
+        ? "Use Priorities to decide who builds, defends, suppresses, rescues, or hauls ammo for the next push."
+        : `First order: place a trench between ${friendlyCamp ? "Russian Camp" : "your camp"} and ${enemyCamp ? "Ukrainian Enemy Camp" : "the enemy camp"}. ${builder ? `${builder.displayName} can carry it if Build stays high.` : ""}`;
+  const steps = [
+    {
+      label: "Build",
+      done: trenchSlots.length > 0 || activeTrenchOrders.length > 0 || officerToolsState.placementMode === "trench",
+      text: officerToolsState.placementMode === "trench" ? "ghost armed" : trenchSlots.length > 0 ? "line started" : "place trench"
+    },
+    {
+      label: "Priorities",
+      done: officerToolsState.open && officerToolsState.pane === "priorities",
+      text: "jobs"
+    },
+    {
+      label: "Inspect",
+      done: officerToolsState.selectedSoldierId !== null,
+      text: "names"
+    },
+    {
+      label: "Objective",
+      done: officerToolsState.open && officerToolsState.pane === "camp",
+      text: "camp read"
+    }
+  ];
+
+  setTextIfChanged(firstMinuteTitleValue, title);
+  setTextIfChanged(firstMinuteCopyValue, copy);
+  setHtmlIfChanged(
+    firstMinuteStepsValue,
+    steps
+      .map(
+        (step) => `
+          <span class="${step.done ? "done" : ""}">
+            <strong>${escapeHtml(step.label)}</strong>
+            ${escapeHtml(step.text)}
+          </span>
+        `
+      )
+      .join("")
+  );
+  const actions = firstMinuteRail.querySelector<HTMLElement>(".first-minute-actions");
+  if (actions) {
+    setHtmlIfChanged(
+      actions,
+      `
+        <button type="button" data-first-minute-action="place-trench">Place trench</button>
+        <button type="button" data-first-minute-action="priorities">Priorities</button>
+        <button type="button" data-first-minute-action="objective">Objective</button>
+      `
+    );
+  }
+}
+
 function renderOfficerTools(): void {
   townWarController.ensureDemoSeeded();
   syncOfficerBuildPlacementPreview();
   const townWar = townWarController.getSnapshot();
+  renderFirstMinuteRail(townWar);
   const campLabel = getOfficerCampLabel(townWar);
   const buildModeActive = officerToolsState.buildModeOpen || officerToolsState.placementMode !== null;
+  const townWarOfficerModeActive = raidController.state.phase === "raid";
+  const officerCommandLocked = townWarOfficerModeActive && !raidController.state.officerOnboarding.squadCommandUnlocked;
+  const inspectModeActive = townWarOfficerModeActive && officerToolsState.open && officerToolsState.pane === "priorities";
+  document.body.classList.toggle("town-war-officer-mode", townWarOfficerModeActive);
+  document.body.classList.toggle("officer-command-locked", officerCommandLocked);
+  document.body.classList.toggle("town-war-readability-inspect-mode", inspectModeActive);
+  if (officerCommandLocked) {
+    officerToolsState.open = false;
+    officerToolsState.buildModeOpen = false;
+    officerToolsState.placementMode = null;
+    raidHudState.squadMenuOpen = false;
+  }
+  if (townWarOfficerModeActive) {
+    raidHudState.tacticalDrawerOpen = false;
+  }
   document.body.classList.toggle("town-war-build-mode", raidController.state.phase === "raid" && buildModeActive);
   buildModeToggleButton.setAttribute("aria-expanded", buildModeActive ? "true" : "false");
   buildModeToggleButton.classList.toggle("active", buildModeActive);
@@ -21554,11 +22469,14 @@ function renderOfficerTools(): void {
       ? renderOfficerBuildPane(townWar)
       : officerToolsState.pane === "priorities"
         ? renderOfficerPrioritiesPane(townWar)
+        : officerToolsState.pane === "push"
+          ? renderOfficerPushPane(townWar)
         : officerToolsState.pane === "camp"
           ? renderOfficerCampPane(townWar)
           : renderOfficerDebriefPane(townWar);
   setHtmlIfChanged(officerToolsBodyValue, body);
   getActiveRaidScene()?.setTownWarSelectedSoldierId(officerToolsState.selectedSoldierId);
+  getActiveRaidScene()?.setTownWarReadabilityInspectMode(inspectModeActive);
 }
 
 function getSurvivorActorFrameRing(activeKnifeEvent: SurvivorTestKnifeEvent | null): string[] {
@@ -23012,8 +23930,9 @@ function updateUi(): void {
   const bestRouteWeaponId = getBestWeaponForRoute(route.id);
   const routeBuildingOccupationEntries = getRouteBuildingOccupationEntries(route, raidController.state.obstacles);
   const routeIdentityRead = buildRouteIdentityRead(route, routeBuildingOccupationEntries);
+  const townWarForOperator = townWarController.getSnapshot();
   const squadRosterRecords = buildSquadRosterRecords(squadRoster, squadMates);
-  const recruitRecords = buildRecruitRecords(recruitPool);
+  const recruitRecords = buildRecruitRecords(recruitPool, townWarForOperator.unifiedSoldiers);
   const memorialReplacementBlock = getMemorialReplacementBlock(squadRosterRecords);
   const memorialRecords = buildMemorialRecords(squadRoster);
   const squadCadenceBoard = buildSquadCadenceBoard(squadRosterRecords, recruitRecords, lastRaidSummary);
@@ -23583,10 +24502,25 @@ function updateUi(): void {
   frontlineAftermathValue.innerHTML = renderFrontlineAftermath(frontlineIncidents);
   if (phase !== "raid") {
     raidHudState.tacticalDrawerOpen = false;
+    raidHudState.squadMenuOpen = false;
   }
   hudDrawer.classList.toggle("controls-card-collapsed", !raidHudState.tacticalDrawerOpen || phase !== "raid");
   hudToggleButton.setAttribute("aria-expanded", raidHudState.tacticalDrawerOpen && phase === "raid" ? "true" : "false");
   hudToggleButton.textContent = raidHudState.tacticalDrawerOpen && phase === "raid" ? "Close Tac Map" : "Open Tac Map";
+  const activeSquadCount = squadRosterRecords.filter((record) => record.status === "active").length;
+  raidSquadDockValue.classList.toggle("hidden", phase !== "raid");
+  raidSquadPanelValue.classList.toggle("hidden", !raidHudState.squadMenuOpen || phase !== "raid");
+  raidSquadToggleButton.setAttribute("aria-expanded", raidHudState.squadMenuOpen && phase === "raid" ? "true" : "false");
+  raidSquadToggleButton.classList.toggle("active", raidHudState.squadMenuOpen && phase === "raid");
+  raidSquadStatusValue.textContent = `${activeSquadCount}/3`;
+  raidSquadTitleValue.textContent = activeSquadCount > 0 ? "Live squad" : "No attached squad";
+  const raidSquadMenuKey = buildRaidSquadMenuRenderKey(squadRosterRecords, recruitRecords, activeSquadCount, memorialReplacementBlock);
+  if (!raidHudState.squadMenuOpen || phase !== "raid") {
+    raidHudState.squadMenuRenderKey = "";
+  } else if (raidHudState.squadMenuRenderKey !== raidSquadMenuKey) {
+    raidSquadBodyValue.innerHTML = renderRaidSquadMenu(squadRosterRecords, recruitRecords, activeSquadCount, memorialReplacementBlock);
+    raidHudState.squadMenuRenderKey = raidSquadMenuKey;
+  }
   document.body.classList.toggle("raid-hud-tactical-open", raidHudState.tacticalDrawerOpen && phase === "raid");
   const stashOpen = phase !== "raid" && !frontDoorOpen;
   document.body.classList.toggle("stash-open", stashOpen);
@@ -24975,7 +25909,7 @@ function stageDebugSquadRosterShowcase(): void {
       readiness: 0.68,
       hook: "Apartment-block cleaner who wants a faster way into hard rooms."
     }
-  ];
+  ].map((candidate, index) => createStaticRecruitCandidate(candidate, index, "memorial-showcase"));
   raidController.state.squadMates = [
     {
       id: "rook",
@@ -26506,7 +27440,7 @@ function stageDebugMemorialWallShowcase(): void {
       readiness: 0.67,
       hook: "Fresh breach body waiting for the line to decide whether grief or greed owns the next raid."
     }
-  ];
+  ].map((candidate, index) => createStaticRecruitCandidate(candidate, index, "story-finale"));
   raidController.state.squadMates = [
     {
       id: "rook",
@@ -34692,11 +35626,44 @@ interface TopDownExtractionDebugApi {
   stageRetakePeelShowcase: () => void;
 }
 
+type TownWarSceneRuntimeReport = ReturnType<RaidScene["getTownWarRenderDebugReport"]>;
+
+interface TownWarRuntimeReport {
+  fps: number;
+  frameTimeMs: number;
+  townWarRealtimeEnabled: boolean;
+  playerPathSamples: number;
+  heatmapCells: number;
+  clockSeconds: number;
+  soldiers: number;
+  unifiedSoldiers: number;
+  combatants: number;
+  orders: number;
+  activeOrders: number;
+  completedOrders: number;
+  trenchSlots: number;
+  ammoCrates: number;
+  dugouts: number;
+  scene: TownWarSceneRuntimeReport | null;
+}
+
 interface TopDownExtractionAgentApi {
   getSnapshot: () => ReturnType<typeof getAgentSnapshot>;
   getOptions: () => ReturnType<typeof getAgentOptions>;
   configureNextRaid: (config: AgentConfigureInput) => ReturnType<typeof getAgentSnapshot>;
   stageState: (stateId: AgentStageStateId) => ReturnType<typeof getAgentSnapshot>;
+  resetTownWar: () => {
+    ok: boolean;
+    summary: string;
+    report: TownWarRuntimeReport;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  getTownWarRuntimeReport: () => {
+    ok: boolean;
+    summary: string;
+    report: TownWarRuntimeReport;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
   damageTownWarCamp: (payload: { campId: "camp-a" | "camp-b"; amount: number }) => ReturnType<typeof getAgentSnapshot>;
   lootTownWarAmmoCrate: (payload: { crateId: string; looterFaction: "camp-a" | "camp-b" }) => {
     ok: boolean;
@@ -34704,10 +35671,38 @@ interface TopDownExtractionAgentApi {
     crate: import("./game/townWar/state").TownWarAmmoCrateState | null;
     war: ReturnType<typeof getAgentSnapshot>["war"] | null;
   };
+  stageTownWarAmmoCrateStock: (payload: { crateId: string; ammo: number }) => {
+    ok: boolean;
+    summary: string;
+    crate: import("./game/townWar/state").TownWarAmmoCrateState | null;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  stageTownWarSoldierPressure: (payload: { soldierId: string; pressure: number }) => {
+    ok: boolean;
+    summary: string;
+    soldier: import("./game/townWar/state").TownWarSoldierState | null;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  assignUnifiedSoldierToSquad: (payload: { unifiedSoldierId: string }) => {
+    ok: boolean;
+    summary: string;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  unassignUnifiedSoldierFromSquad: (payload: { unifiedSoldierId: string }) => {
+    ok: boolean;
+    summary: string;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
   orderTownWarTrench: (payload: { campId: "camp-a" | "camp-b"; x?: number; y?: number; facingAngleRadians?: number }) => {
     ok: boolean;
     summary: string;
     order: import("./game/townWar/controller").TownWarOfficerOrderResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  placeDebugTownWarTrench: (payload: { campId: "camp-a" | "camp-b"; x?: number; y?: number; facingAngleRadians?: number }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarDebugTrenchResult;
     war: ReturnType<typeof getAgentSnapshot>["war"] | null;
   };
   orderTownWarAmmoCrate: (payload: { campId: "camp-a" | "camp-b"; x?: number; y?: number }) => {
@@ -34732,6 +35727,84 @@ interface TopDownExtractionAgentApi {
     ok: boolean;
     summary: string;
     report: ReturnType<typeof townWarController.getDugoutReport>;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  getTownWarTrenchNetworkReport: () => {
+    ok: boolean;
+    summary: string;
+    report: ReturnType<typeof townWarController.getTrenchNetworkReport>;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  orderTownWarSandbags: (payload: { campId: "camp-a" | "camp-b"; coverSlotId?: string; networkId?: string; segmentId?: string; x?: number; y?: number }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarFieldworkUpgradeResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  orderTownWarWire: (payload: { campId: "camp-a" | "camp-b"; coverSlotId?: string; networkId?: string; segmentId?: string; x?: number; y?: number }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarFieldworkUpgradeResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  getTownWarBuildingComboReport: () => {
+    ok: boolean;
+    summary: string;
+    report: ReturnType<typeof townWarController.getBuildingComboReport>;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  getTownWarWorkQueueReport: (payload?: { campId?: "camp-a" | "camp-b" }) => {
+    ok: boolean;
+    summary: string;
+    report: ReturnType<typeof townWarController.getWorkQueueReport>;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  orderTownWarExpedition: (payload: { campId: "camp-a" | "camp-b"; objective?: TownWarExpeditionObjectiveId; soldierIds?: string[] }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarExpeditionOrderResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  requestTownWarExpeditionRetreat: (payload: { expeditionId: string }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarExpeditionOrderResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  getTownWarExpeditionReport: (payload?: { expeditionId?: string }) => {
+    ok: boolean;
+    summary: string;
+    report: ReturnType<typeof townWarController.getExpeditionReport>;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  prepareTownWarDemolition: (payload?: { campId?: "camp-a" | "camp-b"; grenades?: number; satchels?: number; demoCharges?: number; rpgRounds?: number }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarDemolitionPrepResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  orderTownWarCampBreach: (payload: {
+    attackerCampId?: "camp-a" | "camp-b";
+    targetCampId?: "camp-a" | "camp-b";
+    weakPointId?: string;
+    weakPointKind?: TownWarCampWeakPointKind;
+    soldierIds?: string[];
+  }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarCampBreachOrderResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  getTownWarCampDamageReport: (payload?: { campId?: "camp-a" | "camp-b" }) => {
+    ok: boolean;
+    summary: string;
+    report: ReturnType<typeof townWarController.getCampDamageReport>;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  getTownWarReadabilityOverlay: () => {
+    ok: boolean;
+    summary: string;
+    overlay: ReturnType<typeof townWarController.getReadabilityOverlay>;
     war: ReturnType<typeof getAgentSnapshot>["war"] | null;
   };
   focusTownWarLane: (payload: { campId: "camp-a" | "camp-b"; lane: import("./game/townWar/controller").TownWarOfficerLaneId }) => {
@@ -34771,6 +35844,24 @@ interface TopDownExtractionAgentApi {
     war: ReturnType<typeof getAgentSnapshot>["war"] | null;
   };
   setTownWarSoldierAmmo: (payload: { soldierId: string; inMag?: number; reserve?: number; maxMag?: number }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarPriorityMutationResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  stageTownWarSoldierTask: (payload: {
+    soldierId: string;
+    kind: import("./game/townWar/types").TownWarTask["kind"];
+    label?: string;
+    x?: number;
+    y?: number;
+  }) => {
+    ok: boolean;
+    summary: string;
+    result: import("./game/townWar/controller").TownWarPriorityMutationResult;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  stageTownWarSoldierInCover: (payload: { soldierId: string; coverSlotId: string; kind?: import("./game/townWar/types").TownWarTask["kind"] }) => {
     ok: boolean;
     summary: string;
     result: import("./game/townWar/controller").TownWarPriorityMutationResult;
@@ -34888,6 +35979,23 @@ interface TopDownExtractionAgentApi {
     summary: string;
     war: ReturnType<typeof getAgentSnapshot>["war"] | null;
   };
+  stageTownWarBuildPreview: (payload: {
+    campId: "camp-a" | "camp-b";
+    kind: "trench" | "ammo-crate" | "dugout" | null;
+    x?: number;
+    y?: number;
+    facingAngleRadians?: number;
+  }) => {
+    ok: boolean;
+    summary: string;
+    overlay: import("./game/townWar/controller").TownWarReadabilityOverlay;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
+  setTownWarOfficerPane: (payload: { pane?: OfficerToolsPaneId; open?: boolean }) => {
+    ok: boolean;
+    summary: string;
+    war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+  };
   reinforceTownWar: (payload: { campId: "camp-a" | "camp-b"; role?: import("./game/townWar/types").TownWarRoleId; count?: number }) => {
     ok: boolean;
     summary: string;
@@ -34897,6 +36005,9 @@ interface TopDownExtractionAgentApi {
   setTopTab: (tabId: TopTabId) => ReturnType<typeof getAgentSnapshot>;
   setCommandTab: (tabId: CommandTabId) => ReturnType<typeof getAgentSnapshot>;
   startRaid: () => ReturnType<typeof getAgentSnapshot>;
+  advanceRaid: (payload?: { seconds?: number; tickSeconds?: number }) => ReturnType<typeof getAgentSnapshot>;
+  completeOfficerSoloSurvival: () => ReturnType<typeof getAgentSnapshot>;
+  rollRecruitCandidates: () => ReturnType<typeof getAgentSnapshot>;
   setMoveInput: (move: { x: number; y: number }) => ReturnType<typeof getAgentSnapshot>;
   setAimTarget: (target: { x: number; y: number }) => ReturnType<typeof getAgentSnapshot>;
   setTriggerHeld: (held: boolean) => ReturnType<typeof getAgentSnapshot>;
@@ -34976,6 +36087,123 @@ const cliRuntimeMetrics = {
   playerPathSamples: [] as Array<{ x: number; y: number; time: number }>,
   raidHeatmapCells: new Map<string, RaidHeatmapCell>()
 };
+
+function resetOfficerTownWarUiState(): void {
+  officerToolsState.open = false;
+  officerToolsState.buildModeOpen = false;
+  officerToolsState.pane = "build";
+  officerToolsState.placementMode = null;
+  officerToolsState.previewWorld = null;
+  officerToolsState.placementAngleRadians = 0;
+  officerToolsState.selectedSoldierId = null;
+  officerToolsState.workLens = "all";
+  officerToolsState.playerCampArtVisible = true;
+  officerToolsState.firstMinuteDismissed = false;
+  officerToolsState.lastAction = "Town war reset. Build mode is ready.";
+  townWarController.clearBuildPlacementPreview();
+  getActiveRaidScene()?.setTownWarPlayerCampArtVisible(true);
+  getActiveRaidScene()?.setTownWarSelectedSoldierId(null);
+}
+
+function resetTownWarRuntimeMetrics(): void {
+  cliRuntimeMetrics.startedAt = performance.now();
+  cliRuntimeMetrics.frameAccumulatorMs = 0;
+  cliRuntimeMetrics.sampleFrames = 0;
+  cliRuntimeMetrics.fps = 0;
+  cliRuntimeMetrics.frameTimeMs = 0;
+  cliRuntimeMetrics.lastFrameAt = performance.now();
+  cliRuntimeMetrics.townWarRealtimeEnabled = raidController.state.phase === "raid";
+  cliRuntimeMetrics.playerSampleAccumulatorMs = 0;
+  cliRuntimeMetrics.heatmapSampleAccumulatorMs = 0;
+  cliRuntimeMetrics.playerPathSamples = [];
+  cliRuntimeMetrics.raidHeatmapCells.clear();
+}
+
+function buildTownWarRuntimeReport(): TownWarRuntimeReport {
+  const townWar = townWarController.getSnapshot();
+  const activeOrders = townWar.orders.filter((order) => order.status !== "completed").length;
+  const completedOrders = townWar.orders.filter((order) => order.status === "completed").length;
+  const trenchSlots = townWar.aiTactics.coverSlots.filter((slot) => slot.sourceKind === "trench").length;
+  const liveAmmoCrates = townWar.ammoCrates.filter((crate) => crate.destroyedAtSeconds === null).length;
+  const liveDugouts = townWar.dugouts.filter((dugout) => dugout.destroyedAtSeconds === null).length;
+
+  return {
+    fps: Number(cliRuntimeMetrics.fps.toFixed(1)),
+    frameTimeMs: Number(cliRuntimeMetrics.frameTimeMs.toFixed(2)),
+    townWarRealtimeEnabled: cliRuntimeMetrics.townWarRealtimeEnabled,
+    playerPathSamples: cliRuntimeMetrics.playerPathSamples.length,
+    heatmapCells: cliRuntimeMetrics.raidHeatmapCells.size,
+    clockSeconds: Number(townWar.clock.seconds.toFixed(2)),
+    soldiers: townWar.soldiers.length,
+    unifiedSoldiers: townWar.unifiedSoldiers.length,
+    combatants: townWar.combatants.length,
+    orders: townWar.orders.length,
+    activeOrders,
+    completedOrders,
+    trenchSlots,
+    ammoCrates: liveAmmoCrates,
+    dugouts: liveDugouts,
+    scene: getActiveRaidScene()?.getTownWarRenderDebugReport() ?? null
+  };
+}
+
+function syncUnifiedSquadRosterToTownWarBridge(): void {
+  const activeRosterIds = raidController.state.squadRoster.filter((mate) => mate.status === "active").map((mate) => mate.id);
+  for (const mate of raidController.state.squadRoster) {
+    if (!mate.id.startsWith("unified-") || mate.status === "killed") {
+      continue;
+    }
+    const soldierId = mate.id.replace(/^unified-/, "");
+    townWarController.setSoldierSquadBridge(soldierId, {
+      status: "assigned",
+      squadSlot: mate.status === "active" ? activeRosterIds.indexOf(mate.id) : null,
+      legacySquadMateId: mate.id,
+      assignedAtSeconds: townWarController.getSnapshot().clock.seconds,
+      operatorMenuVisible: true
+    });
+  }
+}
+
+function resetTownWarPlaySession(): {
+  ok: boolean;
+  summary: string;
+  report: TownWarRuntimeReport;
+  war: ReturnType<typeof getAgentSnapshot>["war"] | null;
+} {
+  clearLegacyRuntimeForNormalStateTransition();
+  closeBriefing();
+  frontDoorState.menuOpen = false;
+  raidHudState.tacticalDrawerOpen = false;
+  townWarController.reset();
+  townWarController.ensureDemoSeeded();
+  townWarController.deployOfficer(TOWN_WAR_PLAYER_FACTION);
+  syncUnifiedSquadRosterToTownWarBridge();
+  resetOfficerTownWarUiState();
+
+  if (raidController.state.phase === "raid") {
+    raidController.state.phase = "stash";
+  }
+
+  if (raidController.state.phase === "stash" && raidController.canStartRaid()) {
+    raidController.startRaid(raidController.state.selectedWeapon);
+  }
+
+  raidController.state.player.position = { ...townWarController.getSnapshot().officer.position };
+  raidController.state.player.health = raidController.state.player.maxHealth;
+  raidController.state.player.casualtyState = "healthy";
+  raidController.state.message = "Town war reset: Russian player camp is live, Ukrainian enemy camp is opposite, and build orders are clean.";
+  resetTownWarRuntimeMetrics();
+  updateUi();
+
+  const snapshot = getAgentSnapshot();
+  const report = buildTownWarRuntimeReport();
+  return {
+    ok: true,
+    summary: `Town war reset cleanly on Russian camp-a: ${report.soldiers} soldiers, ${report.orders} orders, ${report.trenchSlots} trench slots.`,
+    report,
+    war: snapshot.war ?? null
+  };
+}
 
 function getSafePercent(current: number, max: number): number {
   if (max <= 0) {
@@ -35919,6 +37147,7 @@ function getAgentSnapshot() {
   const { state } = raidController;
   townWarController.ensureDemoSeeded();
   const townWar = townWarController.getSnapshot();
+  const townWarReadability = townWarController.getReadabilityOverlay();
   const storyFinaleSummary = getStoryFinaleTriggerSummary(state.raidHistory);
   const pendingStoryFinale = state.phase === "stash" && storyFinaleSummary !== null && storyFinaleState.choice === null;
   const frontDoorOpen = state.phase === "stash" && frontDoorState.menuOpen && !briefingState.open && !pendingStoryFinale;
@@ -36146,7 +37375,7 @@ function getAgentSnapshot() {
       : "unsupported"
   );
   const squadRosterRecords = buildSquadRosterRecords(state.squadRoster, state.squadMates);
-  const recruitRecords = buildRecruitRecords(state.recruitPool);
+  const recruitRecords = buildRecruitRecords(state.recruitPool, townWar.unifiedSoldiers);
   const memorialRecords = buildMemorialRecords(state.squadRoster);
   const normalizedStashItems = buildNormalizedStashItems(currentBenchTiles, currentRackTiles, memorialRecords);
   const stashOperationalBoard = buildStashOperationalBoard(
@@ -36468,8 +37697,10 @@ function getAgentSnapshot() {
       debriefEchoes: townWar.debriefEchoes,
       flankPressures: townWar.flankPressures,
       skillDebrief: townWar.skillDebrief,
+      frontlineStories: townWar.frontlineStories,
       storyPackAudit: validateDialogueStoryPacks(),
       aiThreats: townWar.aiThreats,
+      readability: townWarReadability,
       aiTactics: townWar.aiTactics,
       coverSlots: townWar.aiTactics.coverSlots,
       suppressionFields: townWar.aiTactics.suppressionFields,
@@ -36501,6 +37732,7 @@ function getAgentSnapshot() {
         trustInOfficer: soldier.dramaArc.trustInOfficer,
         relationshipPressure: soldier.dramaArc.relationshipPressure
       })),
+      unifiedSoldiers: townWar.unifiedSoldiers,
       camps: townWar.camps.map((camp) => ({
         id: camp.id,
         side: camp.id === "camp-a" ? "a" : "b",
@@ -36571,6 +37803,18 @@ function getAgentSnapshot() {
       projectedReserveAmmo: raidController.getProjectedReserveAmmo(),
       selectedWeapon: state.selectedWeapon,
       selectedTacticalService: state.selectedTacticalService,
+      officerOnboarding: {
+        stage: state.officerOnboarding.stage,
+        survivedSeconds: Number(state.officerOnboarding.survivedSeconds.toFixed(1)),
+        targetSeconds: state.officerOnboarding.targetSeconds,
+        remainingSeconds: Number(Math.max(0, state.officerOnboarding.targetSeconds - state.officerOnboarding.survivedSeconds).toFixed(1)),
+        promotionPoints: Number(state.officerOnboarding.promotionPoints.toFixed(1)),
+        promotionThreshold: state.officerOnboarding.promotionThreshold,
+        promotionReason: state.officerOnboarding.promotionReason,
+        promotionTitle: state.officerOnboarding.promotionTitle,
+        promotionSummary: state.officerOnboarding.promotionSummary,
+        squadCommandUnlocked: state.officerOnboarding.squadCommandUnlocked
+      },
       firstSession: {
         active: firstSessionRead.active,
         stage: firstSessionRead.stage,
@@ -36671,6 +37915,24 @@ function getAgentSnapshot() {
         status: lane.status,
         blocker: lane.blocker,
         tone: lane.tone
+      })),
+      recruitCandidates: recruitRecords.map((record) => ({
+        id: record.id,
+        name: record.name,
+        role: record.role,
+        source: record.source,
+        readiness: Number(record.readiness.toFixed(2)),
+        difficulty: record.difficulty,
+        rollLabel: record.rollLabel,
+        trait: record.trait
+          ? {
+              id: record.trait.id,
+              label: record.trait.label,
+              upside: record.trait.upside,
+              downside: record.trait.downside
+            }
+          : null,
+        stats: record.stats ? { ...record.stats } : null
       })),
       memorialDebt: memorialRecords.map((entry) => ({
         id: entry.id,
@@ -37738,15 +39000,7 @@ function stageAgentState(stateId: AgentStageStateId): ReturnType<typeof getAgent
   }
 
   if (stateId === "town-war") {
-    if (raidController.state.phase === "stash") {
-      clearLegacyRuntimeForNormalStateTransition();
-      townWarController.reset();
-      townWarController.ensureDemoSeeded();
-      cliRuntimeMetrics.townWarRealtimeEnabled = true;
-      raidController.state.player.position = { ...townWarController.getSnapshot().officer.position };
-      raidController.state.message = "Town war staged: seeded demo soldiers + town/camps for an active match.";
-      updateUi();
-    }
+    resetTownWarPlaySession();
     return getAgentSnapshot();
   }
 
@@ -37947,6 +39201,122 @@ const topDownWindow = window as Window & {
   __topdownExtractionDebug?: TopDownExtractionDebugApi;
   __topdownExtractionAgentApi?: TopDownExtractionAgentApi;
 };
+const LIVE_AGENT_BRIDGE_BASE_PATH = "/__live-agent-bridge";
+const liveAgentBridgePageId = `live-agent-${Math.random().toString(36).slice(2, 10)}`;
+const liveAgentBridgeSessionId = `live-session-${Math.random().toString(36).slice(2, 10)}`;
+const allowAutomatedLiveAgentBridge = debugParams.get("debugLiveAgentBridge") === "1";
+let liveAgentBridgePollInFlight = false;
+
+function canServeLiveAgentBridge(): boolean {
+  return typeof fetch === "function" && (!navigator.webdriver || allowAutomatedLiveAgentBridge);
+}
+
+async function postLiveAgentBridge(path: string, payload: unknown): Promise<void> {
+  await fetch(`${LIVE_AGENT_BRIDGE_BASE_PATH}${path}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
+async function heartbeatLiveAgentBridge(): Promise<void> {
+  try {
+    await postLiveAgentBridge("/heartbeat", {
+      sessionId: liveAgentBridgeSessionId,
+      pageId: liveAgentBridgePageId,
+      href: window.location.href,
+      visibilityState: document.visibilityState
+    });
+  } catch {
+    // Ignore relay heartbeat failures during normal play.
+  }
+}
+
+async function resolveLiveAgentBridgeRequest(requestId: string, ok: boolean, result: unknown): Promise<void> {
+  try {
+    await postLiveAgentBridge("/resolve", {
+      sessionId: liveAgentBridgeSessionId,
+      pageId: liveAgentBridgePageId,
+      requestId,
+      ok,
+      result
+    });
+  } catch {
+    // Ignore relay resolution failures so local play stays responsive.
+  }
+}
+
+async function pollLiveAgentBridge(): Promise<void> {
+  if (liveAgentBridgePollInFlight) {
+    return;
+  }
+
+  liveAgentBridgePollInFlight = true;
+  try {
+    const response = await fetch(
+      `${LIVE_AGENT_BRIDGE_BASE_PATH}/request?sessionId=${encodeURIComponent(liveAgentBridgeSessionId)}`,
+      {
+        cache: "no-store"
+      }
+    );
+
+    if (!response.ok) {
+      return;
+    }
+
+    const payload = (await response.json()) as {
+      ok?: boolean;
+      request?: {
+        requestId?: string;
+        method?: string;
+        payload?: unknown;
+      } | null;
+    };
+
+    const request = payload?.ok ? payload.request : null;
+    if (!request || typeof request.requestId !== "string" || typeof request.method !== "string") {
+      return;
+    }
+
+    const api = topDownWindow.__topdownExtractionAgentApi as Record<string, ((value?: unknown) => unknown) | undefined> | undefined;
+    const handler = api?.[request.method];
+    if (typeof handler !== "function") {
+      await resolveLiveAgentBridgeRequest(request.requestId, false, {
+        error: `Live agent bridge method "${request.method}" is unavailable.`
+      });
+      return;
+    }
+
+    try {
+      const result = handler(request.payload);
+      await resolveLiveAgentBridgeRequest(request.requestId, true, result);
+    } catch (error) {
+      await resolveLiveAgentBridgeRequest(request.requestId, false, {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  } catch {
+    // Ignore relay poll failures so local play stays responsive.
+  } finally {
+    liveAgentBridgePollInFlight = false;
+  }
+}
+
+function setupLiveAgentBridge(): void {
+  if (!canServeLiveAgentBridge()) {
+    return;
+  }
+
+  void heartbeatLiveAgentBridge();
+  window.setInterval(() => {
+    void heartbeatLiveAgentBridge();
+  }, 1000);
+  window.setInterval(() => {
+    void pollLiveAgentBridge();
+  }, 250);
+}
 
 topDownWindow.__topdownExtractionDebug = {
   forceStoryFinale: () => {
@@ -38081,6 +39451,17 @@ topDownWindow.__topdownExtractionAgentApi = {
   getOptions: () => getAgentOptions(),
   configureNextRaid: (config) => configureNextRaid(config),
   stageState: (stateId) => stageAgentState(stateId),
+  resetTownWar: () => resetTownWarPlaySession(),
+  getTownWarRuntimeReport: () => {
+    const report = buildTownWarRuntimeReport();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: true,
+      summary: `Town war runtime: ${report.fps.toFixed(1)} fps, ${report.frameTimeMs.toFixed(2)} ms frame, ${report.soldiers} soldiers, ${report.scene?.displayObjects ?? 0} display objects.`,
+      report,
+      war: snapshot.war ?? null
+    };
+  },
   stageEnemyCornerUnstick: () => stageEnemyCornerUnstickScenario(),
   deployTownWarOfficer: (payload) => {
     const campId = payload?.campId;
@@ -38119,6 +39500,75 @@ topDownWindow.__topdownExtractionAgentApi = {
     return {
       ok: true,
       summary: `Town war camera focused at ${Math.round(x)},${Math.round(y)}.`,
+      war: snapshot.war ?? null
+    };
+  },
+  stageTownWarBuildPreview: (payload) => {
+    const campId = payload?.campId;
+    const kind = payload?.kind ?? null;
+    const x = typeof payload?.x === "number" ? payload.x : payload?.x !== undefined ? Number(payload.x) : null;
+    const y = typeof payload?.y === "number" ? payload.y : payload?.y !== undefined ? Number(payload.y) : null;
+    const facingAngleRadians =
+      typeof payload?.facingAngleRadians === "number"
+        ? payload.facingAngleRadians
+        : payload?.facingAngleRadians !== undefined
+          ? Number(payload.facingAngleRadians)
+          : officerToolsState.placementAngleRadians;
+    const validKind = kind === null || kind === "trench" || kind === "ammo-crate" || kind === "dugout";
+    const validCamp = campId === "camp-a" || campId === "camp-b";
+    if (!validKind || !validCamp || (kind !== null && (x === null || y === null || !Number.isFinite(x) || !Number.isFinite(y)))) {
+      const snapshot = getAgentSnapshot();
+      return {
+        ok: false,
+        summary: "Town war build preview failed: invalid camp, kind, or position.",
+        overlay: townWarController.getReadabilityOverlay(),
+        war: snapshot.war ?? null
+      };
+    }
+
+    if (kind === null) {
+      officerToolsState.placementMode = null;
+      officerToolsState.previewWorld = null;
+      townWarController.clearBuildPlacementPreview();
+    } else {
+      officerToolsState.placementMode = kind;
+      officerToolsState.previewWorld = { x: x ?? 0, y: y ?? 0 };
+      officerToolsState.placementAngleRadians = Number.isFinite(facingAngleRadians) ? facingAngleRadians : 0;
+      townWarController.setBuildPlacementPreview({
+        kind,
+        faction: campId,
+        position: officerToolsState.previewWorld,
+        facingAngleRadians: officerToolsState.placementAngleRadians,
+        valid: true
+      });
+    }
+    updateUi();
+    const overlay = townWarController.getReadabilityOverlay();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: true,
+      summary: kind
+        ? `Town war ${kind} build preview staged with ${overlay.totals.buildPreview} preview icons.`
+        : "Town war build preview cleared.",
+      overlay,
+      war: snapshot.war ?? null
+    };
+  },
+  setTownWarOfficerPane: (payload) => {
+    const pane = payload?.pane;
+    if (pane && !OFFICER_TOOLS_TABS.some((tab) => tab.id === pane)) {
+      const snapshot = getAgentSnapshot();
+      return { ok: false, summary: `Town war officer pane failed: invalid pane "${String(pane)}".`, war: snapshot.war ?? null };
+    }
+    if (pane) {
+      officerToolsState.pane = pane;
+    }
+    officerToolsState.open = payload?.open ?? true;
+    renderOfficerTools();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: true,
+      summary: `Town war officer pane ${officerToolsState.open ? "open" : "closed"} on ${officerToolsState.pane}.`,
       war: snapshot.war ?? null
     };
   },
@@ -38192,6 +39642,86 @@ topDownWindow.__topdownExtractionAgentApi = {
 
     return { ok: Boolean(crate), summary, crate, war: snapshot.war ?? null };
   },
+  stageTownWarAmmoCrateStock: (payload) => {
+    const crateId = typeof payload?.crateId === "string" ? payload.crateId : payload?.crateId !== undefined ? String(payload.crateId) : "";
+    const ammo = typeof payload?.ammo === "number" ? payload.ammo : Number(payload?.ammo);
+    if (!crateId || !Number.isFinite(ammo)) {
+      const snapshot = getAgentSnapshot();
+      return { ok: false, summary: "Town war ammo crate stock stage failed: invalid crate or ammo.", crate: null, war: snapshot.war ?? null };
+    }
+    const crate = townWarController.setAmmoCrateAmmo(crateId, ammo);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: Boolean(crate),
+      summary: crate ? `Town war ammo crate stock staged: ${crate.id} now ${crate.ammo}/${crate.maxAmmo}.` : "Town war ammo crate stock stage failed: crate missing.",
+      crate,
+      war: snapshot.war ?? null
+    };
+  },
+  stageTownWarSoldierPressure: (payload) => {
+    const soldierId = typeof payload?.soldierId === "string" ? payload.soldierId : payload?.soldierId !== undefined ? String(payload.soldierId) : "";
+    const pressure = typeof payload?.pressure === "number" ? payload.pressure : Number(payload?.pressure);
+    if (!soldierId || !Number.isFinite(pressure)) {
+      const snapshot = getAgentSnapshot();
+      return { ok: false, summary: "Town war soldier pressure stage failed: invalid soldier or pressure.", soldier: null, war: snapshot.war ?? null };
+    }
+    const soldier = townWarController.setSoldierPressure(soldierId, pressure);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: Boolean(soldier),
+      summary: soldier ? `Town war soldier pressure staged: ${soldier.displayName} pressure ${Math.round(soldier.morale.pressure)}.` : "Town war soldier pressure stage failed: soldier missing.",
+      soldier,
+      war: snapshot.war ?? null
+    };
+  },
+  assignUnifiedSoldierToSquad: (payload) => {
+    const unifiedSoldierId =
+      typeof payload?.unifiedSoldierId === "string"
+        ? payload.unifiedSoldierId
+        : payload?.unifiedSoldierId !== undefined
+          ? String(payload.unifiedSoldierId)
+          : "";
+    if (!unifiedSoldierId) {
+      const snapshot = getAgentSnapshot();
+      return { ok: false, summary: "Unified soldier assignment failed: missing soldier id.", war: snapshot.war ?? null };
+    }
+    raidController.assignUnifiedSoldierToSquad(unifiedSoldierId);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    const assigned = snapshot.war?.townWar.unifiedSoldiers.find(
+      (soldier) => soldier.id === unifiedSoldierId || soldier.soldierId === unifiedSoldierId
+    );
+    return {
+      ok: assigned?.squad.status === "assigned",
+      summary: raidController.state.message,
+      war: snapshot.war ?? null
+    };
+  },
+  unassignUnifiedSoldierFromSquad: (payload) => {
+    const unifiedSoldierId =
+      typeof payload?.unifiedSoldierId === "string"
+        ? payload.unifiedSoldierId
+        : payload?.unifiedSoldierId !== undefined
+          ? String(payload.unifiedSoldierId)
+          : "";
+    if (!unifiedSoldierId) {
+      const snapshot = getAgentSnapshot();
+      return { ok: false, summary: "Unified soldier unassignment failed: missing soldier id.", war: snapshot.war ?? null };
+    }
+    raidController.unassignUnifiedSoldierFromSquad(unifiedSoldierId);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    const unassigned = snapshot.war?.townWar.unifiedSoldiers.find(
+      (soldier) => soldier.id === unifiedSoldierId || soldier.soldierId === unifiedSoldierId || soldier.id === `unified-${unifiedSoldierId}`
+    );
+    return {
+      ok: unassigned?.squad.status === "camp",
+      summary: raidController.state.message,
+      war: snapshot.war ?? null
+    };
+  },
   orderTownWarTrench: (payload) => {
     const campId = payload?.campId;
     if (campId !== "camp-a" && campId !== "camp-b") {
@@ -38222,11 +39752,50 @@ topDownWindow.__topdownExtractionAgentApi = {
     const etaSeconds = typeof order.etaSeconds === "number" && Number.isFinite(order.etaSeconds) ? order.etaSeconds.toFixed(1) : "?";
     const riskTier = typeof order.riskTier === "string" ? order.riskTier : "unknown";
     const orderId = typeof order.orderId === "string" ? order.orderId : "order";
+    const networkRead = order.trenchNetwork?.readable ? ` | ${order.trenchNetwork.readable}` : "";
     const summary = order.ok
-      ? `Town war trench order: ${orderId} assigned ${order.assignedSoldierId ?? "builder"} (${campId}) | eta ${etaSeconds}s | risk ${riskTier} | ${supply} | next: war-advance --seconds 6`
+      ? `Town war trench order: ${orderId} assigned ${order.assignedSoldierId ?? "builder"} (${campId}) | eta ${etaSeconds}s | risk ${riskTier} | ${supply}${networkRead} | next: war-advance --seconds 6`
       : `Town war trench order failed (${campId}): ${order.reason ?? "unknown"} | ${supply}`;
 
     return { ok: order.ok, summary, order, war: snapshot.war ?? null };
+  },
+  placeDebugTownWarTrench: (payload) => {
+    const campId = payload?.campId;
+    if (campId !== "camp-a" && campId !== "camp-b") {
+      const snapshot = getAgentSnapshot();
+      return {
+        ok: false,
+        summary: "Town war debug trench failed: invalid camp id.",
+        result: {
+          ok: false,
+          reason: "invalid-camp-id",
+          order: { ok: false, reason: "invalid-camp-id", campId: "camp-a" },
+          coverSlot: null,
+          readable: "Invalid camp id."
+        },
+        war: snapshot.war ?? null
+      };
+    }
+    const x = typeof payload?.x === "number" ? payload.x : payload?.x !== undefined ? Number(payload.x) : null;
+    const y = typeof payload?.y === "number" ? payload.y : payload?.y !== undefined ? Number(payload.y) : null;
+    const facingAngleRadians =
+      typeof payload?.facingAngleRadians === "number"
+        ? payload.facingAngleRadians
+        : payload?.facingAngleRadians !== undefined
+          ? Number(payload.facingAngleRadians)
+          : campId === "camp-a"
+            ? Math.PI
+            : 0;
+    const targetPosition = x !== null && y !== null && Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+    const result = townWarController.placeDebugTrench(campId, targetPosition, facingAngleRadians);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: result.ok,
+      summary: result.readable,
+      result,
+      war: snapshot.war ?? null
+    };
   },
   orderTownWarAmmoCrate: (payload) => {
     const campId = payload?.campId;
@@ -38319,6 +39888,217 @@ topDownWindow.__topdownExtractionAgentApi = {
       ok: true,
       summary: report.readable,
       report,
+      war: snapshot.war ?? null
+    };
+  },
+  getTownWarTrenchNetworkReport: () => {
+    const report = townWarController.getTrenchNetworkReport();
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: true,
+      summary: `Town war trench networks: ${report.readable}`,
+      report,
+      war: snapshot.war ?? null
+    };
+  },
+  orderTownWarSandbags: (payload) => {
+    const campId = payload?.campId;
+    if (campId !== "camp-a" && campId !== "camp-b") {
+      const snapshot = getAgentSnapshot();
+      return {
+        ok: false,
+        summary: "Town war sandbags order failed: invalid camp id.",
+        result: { ok: false, reason: "invalid-camp-id", campId: "camp-a", kind: "sandbags", campSupply: null, upgrade: null, coverSlot: null, readable: "Invalid camp id." },
+        war: snapshot.war ?? null
+      };
+    }
+    const x = typeof payload?.x === "number" ? payload.x : payload?.x !== undefined ? Number(payload.x) : null;
+    const y = typeof payload?.y === "number" ? payload.y : payload?.y !== undefined ? Number(payload.y) : null;
+    const result = townWarController.orderSandbags(campId, {
+      coverSlotId: typeof payload?.coverSlotId === "string" ? payload.coverSlotId : null,
+      networkId: typeof payload?.networkId === "string" ? payload.networkId : null,
+      segmentId: typeof payload?.segmentId === "string" ? payload.segmentId : null,
+      position: x !== null && y !== null && Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null
+    });
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: result.ok,
+      summary: result.ok ? `Town war sandbags: ${result.readable}` : `Town war sandbags failed (${campId}): ${result.reason ?? "unknown"}.`,
+      result,
+      war: snapshot.war ?? null
+    };
+  },
+  orderTownWarWire: (payload) => {
+    const campId = payload?.campId;
+    if (campId !== "camp-a" && campId !== "camp-b") {
+      const snapshot = getAgentSnapshot();
+      return {
+        ok: false,
+        summary: "Town war wire order failed: invalid camp id.",
+        result: { ok: false, reason: "invalid-camp-id", campId: "camp-a", kind: "wire", campSupply: null, upgrade: null, coverSlot: null, readable: "Invalid camp id." },
+        war: snapshot.war ?? null
+      };
+    }
+    const x = typeof payload?.x === "number" ? payload.x : payload?.x !== undefined ? Number(payload.x) : null;
+    const y = typeof payload?.y === "number" ? payload.y : payload?.y !== undefined ? Number(payload.y) : null;
+    const result = townWarController.orderWire(campId, {
+      coverSlotId: typeof payload?.coverSlotId === "string" ? payload.coverSlotId : null,
+      networkId: typeof payload?.networkId === "string" ? payload.networkId : null,
+      segmentId: typeof payload?.segmentId === "string" ? payload.segmentId : null,
+      position: x !== null && y !== null && Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null
+    });
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: result.ok,
+      summary: result.ok ? `Town war wire: ${result.readable}` : `Town war wire failed (${campId}): ${result.reason ?? "unknown"}.`,
+      result,
+      war: snapshot.war ?? null
+    };
+  },
+  getTownWarBuildingComboReport: () => {
+    const report = townWarController.getBuildingComboReport();
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: true,
+      summary: `Town war building combos: ${report.readable}`,
+      report,
+      war: snapshot.war ?? null
+    };
+  },
+  getTownWarWorkQueueReport: (payload) => {
+    const campId = payload?.campId === "camp-a" || payload?.campId === "camp-b" ? payload.campId : undefined;
+    const report = townWarController.getWorkQueueReport(campId);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: report.ok,
+      summary: `Town war work queue: ${report.readable}`,
+      report,
+      war: snapshot.war ?? null
+    };
+  },
+  orderTownWarExpedition: (payload) => {
+    const campId = payload?.campId;
+    if (campId !== "camp-a" && campId !== "camp-b") {
+      const snapshot = getAgentSnapshot();
+      return {
+        ok: false,
+        summary: "Town war expedition order failed: invalid camp id.",
+        result: { ok: false, reason: "invalid-camp-id", campId: "camp-a", expedition: null, assignedSoldiers: [], readable: "Invalid camp id." },
+        war: snapshot.war ?? null
+      };
+    }
+    const objective =
+      payload?.objective === "extend-trench" || payload?.objective === "stock-forward-line" || payload?.objective === "probe-enemy-approach"
+        ? payload.objective
+        : "probe-enemy-approach";
+    const soldierIds = Array.isArray(payload?.soldierIds) ? payload.soldierIds.filter((entry): entry is string => typeof entry === "string") : null;
+    const result = townWarController.orderExpedition(campId, objective, soldierIds);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: result.ok,
+      summary: result.ok ? `Town war expedition: ${result.readable}` : `Town war expedition failed (${campId}): ${result.reason ?? "unknown"}.`,
+      result,
+      war: snapshot.war ?? null
+    };
+  },
+  requestTownWarExpeditionRetreat: (payload) => {
+    const expeditionId = typeof payload?.expeditionId === "string" ? payload.expeditionId : "";
+    const result = townWarController.requestExpeditionRetreat(expeditionId);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: result.ok,
+      summary: result.ok ? `Town war expedition retreat: ${result.readable}` : `Town war expedition retreat failed: ${result.reason ?? "unknown"}.`,
+      result,
+      war: snapshot.war ?? null
+    };
+  },
+  getTownWarExpeditionReport: (payload) => {
+    const expeditionId = typeof payload?.expeditionId === "string" ? payload.expeditionId : null;
+    const report = townWarController.getExpeditionReport(expeditionId);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: report.ok,
+      summary: `Town war expedition report: ${report.readable}`,
+      report,
+      war: snapshot.war ?? null
+    };
+  },
+  prepareTownWarDemolition: (payload) => {
+    const campId = payload?.campId === "camp-a" || payload?.campId === "camp-b" ? payload.campId : getOfficerCamp(townWarController.getSnapshot());
+    const result = townWarController.prepareDemolition(campId, {
+      grenade: typeof payload?.grenades === "number" ? payload.grenades : undefined,
+      satchel: typeof payload?.satchels === "number" ? payload.satchels : undefined,
+      "demo-charge": typeof payload?.demoCharges === "number" ? payload.demoCharges : undefined,
+      rpg: typeof payload?.rpgRounds === "number" ? payload.rpgRounds : undefined
+    });
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: result.ok,
+      summary: result.ok ? `Town war demolition prep: ${result.readable}` : `Town war demolition prep failed (${campId}): ${result.reason ?? "unknown"}.`,
+      result,
+      war: snapshot.war ?? null
+    };
+  },
+  orderTownWarCampBreach: (payload) => {
+    const attackerCampId =
+      payload?.attackerCampId === "camp-a" || payload?.attackerCampId === "camp-b"
+        ? payload.attackerCampId
+        : getOfficerCamp(townWarController.getSnapshot());
+    const targetCampId = payload?.targetCampId === "camp-a" || payload?.targetCampId === "camp-b" ? payload.targetCampId : undefined;
+    const weakPointKind =
+      payload?.weakPointKind === "command-core" ||
+      payload?.weakPointKind === "spawn-dugout" ||
+      payload?.weakPointKind === "ammo-dump" ||
+      payload?.weakPointKind === "radio-mast" ||
+      payload?.weakPointKind === "bunker-entrance"
+        ? payload.weakPointKind
+        : undefined;
+    const soldierIds = Array.isArray(payload?.soldierIds) ? payload.soldierIds.filter((entry): entry is string => typeof entry === "string") : null;
+    const result = townWarController.orderCampBreach({
+      attackerCampId,
+      targetCampId,
+      weakPointId: typeof payload?.weakPointId === "string" ? payload.weakPointId : null,
+      weakPointKind,
+      soldierIds
+    });
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: result.ok,
+      summary: result.ok ? `Town war camp breach: ${result.readable}` : `Town war camp breach failed (${attackerCampId}): ${result.reason ?? "unknown"}.`,
+      result,
+      war: snapshot.war ?? null
+    };
+  },
+  getTownWarCampDamageReport: (payload) => {
+    const campId = payload?.campId === "camp-a" || payload?.campId === "camp-b" ? payload.campId : null;
+    const report = townWarController.getCampDamageReport(campId);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: report.ok,
+      summary: `Town war camp damage report: ${report.readable}`,
+      report,
+      war: snapshot.war ?? null
+    };
+  },
+  getTownWarReadabilityOverlay: () => {
+    const overlay = townWarController.getReadabilityOverlay();
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    return {
+      ok: overlay.ok,
+      summary: overlay.readable,
+      overlay,
       war: snapshot.war ?? null
     };
   },
@@ -38431,6 +40211,73 @@ topDownWindow.__topdownExtractionAgentApi = {
     const summary = result.ok
       ? `Town war soldier ammo set: ${result.soldierId} | ${result.soldier?.ammo?.inMag ?? "?"}/${result.soldier?.ammo?.reserve ?? "?"}`
       : `Town war soldier ammo failed: ${result.reason ?? "unknown"}.`;
+    return { ok: result.ok, summary, result, war: snapshot.war ?? null };
+  },
+  stageTownWarSoldierTask: (payload) => {
+    const soldierId = typeof payload?.soldierId === "string" ? payload.soldierId : "";
+    const kind = payload?.kind;
+    const validKinds: Array<import("./game/townWar/types").TownWarTask["kind"]> = [
+      "idle",
+      "move",
+      "attack",
+      "defend",
+      "suppress",
+      "build",
+      "resupply",
+      "heal",
+      "hold"
+    ];
+    if (!validKinds.includes(kind)) {
+      const snapshot = getAgentSnapshot();
+      return {
+        ok: false,
+        summary: `Town war soldier task failed: invalid task kind "${String(kind)}".`,
+        result: { ok: false, reason: "invalid-task-kind", soldierId, work: null, priority: null, soldier: null, candidates: [] },
+        war: snapshot.war ?? null
+      };
+    }
+    const label = typeof payload?.label === "string" ? payload.label : `Debug ${kind}`;
+    const x = typeof payload?.x === "number" ? payload.x : payload?.x !== undefined ? Number(payload.x) : null;
+    const y = typeof payload?.y === "number" ? payload.y : payload?.y !== undefined ? Number(payload.y) : null;
+    const targetPosition = x !== null && y !== null && Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+    const result = townWarController.setSoldierTaskForDebug(soldierId, kind, label, targetPosition);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    const summary = result.ok
+      ? `Town war soldier task staged: ${result.soldierId} -> ${kind}.`
+      : `Town war soldier task failed: ${result.reason ?? "unknown"}.`;
+    return { ok: result.ok, summary, result, war: snapshot.war ?? null };
+  },
+  stageTownWarSoldierInCover: (payload) => {
+    const soldierId = typeof payload?.soldierId === "string" ? payload.soldierId : "";
+    const coverSlotId = typeof payload?.coverSlotId === "string" ? payload.coverSlotId : "";
+    const kind = payload?.kind ?? "hold";
+    const validKinds: Array<import("./game/townWar/types").TownWarTask["kind"]> = [
+      "idle",
+      "move",
+      "attack",
+      "defend",
+      "suppress",
+      "build",
+      "resupply",
+      "heal",
+      "hold"
+    ];
+    if (!validKinds.includes(kind)) {
+      const snapshot = getAgentSnapshot();
+      return {
+        ok: false,
+        summary: `Town war soldier cover stage failed: invalid task kind "${String(kind)}".`,
+        result: { ok: false, reason: "invalid-task-kind", soldierId, work: null, priority: null, soldier: null, candidates: [] },
+        war: snapshot.war ?? null
+      };
+    }
+    const result = townWarController.stageSoldierInCoverSlotForDebug(soldierId, coverSlotId, kind);
+    updateUi();
+    const snapshot = getAgentSnapshot();
+    const summary = result.ok
+      ? `Town war soldier cover staged: ${result.soldierId} -> ${coverSlotId} as ${kind}.`
+      : `Town war soldier cover stage failed: ${result.reason ?? "unknown"}.`;
     return { ok: result.ok, summary, result, war: snapshot.war ?? null };
   },
   orderTownWarBuildTest: (payload) => {
@@ -38661,6 +40508,30 @@ topDownWindow.__topdownExtractionAgentApi = {
     }
     return getAgentSnapshot();
   },
+  advanceRaid: (payload = {}) => {
+    const seconds = Math.max(0, Math.min(600, Number(payload.seconds ?? 1)));
+    const tickSeconds = Math.max(0.05, Math.min(5, Number(payload.tickSeconds ?? 0.25)));
+    if (raidController.state.phase === "raid" && Number.isFinite(seconds) && Number.isFinite(tickSeconds)) {
+      let elapsed = 0;
+      while (elapsed < seconds && raidController.state.phase === "raid") {
+        const step = Math.min(tickSeconds, seconds - elapsed);
+        raidController.update(step);
+        elapsed += step;
+      }
+      updateUi();
+    }
+    return getAgentSnapshot();
+  },
+  completeOfficerSoloSurvival: () => {
+    raidController.completeOfficerSoloSurvivalForDebug();
+    updateUi();
+    return getAgentSnapshot();
+  },
+  rollRecruitCandidates: () => {
+    raidController.rollRecruitCandidates();
+    updateUi();
+    return getAgentSnapshot();
+  },
   setMoveInput: (move) => {
     raidController.setMoveInput(move);
     return getAgentSnapshot();
@@ -38719,6 +40590,7 @@ topDownWindow.__topdownExtractionAgentApi = {
   },
   stageShowcase: (showcaseId) => stageAgentShowcase(showcaseId)
 };
+setupLiveAgentBridge();
 
 if (debugParams.get("debugRaid") === "1" && raidController.state.phase === "stash" && raidController.canStartRaid()) {
   raidController.startRaid(raidController.state.selectedWeapon);

@@ -1428,6 +1428,20 @@ body.stash-open .hud {
   min-width: 132px;
 }
 
+.raid-squad-dock {
+  pointer-events: auto;
+  position: relative;
+  align-self: flex-end;
+  display: grid;
+  justify-items: end;
+  gap: 7px;
+  min-width: 118px;
+}
+
+.raid-squad-dock.hidden {
+  display: none;
+}
+
 .build-mode-dock {
   pointer-events: auto;
   position: relative;
@@ -1439,7 +1453,8 @@ body.stash-open .hud {
 }
 
 .build-mode-toggle,
-.camp-art-toggle {
+.camp-art-toggle,
+.raid-squad-toggle {
   display: inline-grid;
   grid-template-columns: auto auto;
   align-items: center;
@@ -1461,6 +1476,8 @@ body.stash-open .hud {
 .build-mode-toggle strong,
 .camp-art-toggle span,
 .camp-art-toggle strong,
+.raid-squad-toggle span,
+.raid-squad-toggle strong,
 .build-mode-actions button {
   font-size: 0.62rem;
   font-weight: 900;
@@ -1469,13 +1486,15 @@ body.stash-open .hud {
 }
 
 .build-mode-toggle strong,
-.camp-art-toggle strong {
+.camp-art-toggle strong,
+.raid-squad-toggle strong {
   color: #f8fafc;
 }
 
 .build-mode-toggle.active,
 .build-mode-toggle.placing,
-.camp-art-toggle.hidden-art {
+.camp-art-toggle.hidden-art,
+.raid-squad-toggle.active {
   border-color: rgba(250, 204, 21, 0.68);
   background:
     linear-gradient(135deg, rgba(120, 53, 15, 0.76), rgba(22, 64, 52, 0.72)),
@@ -1492,6 +1511,152 @@ body.stash-open .hud {
   background: rgba(15, 23, 42, 0.56);
   color: #cbd5e1;
   box-shadow: 0 10px 24px rgba(2, 6, 23, 0.24);
+}
+
+.raid-squad-toggle {
+  min-height: 34px;
+  padding: 6px 10px;
+  border-color: rgba(125, 211, 252, 0.28);
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.76), rgba(8, 47, 73, 0.52)),
+    rgba(2, 6, 23, 0.72);
+  color: #dbeafe;
+}
+
+.raid-squad-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  width: min(320px, calc(100vw - 24px));
+  display: grid;
+  gap: 9px;
+  padding: 9px;
+  border: 1px solid rgba(125, 211, 252, 0.2);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(6, 16, 30, 0.94), rgba(2, 6, 23, 0.94)),
+    rgba(2, 6, 23, 0.92);
+  box-shadow: 0 22px 48px rgba(2, 6, 23, 0.48);
+}
+
+.raid-squad-panel.hidden {
+  display: none;
+}
+
+.raid-squad-head,
+.raid-squad-row,
+.raid-squad-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.raid-squad-head strong,
+.raid-squad-row strong {
+  color: #f8fafc;
+  font-size: 0.78rem;
+}
+
+.raid-squad-close,
+.raid-squad-row button {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.62);
+  color: #dbeafe;
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.raid-squad-close {
+  width: 28px;
+  height: 28px;
+}
+
+.raid-squad-body,
+.raid-squad-section {
+  display: grid;
+  gap: 7px;
+}
+
+.raid-squad-summary {
+  padding: 6px 7px;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.48);
+}
+
+.raid-squad-summary span,
+.raid-squad-section-label,
+.raid-squad-row span,
+.raid-squad-empty,
+.raid-squad-reserve span {
+  color: #94a3b8;
+  font-size: 0.61rem;
+  line-height: 1.3;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.raid-squad-row {
+  padding: 7px;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.56);
+}
+
+.raid-squad-row-steady,
+.raid-squad-candidate {
+  border-color: rgba(74, 222, 128, 0.16);
+}
+
+.raid-squad-row-heated {
+  border-color: rgba(245, 158, 11, 0.22);
+}
+
+.raid-squad-row-critical {
+  border-color: rgba(251, 113, 133, 0.24);
+}
+
+.raid-squad-row button {
+  min-height: 26px;
+  padding: 5px 8px;
+}
+
+.raid-squad-row button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.raid-squad-chip {
+  align-self: center;
+  padding: 4px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(2, 6, 23, 0.5);
+}
+
+.raid-squad-empty {
+  margin: 0;
+  color: #cbd5e1;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.raid-squad-reserve {
+  display: grid;
+  gap: 5px;
+}
+
+.raid-squad-reserve-row {
+  border-color: rgba(56, 189, 248, 0.18);
+  background:
+    linear-gradient(180deg, rgba(8, 47, 73, 0.18), rgba(15, 23, 42, 0.56)),
+    rgba(15, 23, 42, 0.56);
 }
 
 .build-mode-strip {
@@ -1579,6 +1744,7 @@ body.stash-open .hud {
 
 body.town-war-build-mode .hud-row-top,
 body.town-war-build-mode .field-strip,
+body.town-war-build-mode .raid-squad-dock,
 body.town-war-build-mode .hud-secondary-card,
 body.town-war-build-mode .decision-card,
 body.town-war-build-mode .tactical-drawer {
@@ -1588,13 +1754,174 @@ body.town-war-build-mode .tactical-drawer {
 }
 
 body.town-war-build-mode .field-strip,
+body.town-war-build-mode .raid-squad-dock,
 body.town-war-build-mode .hud-secondary-card,
 body.town-war-build-mode .decision-card {
   display: none;
 }
 
+body.officer-command-locked .raid-squad-dock,
+body.officer-command-locked .build-mode-dock,
+body.officer-command-locked .officer-tools-dock {
+  display: none;
+}
+
 body.town-war-build-mode .hud-row-bottom {
   justify-content: flex-end;
+}
+
+body.town-war-officer-mode .hud-row-top,
+body.town-war-officer-mode .field-strip,
+body.town-war-officer-mode .hud-secondary-card,
+body.town-war-officer-mode .decision-card,
+body.town-war-officer-mode .tactical-drawer {
+  display: none;
+}
+
+body.town-war-officer-mode .hud {
+  justify-content: flex-end;
+}
+
+body.town-war-officer-mode .hud-row-bottom {
+  justify-content: flex-end;
+  align-items: flex-end;
+}
+
+body.town-war-officer-mode .first-minute-rail:not(.hidden) {
+  margin-right: auto;
+}
+
+.first-minute-rail {
+  pointer-events: auto;
+  width: min(350px, calc(100vw - 28px));
+  padding: 9px;
+  border: 1px solid rgba(250, 204, 21, 0.2);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.82), rgba(20, 83, 45, 0.5)),
+    rgba(2, 6, 23, 0.72);
+  box-shadow: 0 14px 34px rgba(2, 6, 23, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.first-minute-rail.hidden {
+  display: none;
+}
+
+.first-minute-rail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.first-minute-rail-head strong {
+  color: #fef3c7;
+  font-size: 0.82rem;
+}
+
+.first-minute-dismiss {
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.48);
+  color: #cbd5e1;
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+
+.first-minute-rail p {
+  margin: 5px 0 7px;
+  color: #cbd5e1;
+  font-size: 0.66rem;
+  line-height: 1.35;
+}
+
+.first-minute-rail-promotion {
+  border-color: rgba(125, 211, 252, 0.28);
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(21, 94, 117, 0.42)),
+    rgba(2, 6, 23, 0.78);
+  box-shadow:
+    0 14px 34px rgba(2, 6, 23, 0.3),
+    0 0 0 1px rgba(125, 211, 252, 0.05),
+    0 0 28px rgba(14, 165, 233, 0.1);
+}
+
+.first-minute-rail-promotion .first-minute-rail-head strong {
+  color: #e0f2fe;
+}
+
+.first-minute-rail-promotion .first-minute-steps span.done {
+  border-color: rgba(125, 211, 252, 0.34);
+  background: rgba(14, 116, 144, 0.34);
+  color: #cffafe;
+}
+
+.first-minute-rail-promotion .first-minute-actions button {
+  border-color: rgba(125, 211, 252, 0.22);
+  background: rgba(8, 47, 73, 0.58);
+  color: #e0f2fe;
+}
+
+.first-minute-rail-promotion .first-minute-actions button:hover {
+  border-color: rgba(125, 211, 252, 0.48);
+  background: rgba(14, 116, 144, 0.58);
+}
+
+.first-minute-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 7px;
+}
+
+.first-minute-steps span {
+  min-width: 0;
+  padding: 5px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.44);
+  color: #94a3b8;
+  font-size: 0.56rem;
+  line-height: 1.15;
+}
+
+.first-minute-steps span.done {
+  border-color: rgba(34, 197, 94, 0.28);
+  background: rgba(20, 83, 45, 0.42);
+  color: #bbf7d0;
+}
+
+.first-minute-steps strong {
+  display: block;
+  color: #f8fafc;
+  font-size: 0.58rem;
+}
+
+.first-minute-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.first-minute-actions button {
+  min-height: 28px;
+  border: 1px solid rgba(250, 204, 21, 0.18);
+  border-radius: 7px;
+  background: rgba(120, 53, 15, 0.32);
+  color: #fef3c7;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.first-minute-actions button:hover,
+.first-minute-dismiss:hover {
+  border-color: rgba(250, 204, 21, 0.4);
+  background: rgba(120, 53, 15, 0.58);
 }
 
 .officer-tools-toggle {
@@ -1917,6 +2244,29 @@ body.town-war-build-mode .hud-row-bottom {
   background:
     linear-gradient(180deg, rgba(6, 78, 59, 0.16), rgba(15, 23, 42, 0.42)),
     rgba(15, 23, 42, 0.42);
+}
+
+.officer-work-queue-bridge {
+  border-color: rgba(96, 165, 250, 0.16);
+  background:
+    linear-gradient(180deg, rgba(30, 64, 175, 0.12), rgba(15, 23, 42, 0.42)),
+    rgba(15, 23, 42, 0.42);
+}
+
+.officer-work-queue-row {
+  padding: 6px;
+  background: rgba(15, 23, 42, 0.34);
+}
+
+.officer-work-queue-debrief {
+  display: grid;
+  gap: 4px;
+}
+
+.officer-work-queue-debrief span {
+  color: #cbd5e1;
+  font-size: 0.6rem;
+  line-height: 1.35;
 }
 
 .officer-priority-bridge-head {
@@ -3874,11 +4224,71 @@ body.town-war-build-mode .hud-row-bottom {
     rgba(2, 6, 23, 0.42);
 }
 
+.squad-recruit-roll-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(250, 204, 21, 0.24);
+  background:
+    radial-gradient(circle at top right, rgba(250, 204, 21, 0.12), transparent 44%),
+    rgba(15, 23, 42, 0.54);
+}
+
+.squad-recruit-roll-card div {
+  display: grid;
+  gap: 4px;
+}
+
+.squad-recruit-roll-card strong,
+.squad-recruit-roll-card span {
+  display: block;
+}
+
+.squad-recruit-roll-card strong {
+  color: #fef3c7;
+  font-size: 0.82rem;
+}
+
+.squad-recruit-roll-card span {
+  color: #dbeafe;
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
 .squad-recruit-card p {
   margin: 0;
   color: #dbeafe;
   line-height: 1.5;
   font-size: 0.8rem;
+}
+
+.squad-recruit-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.squad-recruit-stat-grid span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(15, 23, 42, 0.58);
+  color: #93c5fd;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.squad-recruit-stat-grid strong {
+  color: #f8fafc;
+  font-size: 0.78rem;
 }
 
 .stash-button,
@@ -13283,6 +13693,7 @@ body.town-war-build-mode .hud-row-bottom {
   .hud-ribbon,
   .objective-card,
   .field-strip,
+  .raid-squad-dock,
   .build-mode-dock,
   .officer-tools-dock,
   .tactical-drawer {

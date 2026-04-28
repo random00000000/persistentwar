@@ -1,0 +1,345 @@
+{
+  "lowBuilder": {
+    "id": "town-war-soldier-10",
+    "name": "Lev Rus-10",
+    "construction": 3
+  },
+  "highBuilder": {
+    "id": "town-war-soldier-1",
+    "name": "Vira Rus-1",
+    "construction": 9
+  },
+  "medic": {
+    "id": "town-war-soldier-7",
+    "name": "Taran Rus-7",
+    "medical": 9
+  },
+  "casualtyTarget": {
+    "id": "town-war-soldier-2",
+    "name": "Makar Rus-2"
+  },
+  "exhausted": {
+    "id": "town-war-soldier-9",
+    "name": "Kira Rus-9"
+  },
+  "lowAssignedSoldierId": "town-war-soldier-10",
+  "highAssignedSoldierId": "town-war-soldier-1",
+  "highOrderOk": true,
+  "highOrderId": "town-war-order-1",
+  "buildReadable": "town-war-order-1 trench assigned: 0% (0/100) rate 0/s stall none support town-war-soldier-3 ammo none stage builder en route cause risk-high > exposure-0.78 > order-accepted > colony-cover-town-war-soldier-3 network free/bad-retreat-path",
+  "rescueReadable": "town-war-casualty-1:town-war-soldier-2 wounded score 54.9 cause no covered rescue path",
+  "workQueue": {
+    "ok": true,
+    "reason": null,
+    "campId": "camp-a",
+    "entries": [
+      {
+        "soldierId": "town-war-soldier-3",
+        "soldierName": "Olek Rus-3",
+        "role": "suppressor",
+        "work": "Suppress",
+        "taskKind": "suppress",
+        "taskLabel": "Colony cover: trench town-war-order-1",
+        "targetId": "town-war-order-1",
+        "targetPosition": {
+          "x": 5642,
+          "y": 3219
+        },
+        "state": "moving",
+        "priority": 5,
+        "skill": 21.3,
+        "score": 73.55,
+        "fatigue": 0.29,
+        "hunger": 0.24,
+        "morale": 0.68,
+        "riskTier": "high",
+        "warning": null,
+        "ownerRead": "Olek Rus-3 covers Vira Rus-1",
+        "consequenceRead": "Olek Rus-3 gives 0% cover fire; ammo support is none."
+      },
+      {
+        "soldierId": "town-war-soldier-1",
+        "soldierName": "Vira Rus-1",
+        "role": "builder",
+        "work": "Build",
+        "taskKind": "build",
+        "taskLabel": "Order: trench @ 5642,3219",
+        "targetId": "town-war-order-1",
+        "targetPosition": {
+          "x": 5642,
+          "y": 3219
+        },
+        "state": "moving",
+        "priority": 5,
+        "skill": 19.15,
+        "score": 53.53,
+        "fatigue": 0.15,
+        "hunger": 0.12,
+        "morale": 0.5,
+        "riskTier": "high",
+        "warning": "low nerve resists exposed work",
+        "ownerRead": "Vira Rus-1 owns trench town-war-order-1",
+        "consequenceRead": "Vira Rus-1 builds at 0/s, 0% done, 15% fatigue."
+      },
+      {
+        "soldierId": "town-war-soldier-10",
+        "soldierName": "Lev Rus-10",
+        "role": "rifleman",
+        "work": "Defend",
+        "taskKind": "defend",
+        "taskLabel": "Resume: hold mid lane",
+        "targetId": null,
+        "targetPosition": {
+          "x": 5912,
+          "y": 3185
+        },
+        "state": "moving",
+        "priority": 2,
+        "skill": 11.75,
+        "score": 29.45,
+        "fatigue": 0.08,
+        "hunger": 0.18,
+        "morale": 0.54,
+        "riskTier": "high",
+        "warning": null,
+        "ownerRead": "Lev Rus-10 works Defend",
+        "consequenceRead": "Lev Rus-10 chose Defend because score 29.45: Defend: priority 2, skill 11.8, urgency 6.0, safety -3.4."
+      },
+      {
+        "soldierId": "town-war-soldier-9",
+        "soldierName": "Kira Rus-9",
+        "role": "defender",
+        "work": "Defend",
+        "taskKind": "defend",
+        "taskLabel": "Order: hold mid lane",
+        "targetId": null,
+        "targetPosition": {
+          "x": 5912,
+          "y": 3185
+        },
+        "state": "moving",
+        "priority": 1,
+        "skill": 11.95,
+        "score": 15.51,
+        "fatigue": 0.95,
+        "hunger": 0.2,
+        "morale": 0.55,
+        "riskTier": "high",
+        "warning": "exhausted: assault and exposed work unreliable",
+        "ownerRead": "Kira Rus-9 works Defend",
+        "consequenceRead": "Kira Rus-9 chose Defend because score 15.51: Defend: priority 1, skill 11.9, urgency 6.0, safety -7.6."
+      },
+      {
+        "soldierId": "town-war-soldier-7",
+        "soldierName": "Taran Rus-7",
+        "role": "medic",
+        "work": "Rescue",
+        "taskKind": "hold",
+        "taskLabel": "no covered rescue path",
+        "targetId": "town-war-casualty-1",
+        "targetPosition": {
+          "x": 5677,
+          "y": 3277
+        },
+        "state": "blocked",
+        "priority": 5,
+        "skill": 19.55,
+        "score": 75.43,
+        "fatigue": 0.22,
+        "hunger": 0.24,
+        "morale": 0.54,
+        "riskTier": "high",
+        "warning": "no covered rescue path",
+        "ownerRead": "Taran Rus-7 owns rescue for Makar Rus-2",
+        "consequenceRead": "Taran Rus-7 cannot reach treatment yet: no covered rescue path."
+      },
+      {
+        "soldierId": "town-war-soldier-2",
+        "soldierName": "Makar Rus-2",
+        "role": "rifleman",
+        "work": "Defend",
+        "taskKind": "hold",
+        "taskLabel": "serious casualty",
+        "targetId": "town-war-casualty-1",
+        "targetPosition": {
+          "x": 5677,
+          "y": 3277
+        },
+        "state": "recovering",
+        "priority": 4,
+        "skill": 12.1,
+        "score": 62.66,
+        "fatigue": 0.22,
+        "hunger": 0.18,
+        "morale": 0.59,
+        "riskTier": "high",
+        "warning": "wounded, cannot hold normal work",
+        "ownerRead": "Makar Rus-2 works Defend",
+        "consequenceRead": "Makar Rus-2 chose Defend because score 62.66: Defend: priority 4, skill 12.1, urgency 6.0, safety -3.2."
+      }
+    ],
+    "activeCount": 5,
+    "warnings": [
+      "low nerve resists exposed work",
+      "exhausted: assault and exposed work unreliable",
+      "no covered rescue path",
+      "wounded, cannot hold normal work"
+    ],
+    "namedConsequences": [
+      "Olek Rus-3 gives 0% cover fire; ammo support is none.",
+      "Vira Rus-1 builds at 0/s, 0% done, 15% fatigue.",
+      "Lev Rus-10 chose Defend because score 29.45: Defend: priority 2, skill 11.8, urgency 6.0, safety -3.4.",
+      "Kira Rus-9 chose Defend because score 15.51: Defend: priority 1, skill 11.9, urgency 6.0, safety -7.6.",
+      "Taran Rus-7 cannot reach treatment yet: no covered rescue path.",
+      "Makar Rus-2 chose Defend because score 62.66: Defend: priority 4, skill 12.1, urgency 6.0, safety -3.2."
+    ],
+    "debriefLines": [
+      "Olek Rus-3 covers Vira Rus-1. Olek Rus-3 gives 0% cover fire; ammo support is none.",
+      "Vira Rus-1 owns trench town-war-order-1. Vira Rus-1 builds at 0/s, 0% done, 15% fatigue.",
+      "Lev Rus-10 works Defend. Lev Rus-10 chose Defend because score 29.45: Defend: priority 2, skill 11.8, urgency 6.0, safety -3.4.",
+      "Kira Rus-9 works Defend. Kira Rus-9 chose Defend because score 15.51: Defend: priority 1, skill 11.9, urgency 6.0, safety -7.6.",
+      "Taran Rus-7 owns rescue for Makar Rus-2. Taran Rus-7 cannot reach treatment yet: no covered rescue path.",
+      "Makar Rus-2 works Defend. Makar Rus-2 chose Defend because score 62.66: Defend: priority 4, skill 12.1, urgency 6.0, safety -3.2."
+    ],
+    "readable": "Olek Rus-3:Suppress/moving | Vira Rus-1:Build/moving (low nerve resists exposed work) | Lev Rus-10:Defend/moving | Kira Rus-9:Defend/moving (exhausted: assault and exposed work unreliable) | Taran Rus-7:Rescue/blocked (no covered rescue path) | Makar Rus-2:Defend/recovering (wounded, cannot hold normal work)"
+  },
+  "exhaustedCandidates": [
+    {
+      "work": "Cook",
+      "taskKind": "hold",
+      "score": 62.93,
+      "reason": "camp cooking improves fatigue recovery, morale, and readiness",
+      "blockedReason": null,
+      "scoreParts": {
+        "priority": 50,
+        "skillFit": 15.95,
+        "urgency": 5.52,
+        "safety": -7.6,
+        "morale": 0.4,
+        "supplyNeed": 3.9,
+        "distance": -5.24
+      }
+    },
+    {
+      "work": "Rest",
+      "taskKind": "hold",
+      "score": 43.66,
+      "reason": "fatigue and morale can override noncritical work",
+      "blockedReason": null,
+      "scoreParts": {
+        "priority": 10,
+        "skillFit": 4.8,
+        "urgency": 13.4,
+        "safety": 0,
+        "morale": 20.7,
+        "supplyNeed": 0,
+        "distance": -5.24
+      }
+    },
+    {
+      "work": "Suppress",
+      "taskKind": "suppress",
+      "score": 42.16,
+      "reason": "suppressors protect builders and hold lanes when construction is exposed",
+      "blockedReason": null,
+      "scoreParts": {
+        "priority": 30,
+        "skillFit": 14.5,
+        "urgency": 12,
+        "safety": -9.5,
+        "morale": 0.4,
+        "supplyNeed": 0,
+        "distance": -5.24
+      }
+    },
+    {
+      "work": "Rescue",
+      "taskKind": "heal",
+      "score": 36.01,
+      "reason": "medics favor wounded allies over routine defense",
+      "blockedReason": null,
+      "scoreParts": {
+        "priority": 20,
+        "skillFit": 11.25,
+        "urgency": 11,
+        "safety": -11.4,
+        "morale": 0.4,
+        "supplyNeed": 10,
+        "distance": -5.24
+      }
+    },
+    {
+      "work": "Medic",
+      "taskKind": "heal",
+      "score": 36.01,
+      "reason": "medics favor wounded allies over routine defense",
+      "blockedReason": null,
+      "scoreParts": {
+        "priority": 20,
+        "skillFit": 11.25,
+        "urgency": 11,
+        "safety": -11.4,
+        "morale": 0.4,
+        "supplyNeed": 10,
+        "distance": -5.24
+      }
+    },
+    {
+      "work": "Resupply",
+      "taskKind": "resupply",
+      "score": 24.44,
+      "reason": "logistics soldiers answer low ammo and reachable crate/camp supply",
+      "blockedReason": null,
+      "scoreParts": {
+        "priority": 20,
+        "skillFit": 6.25,
+        "urgency": 10,
+        "safety": -7.6,
+        "morale": 0.4,
+        "supplyNeed": 0.62,
+        "distance": -5.24
+      }
+    },
+    {
+      "work": "Haul",
+      "taskKind": "resupply",
+      "score": 24.44,
+      "reason": "logistics soldiers answer low ammo and reachable crate/camp supply",
+      "blockedReason": null,
+      "scoreParts": {
+        "priority": 20,
+        "skillFit": 6.25,
+        "urgency": 10,
+        "safety": -7.6,
+        "morale": 0.4,
+        "supplyNeed": 0.62,
+        "distance": -5.24
+      }
+    }
+  ],
+  "exhaustedQueueEntry": {
+    "soldierId": "town-war-soldier-9",
+    "soldierName": "Kira Rus-9",
+    "role": "defender",
+    "work": "Defend",
+    "taskKind": "defend",
+    "taskLabel": "Order: hold mid lane",
+    "targetId": null,
+    "targetPosition": {
+      "x": 5912,
+      "y": 3185
+    },
+    "state": "moving",
+    "priority": 1,
+    "skill": 11.95,
+    "score": 15.51,
+    "fatigue": 0.95,
+    "hunger": 0.2,
+    "morale": 0.55,
+    "riskTier": "high",
+    "warning": "exhausted: assault and exposed work unreliable",
+    "ownerRead": "Kira Rus-9 works Defend",
+    "consequenceRead": "Kira Rus-9 chose Defend because score 15.51: Defend: priority 1, skill 11.9, urgency 6.0, safety -7.6."
+  },
+  "activeNameCount": 6
+}

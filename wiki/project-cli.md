@@ -119,7 +119,7 @@ Supported officer-facing verbs for the town-war slice:
 - `war-priority set --soldier <id> --work <Build|Rescue|Resupply|Defend|Suppress|Rest> --priority <0-5>`
 - `war-priority preset --soldier <id> --preset <builder|medic|quartermaster|suppressor|rifleman|scout|rest-cycle>`
 - `war-task-candidates --soldier <id>`
-- `war-order-trench --id <camp-a|camp-b> [--x <n> --y <n>]`
+- `war-order-trench --id <camp-a|camp-b> [--x <n> --y <n>] [--live-session]`
 - `war-order-dugout --id <camp-a|camp-b> [--x <n> --y <n>] [--facing <radians>]`
 - `war-order-ammo-crate --id <camp-a|camp-b> [--x <n> --y <n>]`
 - `war-dugout-report`
@@ -145,6 +145,8 @@ Supported officer-facing verbs for the town-war slice:
 
 Use these to stage a minimal officer loop (orders → soldiers move → supply drains) without relying on the inherited extraction raid flow.
 
+`war-order-trench` also supports `--live-session` when you want the CLI to place a trench into an already-open manual play tab on the same dev origin while you keep playing. That live route intentionally skips the CLI's usual `stage-state town-war` reset and should be treated as an active-play tool, not a regression-automation surface.
+
 Each command returns JSON with a `summary` string plus the current `war` snapshot (including officer focus, build orders, camp health/supply, and soldier tasks) so agents can inspect the immediate consequence and decide the next pressure to apply.
 
 Soldier identity is now part of the town-war inspect surface. Use `war-roster` for readable summaries and `war-soldier --id <soldier-id>` for a single detailed record. Snapshot fields include `war.soldiers[*].displayName`, `archetype`, `skills`, `traits`, `needs`, `workPriorities`, `currentNeed`, `experience`, `identitySummary`, and `taskDecision`, mirrored under `war.townWar.soldiers[*]`.
@@ -157,7 +159,7 @@ Medical rescue emergence is inspectable through `war-stage-casualty`, `war-medic
 
 Camp sustainment is inspectable through `war-sustainment`, `war-set-camp-work`, `war-stage-ammo-pressure`, `war-stage-fatigue`, `war.camps[*].sustainment`, and `war.townWar.camps[*].sustainment`. Logistics controls ammo flow, Cooking improves readiness and recovery, Endurance/Rest affect fatigue recovery, and build reports can now show ammo-support or sustainment failures separately from trench placement failures.
 
-Operation persistence is inspectable through `war-operation`, `war.operation`, and `war.townWar.operation`. Use `war-operation prepare` to commit protected stockpile, `war-operation start` to launch the next Russian camp cycle, `war-operation end` to capture fatigue/wounds/memory/supply deltas, and `war-operation report` to read current recommendations. Build supply now affects construction rate, while carried soldier records preserve named wounds and fatigue into the next operation.
+Operation persistence is inspectable through `war-operation`, `war.operation`, and `war.townWar.operation`. Use `war-operation prepare` to commit protected stockpile, `war-operation start` to launch the next Russian camp cycle, `war-operation end` to capture fatigue/wounds/memory/supply deltas, and `war-operation report` to read current recommendations. The debrief now exposes `bankedSupply`, `lostSupply`, `soldierLines`, `buildingComboLines`, `workLines`, `routeLines`, and `campDamageLines`, so agents can verify the complete loop from protected stockpile through connected trench support, expedition scars, Ukrainian weak-point damage, and next-operation carryover. Build supply affects construction rate, while carried soldier records preserve named wounds and fatigue into the next operation.
 
 Dugout networks are inspectable through `war-order-dugout`, `war-dugout-report`, `war-damage-dugout`, `war.townWar.dugouts`, and dugout-connected `war.townWar.aiTactics.coverSlots`. A Russian dugout acts as a rally/shelter node behind the trench line: nearby trench slots get stronger occupation priority, reinforcements can rally from the dugout instead of the camp spawn, wounded/suppressed soldiers can count as sheltering there, and damage changes its status/readable map feedback.
 

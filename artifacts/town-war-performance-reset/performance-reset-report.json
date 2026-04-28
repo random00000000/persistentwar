@@ -1,0 +1,408 @@
+{
+  "url": "http://127.0.0.1:5847/?debugRaid=1",
+  "baselineResetSummary": "Town war reset cleanly on Russian camp-a: 12 soldiers, 0 orders, 0 trench slots.",
+  "baseline": {
+    "label": "baseline",
+    "phase": "raid",
+    "officerFaction": "camp-a",
+    "clockSeconds": 0.6429000000059605,
+    "soldiers": 12,
+    "combatants": 12,
+    "orders": 0,
+    "activeOrders": 0,
+    "completedOrders": 0,
+    "trenchSlots": 0,
+    "ammoCrates": 0,
+    "dugouts": 0,
+    "ui": {
+      "gameCanvas": 1,
+      "totalCanvas": 3,
+      "officerToggle": 1,
+      "buildToggle": 1,
+      "campArtToggle": 1,
+      "firstMinuteRail": 1,
+      "campArtStatus": "On",
+      "officerMode": true,
+      "buildMode": false
+    },
+    "runtime": {
+      "fps": 0,
+      "frameTimeMs": 274.9,
+      "townWarRealtimeEnabled": true,
+      "playerPathSamples": 2,
+      "heatmapCells": 18,
+      "clockSeconds": 0.64,
+      "soldiers": 12,
+      "combatants": 12,
+      "orders": 0,
+      "activeOrders": 0,
+      "completedOrders": 0,
+      "trenchSlots": 0,
+      "ammoCrates": 0,
+      "dugouts": 0,
+      "scene": {
+        "soldierSprites": 12,
+        "enemySprites": 33,
+        "fieldworkLabels": 0,
+        "campLabels": 0,
+        "selectedSoldierLabels": 0,
+        "lookSoldierLabels": 0,
+        "statusLabels": 0,
+        "playerCampArtObjects": 147,
+        "playerCampArtVisible": true,
+        "displayObjects": 107
+      }
+    }
+  },
+  "dirty": {
+    "focus": "Town war lane focus: camp-a ordered 6 combatants to mid | next: war-advance --seconds 8",
+    "orderSummaries": [
+      "Town war trench order: town-war-order-1 assigned town-war-soldier-1 (camp-a) | eta 28.6s | risk high | build 225, ammo 250 | next: war-advance --seconds 6",
+      "Town war trench order: town-war-order-2 assigned town-war-soldier-2 (camp-a) | eta 28.2s | risk high | build 200, ammo 250 | next: war-advance --seconds 6",
+      "Town war trench order: town-war-order-3 assigned town-war-soldier-3 (camp-a) | eta 29.5s | risk high | build 175, ammo 250 | next: war-advance --seconds 6",
+      "Town war ammo crate order: town-war-order-4 assigned town-war-soldier-9 (camp-a) | eta 27.4s | risk high | build 165, ammo 130 | next: war-advance --seconds 6",
+      "Town war dugout order: town-war-order-5 assigned town-war-soldier-10 (camp-a) | eta 28.3s | risk high | build 120, ammo 130 | next: war-advance --seconds 6"
+    ],
+    "acceptedOrders": 5
+  },
+  "dirtySummary": {
+    "label": "dirty-before-advance",
+    "phase": "raid",
+    "officerFaction": "camp-a",
+    "clockSeconds": 0.5373000000044703,
+    "soldiers": 12,
+    "combatants": 12,
+    "orders": 5,
+    "activeOrders": 5,
+    "completedOrders": 0,
+    "trenchSlots": 0,
+    "ammoCrates": 0,
+    "dugouts": 0,
+    "ui": {
+      "gameCanvas": 1,
+      "totalCanvas": 3,
+      "officerToggle": 1,
+      "buildToggle": 1,
+      "campArtToggle": 1,
+      "firstMinuteRail": 1,
+      "campArtStatus": "On",
+      "officerMode": true,
+      "buildMode": false
+    },
+    "runtime": {
+      "fps": 0,
+      "frameTimeMs": 171.6,
+      "townWarRealtimeEnabled": true,
+      "playerPathSamples": 3,
+      "heatmapCells": 18,
+      "clockSeconds": 0.54,
+      "soldiers": 12,
+      "combatants": 12,
+      "orders": 5,
+      "activeOrders": 5,
+      "completedOrders": 0,
+      "trenchSlots": 0,
+      "ammoCrates": 0,
+      "dugouts": 0,
+      "scene": {
+        "soldierSprites": 12,
+        "enemySprites": 33,
+        "fieldworkLabels": 0,
+        "campLabels": 2,
+        "selectedSoldierLabels": 0,
+        "lookSoldierLabels": 0,
+        "statusLabels": 0,
+        "playerCampArtObjects": 147,
+        "playerCampArtVisible": true,
+        "displayObjects": 109
+      }
+    }
+  },
+  "beforeFrames": {
+    "samples": 180,
+    "averageMs": 192.14,
+    "p95Ms": 240.9,
+    "maxMs": 269.4,
+    "framesOver50Ms": 179
+  },
+  "tenMinuteAdvance": {
+    "chunks": [
+      {
+        "elapsedMs": 156.19999999552965,
+        "summary": "Town war advanced 60s (120 ticks @ 0.5s) | clock 95.4s | focus mid | orders 4 done / 1 active | build trench town-war-order-3: 80% @ 7.76/s | crates 0 | crate ammo 0 | drama bad-order-cost",
+        "appliedTicks": 120
+      },
+      {
+        "elapsedMs": 84.39999999850988,
+        "summary": "Town war advanced 60s (120 ticks @ 0.5s) | clock 155.8s | focus mid | orders 4 done / 1 active | build trench town-war-order-3: 80% @ 7.76/s | crates 0 | crate ammo 0 | drama bad-order-cost",
+        "appliedTicks": 120
+      },
+      {
+        "elapsedMs": 110.60000000149012,
+        "summary": "Town war advanced 60s (120 ticks @ 0.5s) | clock 216.1s | focus mid | orders 4 done / 1 active | build trench town-war-order-3: 80% @ 7.76/s | crates 0 | crate ammo 0 | drama bad-order-cost",
+        "appliedTicks": 120
+      },
+      {
+        "elapsedMs": 97.10000000149012,
+        "summary": "Town war advanced 60s (120 ticks @ 0.5s) | clock 276.5s | focus mid | orders 4 done / 1 active | build trench town-war-order-3: 80% @ 7.76/s | crates 0 | crate ammo 0 | drama bad-order-cost",
+        "appliedTicks": 120
+      },
+      {
+        "elapsedMs": 83.59999999403954,
+        "summary": "Town war advanced 60s (120 ticks @ 0.5s) | clock 336.8s | focus mid | orders 4 done / 1 active | build trench town-war-order-3: 80% @ 7.76/s | crates 0 | crate ammo 0 | drama bad-order-cost",
+        "appliedTicks": 120
+      },
+      {
+        "elapsedMs": 88.39999999850988,
+        "summary": "Town war advanced 60s (120 ticks @ 0.5s) | clock 397.1s | focus mid | orders 4 done / 1 active | build trench town-war-order-3: 80% @ 7.76/s | crates 0 | crate ammo 0 | drama bad-order-cost",
+        "appliedTicks": 120
+      },
+      {
+        "elapsedMs": 72.39999999850988,
+        "summary": "Town war advanced 60s (120 ticks @ 0.5s) | clock 457.4s | focus mid | orders 4 done / 1 active | build trench town-war-order-3: 80% @ 7.76/s | crates 0 | crate ammo 0 | drama bad-order-cost",
+        "appliedTicks": 120
+      },
+      {
+        "elapsedMs": 65.39999999850988,
+        "summary": "Town war advanced 60s (120 ticks @ 0.5s) | clock 517.7s | focus mid | orders 4 done / 1 active | build trench town-war-order-3: 80% @ 7.76/s | crates 0 | crate ammo 0 | drama bad-order-cost",
+        "appliedTicks": 120
+      },
+      {
+        "elapsedMs": 78.60000000149012,
+        "summary": "Town war advanced 60s (120 ticks @ 0.5s) | clock 577.9s | focus mid | orders 4 done / 1 active | build trench town-war-order-3: 80% @ 7.76/s | crates 0 | crate ammo 0 | drama bad-order-cost",
+        "appliedTicks": 120
+      },
+      {
+        "elapsedMs": 80.89999999850988,
+        "summary": "Town war advanced 60s (120 ticks @ 0.5s) | clock 638.2s | focus mid | orders 4 done / 1 active | build trench town-war-order-3: 80% @ 7.76/s | crates 0 | crate ammo 0 | drama bad-order-cost",
+        "appliedTicks": 120
+      }
+    ],
+    "totalElapsedMs": 917.6,
+    "totalTicks": 1200
+  },
+  "afterFrames": {
+    "samples": 180,
+    "averageMs": 178.68,
+    "p95Ms": 228.6,
+    "maxMs": 266.5,
+    "framesOver50Ms": 180
+  },
+  "afterAdvance": {
+    "label": "after-10-minute-sim",
+    "phase": "stash",
+    "officerFaction": "camp-a",
+    "clockSeconds": 657.4779999999997,
+    "soldiers": 12,
+    "combatants": 12,
+    "orders": 5,
+    "activeOrders": 1,
+    "completedOrders": 4,
+    "trenchSlots": 6,
+    "ammoCrates": 0,
+    "dugouts": 1,
+    "ui": {
+      "gameCanvas": 1,
+      "totalCanvas": 3,
+      "officerToggle": 1,
+      "buildToggle": 1,
+      "campArtToggle": 1,
+      "firstMinuteRail": 1,
+      "campArtStatus": "On",
+      "officerMode": false,
+      "buildMode": false
+    },
+    "runtime": {
+      "fps": 6.5,
+      "frameTimeMs": 145.6,
+      "townWarRealtimeEnabled": false,
+      "playerPathSamples": 0,
+      "heatmapCells": 0,
+      "clockSeconds": 657.48,
+      "soldiers": 12,
+      "combatants": 12,
+      "orders": 5,
+      "activeOrders": 1,
+      "completedOrders": 4,
+      "trenchSlots": 6,
+      "ammoCrates": 0,
+      "dugouts": 1,
+      "scene": {
+        "soldierSprites": 12,
+        "enemySprites": 0,
+        "fieldworkLabels": 0,
+        "campLabels": 2,
+        "selectedSoldierLabels": 0,
+        "lookSoldierLabels": 0,
+        "statusLabels": 0,
+        "playerCampArtObjects": 147,
+        "playerCampArtVisible": true,
+        "displayObjects": 67
+      }
+    }
+  },
+  "resetResultSummary": "Town war reset cleanly on Russian camp-a: 12 soldiers, 0 orders, 0 trench slots.",
+  "afterReset": {
+    "label": "after-api-reset",
+    "phase": "raid",
+    "officerFaction": "camp-a",
+    "clockSeconds": 0.5921999999955296,
+    "soldiers": 12,
+    "combatants": 12,
+    "orders": 0,
+    "activeOrders": 0,
+    "completedOrders": 0,
+    "trenchSlots": 0,
+    "ammoCrates": 0,
+    "dugouts": 0,
+    "ui": {
+      "gameCanvas": 1,
+      "totalCanvas": 3,
+      "officerToggle": 1,
+      "buildToggle": 1,
+      "campArtToggle": 1,
+      "firstMinuteRail": 1,
+      "campArtStatus": "On",
+      "officerMode": true,
+      "buildMode": false
+    },
+    "runtime": {
+      "fps": 0,
+      "frameTimeMs": 192,
+      "townWarRealtimeEnabled": true,
+      "playerPathSamples": 2,
+      "heatmapCells": 17,
+      "clockSeconds": 0.59,
+      "soldiers": 12,
+      "combatants": 12,
+      "orders": 0,
+      "activeOrders": 0,
+      "completedOrders": 0,
+      "trenchSlots": 0,
+      "ammoCrates": 0,
+      "dugouts": 0,
+      "scene": {
+        "soldierSprites": 12,
+        "enemySprites": 33,
+        "fieldworkLabels": 0,
+        "campLabels": 2,
+        "selectedSoldierLabels": 0,
+        "lookSoldierLabels": 0,
+        "statusLabels": 0,
+        "playerCampArtObjects": 147,
+        "playerCampArtVisible": true,
+        "displayObjects": 118
+      }
+    }
+  },
+  "artHiddenAfterReset": {
+    "label": "camp-art-hidden-after-reset",
+    "phase": "raid",
+    "officerFaction": "camp-a",
+    "clockSeconds": 4.81779999999702,
+    "soldiers": 12,
+    "combatants": 12,
+    "orders": 0,
+    "activeOrders": 0,
+    "completedOrders": 0,
+    "trenchSlots": 0,
+    "ammoCrates": 0,
+    "dugouts": 0,
+    "ui": {
+      "gameCanvas": 1,
+      "totalCanvas": 3,
+      "officerToggle": 1,
+      "buildToggle": 1,
+      "campArtToggle": 1,
+      "firstMinuteRail": 1,
+      "campArtStatus": "Off",
+      "officerMode": true,
+      "buildMode": false
+    },
+    "runtime": {
+      "fps": 4.9,
+      "frameTimeMs": 169.2,
+      "townWarRealtimeEnabled": true,
+      "playerPathSamples": 23,
+      "heatmapCells": 24,
+      "clockSeconds": 4.82,
+      "soldiers": 12,
+      "combatants": 12,
+      "orders": 0,
+      "activeOrders": 0,
+      "completedOrders": 0,
+      "trenchSlots": 0,
+      "ammoCrates": 0,
+      "dugouts": 0,
+      "scene": {
+        "soldierSprites": 12,
+        "enemySprites": 33,
+        "fieldworkLabels": 0,
+        "campLabels": 2,
+        "selectedSoldierLabels": 0,
+        "lookSoldierLabels": 0,
+        "statusLabels": 0,
+        "playerCampArtObjects": 147,
+        "playerCampArtVisible": false,
+        "displayObjects": 118
+      }
+    }
+  },
+  "afterReloadReset": {
+    "label": "after-browser-reload-reset",
+    "phase": "raid",
+    "officerFaction": "camp-a",
+    "clockSeconds": 0.7603999999985099,
+    "soldiers": 12,
+    "combatants": 12,
+    "orders": 0,
+    "activeOrders": 0,
+    "completedOrders": 0,
+    "trenchSlots": 0,
+    "ammoCrates": 0,
+    "dugouts": 0,
+    "ui": {
+      "gameCanvas": 1,
+      "totalCanvas": 3,
+      "officerToggle": 1,
+      "buildToggle": 1,
+      "campArtToggle": 1,
+      "firstMinuteRail": 1,
+      "campArtStatus": "On",
+      "officerMode": true,
+      "buildMode": false
+    },
+    "runtime": {
+      "fps": 0,
+      "frameTimeMs": 231.6,
+      "townWarRealtimeEnabled": true,
+      "playerPathSamples": 3,
+      "heatmapCells": 16,
+      "clockSeconds": 0.76,
+      "soldiers": 12,
+      "combatants": 12,
+      "orders": 0,
+      "activeOrders": 0,
+      "completedOrders": 0,
+      "trenchSlots": 0,
+      "ammoCrates": 0,
+      "dugouts": 0,
+      "scene": {
+        "soldierSprites": 12,
+        "enemySprites": 33,
+        "fieldworkLabels": 0,
+        "campLabels": 2,
+        "selectedSoldierLabels": 0,
+        "lookSoldierLabels": 0,
+        "statusLabels": 0,
+        "playerCampArtObjects": 147,
+        "playerCampArtVisible": true,
+        "displayObjects": 109
+      }
+    }
+  },
+  "screenshots": [
+    "artifacts/town-war-performance-reset/01-after-10-minute-sim.png",
+    "artifacts/town-war-performance-reset/02-after-api-reset.png"
+  ]
+}
