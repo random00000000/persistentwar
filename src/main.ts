@@ -195,8 +195,10 @@ const survivorIdleRifleImages = buildSpritePaintFrameImages(survivorIdleRifleFra
 const survivorMoveRifleImages = buildSpritePaintFrameImages(survivorMoveRifleFrames);
 
 type ActiveRoute = ReturnType<typeof raidController.getActiveRoute>;
+type TownWarSnapshot = ReturnType<typeof townWarController.getSnapshot>;
 type BriefingSpeakerId = "handler" | "operator" | "broker";
 type StoryFinaleChoiceId = "sell-route" | "burn-route";
+type WarVictoryRewardTone = "cash" | "supply" | "veteran" | "jackpot";
 type CommandTabId = "forecast" | "operations" | "debrief" | "ledger";
 type TopTabId = "gear" | "operator" | "health" | "skills" | "map" | "tasks";
 type GearWorkbenchTabId = "loadout" | "storage" | "planning";
@@ -225,6 +227,52 @@ const OFFICER_PRIORITY_QUICK_WORKS: TownWarWorkPriorityId[] = ["Build", "Defend"
 const OFFICER_PRIORITY_INSPECTOR_WORKS: TownWarWorkPriorityId[] = ["Build", "Defend", "Suppress", "Resupply", "Medic", "Rescue", "Haul", "Rest"];
 const OFFICER_CAMP_WORKS: TownWarCampWorkPriorityId[] = ["Resupply", "Cook", "Rest"];
 const OFFICER_FLANK_LANES: TownWarFlankLaneId[] = ["north", "mid", "south"];
+const WAR_VICTORY_REWARD_TIERS: Array<{
+  label: string;
+  title: string;
+  detail: string;
+  credits: number;
+  medkits: number;
+  ammoPacks: number;
+  tone: WarVictoryRewardTone;
+}> = [
+  {
+    label: "Combat Bonus",
+    title: "Command wired the bounty before the smoke cleared.",
+    detail: "Good for one cheaper redeploy, one reserve ammo pack, and enough money to keep momentum.",
+    credits: 220,
+    medkits: 0,
+    ammoPacks: 1,
+    tone: "cash"
+  },
+  {
+    label: "Supply Convoy",
+    title: "The rear line drove through the gap you opened.",
+    detail: "More sustainment than money: the next camp phase starts with breathing room.",
+    credits: 120,
+    medkits: 2,
+    ammoPacks: 2,
+    tone: "supply"
+  },
+  {
+    label: "Veteran Authority",
+    title: "The victory board signs off on a bigger next push.",
+    detail: "A rounded payout that makes the next squad recruit or RPG run easier to justify.",
+    credits: 300,
+    medkits: 1,
+    ammoPacks: 2,
+    tone: "veteran"
+  },
+  {
+    label: "War Chest",
+    title: "The camp collapse turns into a full exploitation bonus.",
+    detail: "Big cash, extra sealed supplies, and a loud reason to start the next operation.",
+    credits: 520,
+    medkits: 2,
+    ammoPacks: 3,
+    tone: "jackpot"
+  }
+];
 const OFFICER_WORK_LENSES: Array<{ id: OfficerWorkLensId; label: string; works: TownWarWorkPriorityId[] }> = [
   { id: "all", label: "All", works: [] },
   { id: "build", label: "Build", works: ["Build", "Repair", "Haul"] },
@@ -5347,6 +5395,92 @@ function renderStoryFinaleCredits(summary: RaidSummary): string {
       `
     )
     .join("");
+}
+
+function getWarVictoryMatchKey(townWar: TownWarSnapshot): string | null {
+  if (townWar.match.status !== "ended" || townWar.match.winner !== TOWN_WAR_PLAYER_FACTION) {
+    return null;
+  }
+
+  const destroyedCamp = getWarVictoryDestroyedCamp(townWar);
+  if (!destroyedCamp) {
+    return null;
+  }
+
+  const finalEvent = townWar.dialogue.recentDramaEvents.find((event) => event.kind === "camp-destroyed");
+  return `${townWar.match.winner}:${townWar.match.reason ?? "ended"}:${destroyedCamp.id}:${Math.round(finalEvent?.atSeconds ?? 0)}`;
+}
+
+function getWarVictoryDestroyedCamp(townWar: TownWarSnapshot) {
+  return (
+    townWar.camps.find((camp) => camp.id === TOWN_WAR_ENEMY_FACTION && camp.destroyed) ??
+    townWar.camps.find((camp) => camp.destroyed) ??
+    null
+  );
+}
+
+function hashWarVictoryKey(key: string): number {
+  let hash = 0;
+  for (let index = 0; index < key.length; index += 1) {
+    hash = (hash * 31 + key.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
+function getWarVictoryRewardIndex(townWar: TownWarSnapshot, matchKey: string): number {
+  const dramaticHit = townWar.dialogue.recentDramaEvents.find(
+    (event) => event.kind === "camp-destroyed" || event.tags.includes("explosive") || event.tags.includes("rpg")
+  );
+  const seed = dramaticHit ? `${matchKey}:${dramaticHit.id}:${dramaticHit.summary}` : matchKey;
+  return hashWarVictoryKey(seed) % WAR_VICTORY_REWARD_TIERS.length;
+}
+
+function renderWarVictoryCredits(townWar: TownWarSnapshot): string {
+  const destroyedCamp = getWarVictoryDestroyedCamp(townWar);
+  const campLabel = destroyedCamp?.label ?? "Enemy Camp";
+  const explosiveEvent = townWar.dialogue.recentDramaEvents.find((event) => event.tags.includes("explosive") || event.tags.includes("rpg"));
+  const lineEvent = townWar.dialogue.lastDramaEvent ?? explosiveEvent;
+  const survivingCamp = townWar.camps.find((camp) => camp.id === TOWN_WAR_PLAYER_FACTION);
+  const credits = [
+    { role: "Target", value: `${campLabel} destroyed` },
+    { role: "Demolition", value: explosiveEvent?.tags.includes("rpg") ? "RPG team impact" : "Explosive breach confirmed" },
+    { role: "Survivors", value: `${survivingCamp?.label ?? "Russian Camp"} still standing` },
+    { role: "Final Radio", value: lineEvent?.summary ?? "The frontline goes quiet for the first time tonight." }
+  ];
+
+  return credits
+    .map(
+      (credit) => `
+        <div class="story-finale-credit-line">
+          <span>${escapeHtml(credit.role)}</span>
+          <strong>${escapeHtml(credit.value)}</strong>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function renderWarVictoryWheel(selectedIndex: number): string {
+  return WAR_VICTORY_REWARD_TIERS.map((tier, index) => {
+    const selected = index === selectedIndex;
+    return `
+      <div class="war-victory-wheel-prize${selected ? " selected" : ""}" data-tone="${tier.tone}">
+        <span>${escapeHtml(tier.label)}</span>
+        <strong>${escapeHtml(`+${tier.credits} cr`)}</strong>
+      </div>
+    `;
+  }).join("");
+}
+
+function formatWarVictoryReward(reward: (typeof WAR_VICTORY_REWARD_TIERS)[number]): string {
+  const parts = [`${reward.credits} cr`];
+  if (reward.medkits > 0) {
+    parts.push(`${reward.medkits} med`);
+  }
+  if (reward.ammoPacks > 0) {
+    parts.push(`${reward.ammoPacks} ammo`);
+  }
+  return parts.join(" // ");
 }
 
 interface LedgerStats {
@@ -12194,6 +12328,69 @@ app.innerHTML = `
           </div>
         </section>
       </div>
+      <div class="story-finale-overlay war-victory-overlay hidden" data-war-victory-overlay>
+        <section class="story-finale-panel war-victory-panel" aria-label="War victory credits">
+          <div class="story-finale-vfx" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div class="story-finale-grid war-victory-grid">
+            <section class="story-finale-stage war-victory-stage">
+              <div class="story-finale-stage-head">
+                <div>
+                  <p class="eyebrow">Operation Complete</p>
+                  <h2 data-war-victory-title>Enemy Camp Destroyed</h2>
+                  <p class="story-finale-subtitle" data-war-victory-subtitle>
+                    The camp is gone. The front has a new ending.
+                  </p>
+                </div>
+                <div class="story-finale-soundtrack war-victory-soundtrack" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              </div>
+              <div class="war-victory-cinema">
+                <span>camp breach</span>
+                <strong>Fireball on the horizon. Radio static. Somebody starts counting survivors.</strong>
+              </div>
+              <div class="story-finale-roll">
+                <p class="eyebrow">Action Credits</p>
+                <div class="story-finale-credit-list" data-war-victory-credits></div>
+              </div>
+            </section>
+            <aside class="story-finale-choice-panel war-victory-boost-panel">
+              <p class="eyebrow">Victory Boost</p>
+              <h3 data-war-victory-reward-label>Spin The War Chest</h3>
+              <div class="war-victory-wheel" data-war-victory-wheel aria-hidden="true"></div>
+              <p class="story-finale-choice-copy" data-war-victory-reward-copy>
+                Command is pushing one fast reward into the protected stash before the next operation.
+              </p>
+              <strong class="war-victory-reward-total" data-war-victory-reward-total>+0 cr</strong>
+              <button class="story-finale-choice story-finale-choice-profit war-victory-claim" data-war-victory-claim type="button">
+                <span>Claim Victory Boost</span>
+                <strong data-war-victory-claim-copy>Bank the payout and keep the next push alive.</strong>
+              </button>
+              <button class="story-finale-choice story-finale-choice-burn war-victory-close" data-war-victory-close type="button">
+                <span>Return To War Room</span>
+                <strong>Close the credits and inspect the new frontline.</strong>
+              </button>
+            </aside>
+          </div>
+        </section>
+      </div>
     </div>
   </div>
 `;
@@ -12443,6 +12640,7 @@ const stashOverlay = requireElement<HTMLElement>("[data-stash]");
 const briefingOverlay = requireElement<HTMLElement>("[data-briefing]");
 const briefingPanel = requireElement<HTMLElement>("[data-briefing-panel]");
 const storyFinaleOverlay = requireElement<HTMLElement>("[data-story-finale]");
+const warVictoryOverlay = requireElement<HTMLElement>("[data-war-victory-overlay]");
 const weaponGrid = requireElement<HTMLElement>("[data-weapon-grid]");
 const raidTelemetryPanel = requireElement<HTMLElement>("[data-raid-telemetry]");
 const raidTelemetryStateValue = requireElement<HTMLElement>("[data-telemetry-state]");
@@ -12507,6 +12705,15 @@ const storyFinaleTitleValue = requireElement<HTMLElement>("[data-story-finale-ti
 const storyFinaleSubtitleValue = requireElement<HTMLElement>("[data-story-finale-subtitle]");
 const storyFinaleBeatsValue = requireElement<HTMLElement>("[data-story-finale-beats]");
 const storyFinaleCreditsValue = requireElement<HTMLElement>("[data-story-finale-credits]");
+const warVictoryTitleValue = requireElement<HTMLElement>("[data-war-victory-title]");
+const warVictorySubtitleValue = requireElement<HTMLElement>("[data-war-victory-subtitle]");
+const warVictoryCreditsValue = requireElement<HTMLElement>("[data-war-victory-credits]");
+const warVictoryWheelValue = requireElement<HTMLElement>("[data-war-victory-wheel]");
+const warVictoryRewardLabelValue = requireElement<HTMLElement>("[data-war-victory-reward-label]");
+const warVictoryRewardCopyValue = requireElement<HTMLElement>("[data-war-victory-reward-copy]");
+const warVictoryRewardTotalValue = requireElement<HTMLElement>("[data-war-victory-reward-total]");
+const warVictoryClaimButton = requireElement<HTMLButtonElement>("[data-war-victory-claim]");
+const warVictoryClaimCopyValue = requireElement<HTMLElement>("[data-war-victory-claim-copy]");
 const deploymentCostValue = requireElement<HTMLElement>("[data-deployment-cost]");
 const projectedReserveValue = requireElement<HTMLElement>("[data-projected-reserve]");
 const entryLoadValue = requireElement<HTMLElement>("[data-entry-load]");
@@ -13461,6 +13668,43 @@ const briefingState = {
 const storyFinaleState = {
   choice: null as StoryFinaleChoiceId | null
 };
+
+const warVictoryOverlayState = {
+  open: false,
+  rewardClaimed: false,
+  matchKey: null as string | null,
+  rewardIndex: 0
+};
+
+function syncWarVictoryOverlay(townWar: TownWarSnapshot): void {
+  const matchKey = getWarVictoryMatchKey(townWar);
+  if (!matchKey) {
+    return;
+  }
+
+  if (warVictoryOverlayState.matchKey === matchKey) {
+    return;
+  }
+
+  warVictoryOverlayState.matchKey = matchKey;
+  warVictoryOverlayState.rewardIndex = getWarVictoryRewardIndex(townWar, matchKey);
+  warVictoryOverlayState.rewardClaimed = false;
+  warVictoryOverlayState.open = true;
+}
+
+function claimWarVictoryReward(): void {
+  if (warVictoryOverlayState.rewardClaimed) {
+    return;
+  }
+
+  const reward = WAR_VICTORY_REWARD_TIERS[warVictoryOverlayState.rewardIndex] ?? WAR_VICTORY_REWARD_TIERS[0];
+  raidController.state.stashCredits += reward.credits;
+  raidController.state.stashSupplies.medkits += reward.medkits;
+  raidController.state.stashSupplies.ammoPacks += reward.ammoPacks;
+  raidController.state.message = `Victory boost claimed: ${formatWarVictoryReward(reward)} moved into the protected stash.`;
+  warVictoryOverlayState.rewardClaimed = true;
+  updateUi();
+}
 
 const raidHudState = {
   tacticalDrawerOpen: false,
@@ -19210,6 +19454,17 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-story-c
   });
 }
 
+warVictoryClaimButton.addEventListener("click", () => {
+  claimWarVictoryReward();
+});
+
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-war-victory-close]")) {
+  button.addEventListener("click", () => {
+    warVictoryOverlayState.open = false;
+    updateUi();
+  });
+}
+
 hudToggleButton.addEventListener("click", () => {
   raidHudState.tacticalDrawerOpen = !raidHudState.tacticalDrawerOpen;
   updateUi();
@@ -23943,6 +24198,7 @@ function updateUi(): void {
   const routeBuildingOccupationEntries = getRouteBuildingOccupationEntries(route, raidController.state.obstacles);
   const routeIdentityRead = buildRouteIdentityRead(route, routeBuildingOccupationEntries);
   const townWarForOperator = townWarController.getSnapshot();
+  syncWarVictoryOverlay(townWarForOperator);
   const squadRosterRecords = buildSquadRosterRecords(squadRoster, squadMates);
   const recruitRecords = buildRecruitRecords(recruitPool, townWarForOperator.unifiedSoldiers);
   const memorialReplacementBlock = getMemorialReplacementBlock(squadRosterRecords);
@@ -24541,6 +24797,7 @@ function updateUi(): void {
   stashOverlay.classList.toggle("hidden", !stashOpen);
   briefingOverlay.classList.toggle("hidden", phase === "raid" || !briefingState.open);
   storyFinaleOverlay.classList.toggle("hidden", phase === "raid" || briefingState.open || frontDoorOpen || !pendingStoryFinale);
+  warVictoryOverlay.classList.toggle("hidden", !warVictoryOverlayState.open);
   stashCredits.textContent = `${stash} cr`;
   stashMedkits.textContent = `${stashSupplies.medkits}`;
   stashAmmoPacks.textContent = `${stashSupplies.ammoPacks}`;
@@ -25036,6 +25293,30 @@ function updateUi(): void {
     storyFinaleSubtitleValue.textContent = `${storyFinaleSummary.contractTitle} cashed, both intel bundles cleared, and the district is finally looking at your stash.`;
     storyFinaleBeatsValue.innerHTML = renderStoryFinaleBeats(storyFinaleSummary);
     storyFinaleCreditsValue.innerHTML = renderStoryFinaleCredits(storyFinaleSummary);
+  }
+
+  const warVictoryMatchKey = getWarVictoryMatchKey(townWarForOperator);
+  if (warVictoryMatchKey) {
+    const destroyedCamp = getWarVictoryDestroyedCamp(townWarForOperator);
+    const reward = WAR_VICTORY_REWARD_TIERS[warVictoryOverlayState.rewardIndex] ?? WAR_VICTORY_REWARD_TIERS[0];
+    warVictoryTitleValue.textContent = `${destroyedCamp?.label ?? "Enemy Camp"} Destroyed`;
+    warVictorySubtitleValue.textContent =
+      townWarForOperator.match.reason === "camp-destroyed"
+        ? "The camp took enough explosive damage to end the run. The front finally has a hard stop."
+        : "The town war ended in your favor. Command is turning the win into momentum.";
+    warVictoryCreditsValue.innerHTML = renderWarVictoryCredits(townWarForOperator);
+    warVictoryWheelValue.innerHTML = renderWarVictoryWheel(warVictoryOverlayState.rewardIndex);
+    warVictoryWheelValue.classList.toggle("claimed", warVictoryOverlayState.rewardClaimed);
+    warVictoryRewardLabelValue.textContent = reward.label;
+    warVictoryRewardCopyValue.textContent = warVictoryOverlayState.rewardClaimed
+      ? `${reward.title} The stash has already banked the payout.`
+      : reward.title;
+    warVictoryRewardTotalValue.textContent = `+${formatWarVictoryReward(reward)}`;
+    warVictoryClaimButton.disabled = warVictoryOverlayState.rewardClaimed;
+    warVictoryClaimButton.classList.toggle("claimed", warVictoryOverlayState.rewardClaimed);
+    warVictoryClaimCopyValue.textContent = warVictoryOverlayState.rewardClaimed
+      ? "Boost banked. The next operation has teeth."
+      : reward.detail;
   }
 
   for (const card of document.querySelectorAll<HTMLButtonElement>(".contract-card")) {
@@ -37176,6 +37457,7 @@ function getAgentSnapshot() {
   const townWarReadability = townWarController.getReadabilityOverlay();
   const storyFinaleSummary = getStoryFinaleTriggerSummary(state.raidHistory);
   const pendingStoryFinale = state.phase === "stash" && storyFinaleSummary !== null && storyFinaleState.choice === null;
+  const warVictoryMatchKey = getWarVictoryMatchKey(townWar);
   const frontDoorOpen = state.phase === "stash" && frontDoorState.menuOpen && !briefingState.open && !pendingStoryFinale;
   const stashOpen = state.phase !== "raid" && !frontDoorOpen;
   const activeSector = state.frontlineSectors.find((sector) => sector.routeId === route.id) ?? null;
@@ -37811,7 +38093,10 @@ function getAgentSnapshot() {
         stashOpen,
         briefingOpen: briefingState.open,
         storyFinalePending: pendingStoryFinale,
-        storyFinaleResolved: storyFinaleState.choice !== null
+        storyFinaleResolved: storyFinaleState.choice !== null,
+        warVictoryOpen: warVictoryOverlayState.open,
+        warVictoryClaimed: warVictoryOverlayState.rewardClaimed,
+        warVictoryReady: warVictoryMatchKey !== null
       }
     },
     stash: {
