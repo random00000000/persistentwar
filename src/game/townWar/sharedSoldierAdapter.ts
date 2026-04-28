@@ -1,7 +1,7 @@
 import { WEAPONS } from "../weapons";
 import type { WeaponId } from "../weapons";
 import type { SharedSoldierSquadStatus, SharedSoldierState } from "../soldiers/sharedSoldier";
-import { TOWN_WAR_PLAYER_FACTION } from "./types";
+import { getTownWarFactionRead, TOWN_WAR_PLAYER_FACTION } from "./types";
 import type { TownWarSoldierState } from "./state";
 
 function clonePosition(position: TownWarSoldierState["position"]): TownWarSoldierState["position"] {
@@ -50,6 +50,7 @@ export function buildSharedSoldierFromTownWarSoldier(soldier: TownWarSoldierStat
   const weaponName = WEAPONS[weaponId]?.name ?? weaponId;
   const orderLabel = soldier.task.label ?? soldier.task.kind;
   const squadStatus = getSharedSoldierSquadStatus(soldier);
+  const factionRead = getTownWarFactionRead(soldier.faction);
 
   return {
     contractVersion: 1,
@@ -62,6 +63,13 @@ export function buildSharedSoldierFromTownWarSoldier(soldier: TownWarSoldierStat
       traits: [...soldier.traits]
     },
     faction: soldier.faction,
+    factionRead: {
+      side: factionRead.side,
+      campLabel: factionRead.campLabel,
+      forceLabel: factionRead.forceLabel,
+      armbandColor: factionRead.armbandColor,
+      playerControlled: factionRead.playerControlled
+    },
     role: soldier.role,
     weapon: {
       weaponId
@@ -120,6 +128,6 @@ export function buildSharedSoldierFromTownWarSoldier(soldier: TownWarSoldierStat
       spawnedAtSeconds: soldier.spawnedAtSeconds,
       lastUpdatedAtSeconds: clockSeconds
     },
-    readable: `${soldier.displayName} shared soldier: ${soldier.faction}, ${soldier.role}, ${weaponName}, ${orderLabel}, ${squadStatus}.`
+    readable: `${soldier.displayName} shared soldier: ${factionRead.forceLabel} ${factionRead.side} side, ${soldier.role}, ${weaponName}, ${orderLabel}, ${squadStatus}.`
   };
 }

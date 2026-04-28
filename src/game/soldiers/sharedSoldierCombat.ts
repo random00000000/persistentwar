@@ -40,6 +40,20 @@ export interface SharedSoldierIncomingFireResult {
   died: boolean;
 }
 
+export const SHARED_SOLDIER_TRENCH_DAMAGE_MULTIPLIER = 0.1;
+
+export function getSharedSoldierIncomingDamageScale(input: { inCover: boolean; inTrench: boolean; coverProtection: number }): number {
+  if (input.inTrench) {
+    return SHARED_SOLDIER_TRENCH_DAMAGE_MULTIPLIER;
+  }
+
+  if (input.inCover) {
+    return Math.max(0, 1 - Math.max(0, input.coverProtection));
+  }
+
+  return 1;
+}
+
 export function getSharedSoldierAmmoTotal(soldier: SharedSoldierCombatant): number {
   return Math.max(0, soldier.ammo.inMag) + Math.max(0, soldier.ammo.reserve);
 }

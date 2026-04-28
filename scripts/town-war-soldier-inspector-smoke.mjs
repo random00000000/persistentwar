@@ -116,15 +116,31 @@ async function runSoldierInspectorSmoke() {
         const townSoldiers = snapshot.war?.townWar.soldiers ?? [];
         const sharedRussian = sharedSoldiers.find((soldier) => soldier.faction === "camp-a") ?? null;
         const sharedUkrainian = sharedSoldiers.find((soldier) => soldier.faction === "camp-b") ?? null;
+        const playerCamp = snapshot.war?.townWar.camps.find((camp) => camp.id === "camp-a") ?? null;
+        const enemyCamp = snapshot.war?.townWar.camps.find((camp) => camp.id === "camp-b") ?? null;
+        const playerFactionReadOk =
+          sharedRussian?.factionRead?.forceLabel === "Russian" &&
+          sharedRussian?.factionRead?.side === "right" &&
+          sharedRussian?.factionRead?.armbandColor === "#ef4444" &&
+          sharedRussian?.factionRead?.playerControlled === true &&
+          sharedUkrainian?.factionRead?.forceLabel === "Ukrainian" &&
+          sharedUkrainian?.factionRead?.side === "left" &&
+          sharedUkrainian?.factionRead?.playerControlled === false &&
+          playerCamp &&
+          enemyCamp &&
+          playerCamp.spawn.position.x > enemyCamp.spawn.position.x;
         const sharedContractOk =
           sharedSoldiers.length === townSoldiers.length &&
           Boolean(sharedRussian) &&
           Boolean(sharedUkrainian) &&
+          Boolean(playerFactionReadOk) &&
           sharedSoldiers.every(
             (soldier) =>
               soldier.contractVersion === 1 &&
               soldier.identity?.id &&
               soldier.faction &&
+              soldier.factionRead?.forceLabel &&
+              soldier.factionRead?.armbandColor &&
               soldier.role &&
               soldier.weapon?.weaponId &&
               typeof soldier.ammo?.inMag === "number" &&
@@ -139,7 +155,7 @@ async function runSoldierInspectorSmoke() {
         const unifiedSoldier =
           snapshot.war?.townWar.unifiedSoldiers.find((entry) => entry.faction === "camp-a" && entry.squad.assignable) ?? null;
         if (!unifiedSoldier) {
-          return { found: false, sharedContractOk, sharedCount: sharedSoldiers.length, townCount: townSoldiers.length };
+          return { found: false, sharedContractOk, playerFactionReadOk, sharedCount: sharedSoldiers.length, townCount: townSoldiers.length };
         }
         const assigned = api.assignUnifiedSoldierToSquad({ unifiedSoldierId: unifiedSoldier.id });
         const assignedSoldier = assigned.war?.townWar.unifiedSoldiers.find((entry) => entry.id === unifiedSoldier.id) ?? null;
@@ -150,8 +166,11 @@ async function runSoldierInspectorSmoke() {
           sharedContractOk,
           sharedCount: sharedSoldiers.length,
           townCount: townSoldiers.length,
+          playerFactionReadOk,
           sharedRussianId: sharedRussian?.identity.id ?? null,
+          sharedRussianRead: sharedRussian?.factionRead ?? null,
           sharedUkrainianId: sharedUkrainian?.identity.id ?? null,
+          sharedUkrainianRead: sharedUkrainian?.factionRead ?? null,
           unifiedSoldierId: unifiedSoldier.id,
           soldierId: unifiedSoldier.soldierId,
           assignOk: assigned.ok,

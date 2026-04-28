@@ -5,6 +5,7 @@ import {
   applySharedSoldierIncomingFire,
   canSharedSoldierShoot,
   consumeSharedSoldierFireAmmo,
+  getSharedSoldierIncomingDamageScale,
   recoverSharedSoldierPressure,
   shouldSharedSoldierRetreatFromSuppression
 } from "../soldiers";
@@ -6023,7 +6024,11 @@ export class TownWarController {
       const missed = roll > Math.max(0.08, fireProfile.hitChance + trenchFireBonus - tacticalAccuracyPenalty - extendedRangeAccuracyPenalty);
 
       const scaledRoll = 0.7 + roll * 0.6;
-      const coverDamageScale = targetInCover ? (targetInTrench ? Math.max(0.18, 1 - coverProtection) : 1 - coverProtection) : 1;
+      const coverDamageScale = getSharedSoldierIncomingDamageScale({
+        inCover: targetInCover,
+        inTrench: targetInTrench,
+        coverProtection
+      });
       const trenchIncomingPressureMultiplier =
         targetInTrench && combatant.task.kind === "suppress"
           ? TRENCH_INCOMING_SUPPRESSION_SUPPRESS_MULTIPLIER

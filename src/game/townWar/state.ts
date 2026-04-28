@@ -1,7 +1,7 @@
 import { WORLD_HEIGHT, WORLD_WIDTH, type Vec2 } from "../arena";
 import type { WeaponId } from "../weapons";
 import type { SharedSoldierState } from "../soldiers/sharedSoldier";
-import { TOWN_WAR_ENEMY_FACTION, TOWN_WAR_PLAYER_FACTION } from "./types";
+import { getTownWarFactionRead, TOWN_WAR_ENEMY_FACTION, TOWN_WAR_PLAYER_FACTION } from "./types";
 import type {
   TownWarCurrentNeedId,
   TownWarEntityKind,
@@ -1345,8 +1345,8 @@ export function createTownWarState(): TownWarState {
       control: buildDefaultTownControl()
     },
     camps: [
-      createTownWarCampState(TOWN_WAR_PLAYER_FACTION, "Russian Camp", playerCampSpawn),
-      createTownWarCampState(TOWN_WAR_ENEMY_FACTION, "Ukrainian Enemy Camp", enemyCampSpawn)
+      createTownWarCampState(TOWN_WAR_PLAYER_FACTION, getTownWarFactionRead(TOWN_WAR_PLAYER_FACTION).campLabel, playerCampSpawn),
+      createTownWarCampState(TOWN_WAR_ENEMY_FACTION, getTownWarFactionRead(TOWN_WAR_ENEMY_FACTION).campLabel, enemyCampSpawn)
     ],
     match: { status: "active", winner: null, reason: null },
     enemyCommander: {

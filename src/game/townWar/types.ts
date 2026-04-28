@@ -5,6 +5,40 @@ export type TownWarFactionId = "camp-a" | "camp-b";
 export const TOWN_WAR_PLAYER_FACTION: TownWarFactionId = "camp-a";
 export const TOWN_WAR_ENEMY_FACTION: TownWarFactionId = "camp-b";
 
+export type TownWarFactionSide = "right" | "left";
+
+export interface TownWarFactionRead {
+  faction: TownWarFactionId;
+  side: TownWarFactionSide;
+  campLabel: string;
+  forceLabel: string;
+  armbandColor: string;
+  playerControlled: boolean;
+}
+
+export const TOWN_WAR_FACTION_READ: Record<TownWarFactionId, TownWarFactionRead> = {
+  "camp-a": {
+    faction: "camp-a",
+    side: "right",
+    campLabel: "Russian Camp",
+    forceLabel: "Russian",
+    armbandColor: "#ef4444",
+    playerControlled: true
+  },
+  "camp-b": {
+    faction: "camp-b",
+    side: "left",
+    campLabel: "Ukrainian Enemy Camp",
+    forceLabel: "Ukrainian",
+    armbandColor: "#2563eb",
+    playerControlled: false
+  }
+};
+
+export function getTownWarFactionRead(faction: TownWarFactionId): TownWarFactionRead {
+  return TOWN_WAR_FACTION_READ[faction];
+}
+
 export type TownWarRoleId = "builder" | "rifleman" | "suppressor" | "medic" | "defender";
 
 export type TownWarSoldierArchetype =

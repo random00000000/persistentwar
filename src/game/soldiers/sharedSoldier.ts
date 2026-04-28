@@ -3,6 +3,7 @@ import type { WeaponId } from "../weapons";
 import type {
   TownWarCurrentNeedId,
   TownWarFactionId,
+  TownWarFactionSide,
   TownWarRoleId,
   TownWarSoldierArchetype,
   TownWarTaskKind,
@@ -33,6 +34,14 @@ export interface SharedSoldierIdentityState {
   displayName: string;
   archetype: TownWarSoldierArchetype;
   traits: TownWarTraitId[];
+}
+
+export interface SharedSoldierFactionReadState {
+  side: TownWarFactionSide;
+  campLabel: string;
+  forceLabel: string;
+  armbandColor: string;
+  playerControlled: boolean;
 }
 
 export interface SharedSoldierWeaponState {
@@ -106,6 +115,7 @@ export interface SharedSoldierState {
   contractVersion: SharedSoldierContractVersion;
   identity: SharedSoldierIdentityState;
   faction: TownWarFactionId;
+  factionRead: SharedSoldierFactionReadState;
   role: TownWarRoleId;
   weapon: SharedSoldierWeaponState;
   ammo: SharedSoldierAmmoState;
