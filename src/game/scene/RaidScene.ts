@@ -41,6 +41,7 @@ import {
   type FrontlineSupportState,
   type FrontlineTracerState,
   type GrenadeState,
+  type PlantedChargeState,
   getFrontlineRoomIdentityProfile,
   type RaidPocketPlanState,
   raidController,
@@ -4213,6 +4214,31 @@ function drawGrenade(
   }
 }
 
+function drawPlantedCharge(
+  graphics: Phaser.GameObjects.Graphics,
+  charge: PlantedChargeState,
+  timeMs: number
+): void {
+  const fuseRatio = charge.fuseTime > 0 ? Phaser.Math.Clamp(1 - charge.elapsed / charge.fuseTime, 0, 1) : 0;
+  const armedRatio = 1 - fuseRatio;
+  const pulse = 0.5 + 0.5 * Math.sin(timeMs / 70 + charge.id * 0.9);
+  const warningRadius = charge.radius * (0.18 + armedRatio * 0.56 + pulse * 0.06);
+  graphics.fillStyle(0x020617, 0.92);
+  graphics.fillRoundedRect(charge.position.x - 8, charge.position.y - 5, 16, 10, 3);
+  graphics.fillStyle(0xf43f5e, 0.86);
+  graphics.fillRoundedRect(charge.position.x - 6, charge.position.y - 3, 12, 6, 2);
+  graphics.fillStyle(0xfef3c7, 0.72 + pulse * 0.22);
+  graphics.fillCircle(charge.position.x + 5, charge.position.y - 3, 1.8 + pulse * 0.9);
+  graphics.lineStyle(1.4, 0xf43f5e, 0.22 + armedRatio * 0.32);
+  graphics.strokeCircle(charge.position.x, charge.position.y, warningRadius);
+  graphics.lineStyle(1, 0xfef3c7, 0.12 + armedRatio * 0.28);
+  graphics.strokeCircle(charge.position.x, charge.position.y, warningRadius * 0.68);
+  if (fuseRatio < 0.36) {
+    graphics.lineStyle(1.4, 0xfef3c7, 0.24 + armedRatio * 0.3);
+    graphics.strokeCircle(charge.position.x, charge.position.y, warningRadius * (1.08 + pulse * 0.12));
+  }
+}
+
 function drawOrientedQuad(
   graphics: Phaser.GameObjects.Graphics,
   center: { x: number; y: number },
@@ -6837,6 +6863,10 @@ function getPlayerAimProfile(weaponId: keyof typeof WEAPONS): { x: number; width
 
   if (weaponId === "shotgun") {
     return { x: 17, width: 12, height: 5, color: 0xfbbf24, alpha: 0.96 };
+  }
+
+  if (weaponId === "c4") {
+    return { x: 11, width: 8, height: 7, color: 0xf43f5e, alpha: 0.94 };
   }
 
   return { x: 19, width: 16, height: 3, color: 0xa7f3d0, alpha: 0.95 };
@@ -11836,7 +11866,7 @@ export class RaidScene extends Phaser.Scene {
   }
 
   private syncSprites(): void {
-    const { player, enemies, friendlyCombatants, fallenSquadBodies, fallenEnemyBodies, bullets, grenades, frontlineTracers, frontlineImpacts, loot, intelSites, supplyCaches, extractZone, extractionReady, extractionContested, extractionHoldDuration, extractionHoldTimer, phase, activeSearch, activeIntelCapture, activeLootPickup, activeObstacleBreach, recentNoisePosition, recentNoisePulse, soundPressure, frontlineSupports, frontlineIncidents, activeFrontlineHoldZoneId, activeSquadBodyRecovery } =
+    const { player, enemies, friendlyCombatants, fallenSquadBodies, fallenEnemyBodies, bullets, grenades, plantedCharges, frontlineTracers, frontlineImpacts, loot, intelSites, supplyCaches, extractZone, extractionReady, extractionContested, extractionHoldDuration, extractionHoldTimer, phase, activeSearch, activeIntelCapture, activeLootPickup, activeObstacleBreach, recentNoisePosition, recentNoisePulse, soundPressure, frontlineSupports, frontlineIncidents, activeFrontlineHoldZoneId, activeSquadBodyRecovery } =
       raidController.state;
     const playerInExtractZone =
       Phaser.Math.Distance.Between(player.position.x, player.position.y, extractZone.position.x, extractZone.position.y) <
@@ -12326,6 +12356,12 @@ export class RaidScene extends Phaser.Scene {
 
     for (const grenade of renderableGrenades) {
       drawGrenade(this.grenadeGraphics, grenade, this.time.now);
+    }
+
+    for (const charge of plantedCharges) {
+      if (this.isPointNearCamera(charge.position, 220)) {
+        drawPlantedCharge(this.grenadeGraphics, charge, this.time.now);
+      }
     }
 
     for (const drop of loot) {

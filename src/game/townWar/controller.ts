@@ -244,7 +244,7 @@ const TOWN_WAR_DEMOLITION_TOOL_DAMAGE: Record<TownWarDemolitionToolId, { weakPoi
   rpg: { weakPoint: 350, camp: 220, ammoCost: 46, buildCost: 12 }
 };
 type TownWarCampDamageType = "direct" | "explosive";
-type TownWarExplosiveRaidToolId = Extract<TownWarDemolitionToolId, "grenade" | "rpg">;
+type TownWarExplosiveRaidToolId = Extract<TownWarDemolitionToolId, "grenade" | "demo-charge" | "rpg">;
 type TownWarCampDamageOptions = {
   attackerFaction?: TownWarFactionId | null;
   damageType?: TownWarCampDamageType;

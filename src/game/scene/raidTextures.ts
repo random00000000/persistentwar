@@ -528,7 +528,7 @@ function drawPlayerTextures(scene: Phaser.Scene): void {
     "#ef4444"
   );
 
-    drawOperatorTexture(
+  drawOperatorTexture(
       scene,
       "player-rpg",
     [
@@ -563,6 +563,45 @@ function drawPlayerTextures(scene: Phaser.Scene): void {
       r: "#facc15"
     },
     17,
+    6,
+    "#ef4444"
+  );
+
+  drawOperatorTexture(
+    scene,
+    "player-c4",
+    [
+      "........................",
+      ".........hhhhhh.........",
+      ".......hhmmmmmmhh.......",
+      "......hhmvvvvvmmhh......",
+      "......hmvvffffvvmh......",
+      "......hmvfffffffvmh.....",
+      "......hhmffffffmhh......",
+      ".......ccccttttccc......",
+      "......ccccaattaccc......",
+      ".....cccssasssasscc.....",
+      ".....ccsaggrrggasxc.....",
+      "....cccsagrrrrrgaxcc....",
+      "....cccsaarrrrraascc....",
+      "....ccccaakkkkaaccc.....",
+      ".....cccaakyykaaccc.....",
+      ".....cccaakyykaaccc.....",
+      ".....cccakkbbkkaccc.....",
+      "......ccakbbbbkacc......",
+      "......llkbb..bbkll......",
+      ".....lllbb.u..bblll.....",
+      ".....dllb.uuu..blld.....",
+      ".....ddlb.rrr..bldd.....",
+      "......dd........dd......",
+      "........................"
+    ],
+    {
+      ...basePalette,
+      u: "#f43f5e",
+      r: "#fef3c7"
+    },
+    12,
     6,
     "#ef4444"
   );

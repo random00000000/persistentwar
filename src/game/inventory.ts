@@ -17,6 +17,7 @@ export type InventoryItemSubcategory =
   | "pkm"
   | "amr"
   | "rpg"
+  | "c4"
   | "pistol"
   | "magazine"
   | "medical"
@@ -266,6 +267,23 @@ const INVENTORY_ITEM_DEFINITIONS: Record<string, InventoryItemDefinition> = {
     value: 980,
     description: "Earned siege launcher for cracking bunker mouths, camp anchors, and packed trench lines.",
     tags: ["primary", "endgame", "siege", "rocket", "operator"]
+  },
+  "weapon-c4": {
+    itemId: "weapon-c4",
+    displayName: "C4 Charge",
+    category: "weapon",
+    subcategory: "c4",
+    width: 2,
+    height: 2,
+    weight: 2.4,
+    stackable: false,
+    maxStack: 1,
+    allowedSlots: ["on-sling", "on-back"],
+    allowedParents: ["stash", "backpack", "tactical-rig"],
+    rotationAllowed: false,
+    value: 760,
+    description: "Plantable demolition charge for camp anchors. The officer must plant it in person and clear the blast radius.",
+    tags: ["primary", "endgame", "siege", "explosive", "operator"]
   },
   "item-pistol": {
     itemId: "item-pistol",

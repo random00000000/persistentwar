@@ -333,6 +333,11 @@ const RPG_TEST_RESERVE_AMMO = 99;
 const PLAYER_GRENADE_DAMAGE = 62;
 const PLAYER_GRENADE_CAMP_EXPLOSIVE_DAMAGE = 32;
 const RPG_CAMP_EXPLOSIVE_DAMAGE = 220;
+const C4_CAMP_EXPLOSIVE_DAMAGE = 340;
+const C4_FUSE_TIME = 4.8;
+const C4_BLAST_RADIUS = 156;
+const C4_PRESSURE_RADIUS = 244;
+const C4_BLAST_DAMAGE = 132;
 const HOSTILE_GRENADE_DAMAGE = 46;
 const GRENADE_FUSE_TIME = 0.92;
 const GRENADE_TRAVEL_TIME = 0.28;
@@ -396,6 +401,19 @@ export interface GrenadeState {
   fuseTime: number;
   travelTime: number;
   radius: number;
+  damage: number;
+}
+
+export interface PlantedChargeState {
+  id: number;
+  source: "player";
+  faction: "friendly";
+  ownerLabel: string;
+  position: Vec2;
+  elapsed: number;
+  fuseTime: number;
+  radius: number;
+  pressureRadius: number;
   damage: number;
 }
 
@@ -2154,6 +2172,7 @@ export interface RaidState {
   friendlyCombatants: FriendlyCombatantState[];
   bullets: BulletState[];
   grenades: GrenadeState[];
+  plantedCharges: PlantedChargeState[];
   frontlineTracers: FrontlineTracerState[];
   frontlineImpacts: FrontlineImpactState[];
   loot: LootState[];
@@ -8857,6 +8876,10 @@ function getSharedWeaponCombatProfile(
 function getPlayerStartingReserveAmmo(weapon: WeaponDefinition, prepLoadout: SupplyStock): number {
   if (weapon.id === "rpg") {
     return RPG_TEST_RESERVE_AMMO;
+  }
+
+  if (weapon.id === "c4") {
+    return 0;
   }
 
   return weapon.reserveAmmo + prepLoadout.ammoPacks * weapon.ammoPackAmmo;
@@ -16165,6 +16188,7 @@ export class RaidController {
       friendlyCombatants: [],
       bullets: [],
       grenades: [],
+      plantedCharges: [],
       frontlineTracers: [],
       frontlineImpacts: [],
       loot: [],
@@ -17542,6 +17566,7 @@ export class RaidController {
     this.state.enemies.push(...this.createEnemyFrontlinePatrol(townWarSnapshot, this.state.player.position));
     this.state.bullets = [];
     this.state.grenades = [];
+    this.state.plantedCharges = [];
     this.state.frontlineTracers = [];
     this.state.frontlineImpacts = [];
     this.state.loot = [];
@@ -20048,6 +20073,7 @@ export class RaidController {
     this.updateEnemies(deltaSeconds);
     this.updateBullets(deltaSeconds);
     this.updateGrenades(deltaSeconds);
+    this.updatePlantedCharges(deltaSeconds);
     this.updateFrontlineTracers(deltaSeconds);
     this.updateFrontlineImpacts(deltaSeconds);
     this.updateLootPickup(deltaSeconds);
@@ -24573,6 +24599,11 @@ export class RaidController {
       return;
     }
 
+    if (weapon.id === "c4") {
+      this.plantPlayerC4(weapon);
+      return;
+    }
+
     if (player.ammoInMag === 0) {
       this.beginReload(weapon, true);
       return;
@@ -24836,6 +24867,38 @@ export class RaidController {
     });
   }
 
+  private plantPlayerC4(weapon: WeaponDefinition): void {
+    const player = this.state.player;
+    if (this.state.phase !== "raid") {
+      return;
+    }
+
+    if (player.ammoInMag <= 0) {
+      this.state.message = "No C4 charges left. The demolition run needs another charge staged from the stash.";
+      return;
+    }
+
+    const plantPosition = add(player.position, multiply(player.facing, player.radius + 8));
+    const safePosition = clampWorldPoint(plantPosition);
+    player.ammoInMag -= 1;
+    player.fireCooldown = weapon.fireInterval * getWoundFireIntervalMultiplier(player.woundSeverity);
+    this.emitNoise(safePosition, weapon.noiseRadius, weapon.noiseScore, "C4 planted");
+    this.state.plantedCharges.push({
+      id: this.grenadeId++,
+      source: "player",
+      faction: "friendly",
+      ownerLabel: "Player C4",
+      position: safePosition,
+      elapsed: 0,
+      fuseTime: C4_FUSE_TIME,
+      radius: C4_BLAST_RADIUS,
+      pressureRadius: C4_PRESSURE_RADIUS,
+      damage: C4_BLAST_DAMAGE
+    });
+    this.state.message = `C4 planted. ${C4_FUSE_TIME.toFixed(1)} seconds on the fuse. Move away before the camp answers.`;
+    this.pushSquadLog("Makar", "warning", "C4 planted. Break contact and let the charge do the work.", "C4");
+  }
+
   private tryThrowPlayerGrenade(): void {
     const player = this.state.player;
     if (this.state.phase !== "raid") {
@@ -24883,13 +24946,34 @@ export class RaidController {
     this.state.grenades = remainingGrenades;
   }
 
+  private updatePlantedCharges(deltaSeconds: number): void {
+    const remainingCharges: PlantedChargeState[] = [];
+
+    for (const charge of this.state.plantedCharges) {
+      charge.elapsed += deltaSeconds;
+      if (charge.elapsed >= charge.fuseTime) {
+        this.explodePlantedCharge(charge);
+        continue;
+      }
+
+      remainingCharges.push(charge);
+    }
+
+    this.state.plantedCharges = remainingCharges;
+  }
+
   private applyRaidExplosiveCampDamage(
     position: Vec2,
     radius: number,
-    tool: "grenade" | "rpg",
+    tool: "grenade" | "rpg" | "c4",
     faction: "friendly" | "hostile"
   ): ReturnType<typeof townWarController.applyExplosiveDamage> | null {
-    const damage = tool === "rpg" ? RPG_CAMP_EXPLOSIVE_DAMAGE : PLAYER_GRENADE_CAMP_EXPLOSIVE_DAMAGE;
+    const damage =
+      tool === "c4"
+        ? C4_CAMP_EXPLOSIVE_DAMAGE
+        : tool === "rpg"
+          ? RPG_CAMP_EXPLOSIVE_DAMAGE
+          : PLAYER_GRENADE_CAMP_EXPLOSIVE_DAMAGE;
     const attackerFaction = faction === "friendly" ? TOWN_WAR_PLAYER_FACTION : TOWN_WAR_ENEMY_FACTION;
     const targetCampId = faction === "friendly" ? TOWN_WAR_ENEMY_FACTION : TOWN_WAR_PLAYER_FACTION;
     return townWarController.applyExplosiveDamage({
@@ -24898,9 +24982,70 @@ export class RaidController {
       position,
       radius,
       damage,
-      tool,
+      tool: tool === "c4" ? "demo-charge" : tool,
       sourceLabel: `raid-${tool}`
     });
+  }
+
+  private explodePlantedCharge(charge: PlantedChargeState): void {
+    const blastPosition = { ...charge.position };
+    const blastAngle = Math.atan2(blastPosition.y - this.state.player.position.y, blastPosition.x - this.state.player.position.x);
+    this.emitNoise(blastPosition, 1120, 3.55, "C4 blast");
+    this.emitFrontlineImpact(blastPosition, blastAngle, WEAPONS.c4.color, "friendly", "blast", 2.85, "concrete", "c4");
+    const campExplosiveHit = this.applyRaidExplosiveCampDamage(blastPosition, charge.radius, "c4", "friendly");
+
+    const struckEnemies = [...this.state.enemies];
+    for (const enemy of struckEnemies) {
+      const distanceToBlast = distance(enemy.position, blastPosition);
+      if (distanceToBlast > charge.radius) {
+        if (distanceToBlast <= charge.pressureRadius) {
+          this.applyEnemyPanic(enemy, 1.55, blastPosition);
+          this.applyEnemyPressure(enemy, "suppressed", 1.7, blastPosition);
+        }
+        continue;
+      }
+
+      const falloff = clamp(1 - distanceToBlast / charge.radius, 0.24, 1);
+      enemy.health -= Math.max(24, Math.round(charge.damage * falloff));
+      enemy.alert = true;
+      enemy.awareness = "engaged";
+      enemy.investigateTarget = { ...blastPosition };
+      enemy.investigateTimer = Math.max(enemy.investigateTimer, 2.4);
+      enemy.facing = normalize(subtract(blastPosition, enemy.position));
+      enemy.fleshFlash = Math.max(enemy.fleshFlash, 0.34);
+      this.applyEnemyPanic(enemy, 2.1 * falloff + 0.5, blastPosition);
+      this.applyEnemyPressure(enemy, distanceToBlast < charge.radius * 0.54 ? "staggered" : "suppressed", 1.65 * falloff + 0.5, blastPosition);
+      if (this.shouldEnterDownedState(enemy.health, enemy.maxHealth, "enemy")) {
+        this.downEnemy(enemy);
+      } else {
+        this.updateLivingCasualtyRead(enemy);
+      }
+    }
+
+    const player = this.state.player;
+    const distanceToPlayer = distance(player.position, blastPosition);
+    if (distanceToPlayer <= charge.radius && player.casualtyState !== "downed" && player.casualtyState !== "dead") {
+      const falloff = clamp(1 - distanceToPlayer / charge.radius, 0.2, 1);
+      const appliedDamage = Math.max(
+        18,
+        Math.round(charge.damage * falloff * (1 - player.frontlineCoverMitigation * 0.35) * this.getFriendlyDamageScale("player"))
+      );
+      player.health -= appliedDamage;
+      this.state.currentRaidStats.damageTaken += appliedDamage;
+      if (this.shouldEnterDownedState(player.health, player.maxHealth, "player")) {
+        this.downPlayer();
+      } else {
+        this.updateLivingCasualtyRead(player);
+      }
+    }
+
+    this.state.message = campExplosiveHit?.destroyed
+      ? "C4 blast destroyed the enemy camp. The town fight is ending around the breach."
+      : campExplosiveHit?.ok
+        ? `C4 blast hit camp structure. ${campExplosiveHit.readable}`
+        : distanceToPlayer <= charge.radius
+          ? "C4 detonated too close. The breach worked, but the blast punished the plant."
+          : "C4 detonated. Move into the breach before Blue restacks the camp.";
   }
 
   private explodeGrenade(grenade: GrenadeState): void {

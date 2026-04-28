@@ -10405,6 +10405,21 @@ body.town-war-officer-mode .first-minute-rail:not(.hidden) {
   background: rgba(250, 204, 21, 0.92);
 }
 
+.stash-operator-portrait[data-weapon="c4"] .stash-operator-weapon {
+  width: 16px;
+  height: 12px;
+  top: 68px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(244, 63, 94, 0.94), rgba(127, 29, 29, 0.94));
+}
+
+.stash-operator-portrait[data-weapon="c4"] .stash-operator-accent {
+  width: 8px;
+  height: 8px;
+  margin-left: 18px;
+  background: rgba(254, 243, 199, 0.88);
+}
+
 .stash-operator-portrait[data-weapon="shotgun"] .stash-operator-weapon {
   width: 38px;
   height: 10px;
@@ -11135,6 +11150,32 @@ body.town-war-officer-mode .first-minute-rail:not(.hidden) {
   border-radius: 5px;
   background: linear-gradient(180deg, rgba(100, 116, 139, 0.98), rgba(30, 41, 59, 0.98));
   box-shadow: 28px 4px 0 -5px rgba(250, 204, 21, 0.86);
+}
+
+.stash-tile-art-c4 {
+  background:
+    radial-gradient(circle at 68% 30%, rgba(254, 243, 199, 0.22), transparent 22%),
+    linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(127, 29, 29, 0.88));
+}
+
+.stash-tile-art-c4::before {
+  left: 16px;
+  top: 18px;
+  width: 34px;
+  height: 23px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(244, 63, 94, 0.96), rgba(127, 29, 29, 0.98));
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.85);
+}
+
+.stash-tile-art-c4::after {
+  left: 47px;
+  top: 13px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(254, 243, 199, 0.92);
+  box-shadow: -26px 9px 0 -3px rgba(254, 243, 199, 0.88);
 }
 
 .stash-tile-art-shotgun::before {
@@ -12309,6 +12350,36 @@ body.town-war-officer-mode .first-minute-rail:not(.hidden) {
   height: 6px;
   top: 42px;
   background: rgba(250, 204, 21, 0.82);
+}
+
+.weapon-preview-c4 .weapon-preview-frame {
+  background:
+    radial-gradient(circle at 54% 28%, rgba(244, 63, 94, 0.16), transparent 30%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.95), rgba(69, 10, 10, 0.86));
+}
+
+.weapon-preview-c4 .weapon-preview-stock {
+  width: 18px;
+  height: 18px;
+  margin-left: -17px;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #f43f5e, #7f1d1d);
+}
+
+.weapon-preview-c4 .weapon-preview-barrel {
+  width: 28px;
+  height: 18px;
+  top: 45px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #be123c, #450a0a);
+}
+
+.weapon-preview-c4 .weapon-preview-accent {
+  width: 10px;
+  height: 10px;
+  top: 39px;
+  border-radius: 999px;
+  background: rgba(254, 243, 199, 0.88);
 }
 
 .weapon-preview-smg .weapon-preview-frame {

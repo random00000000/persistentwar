@@ -1,4 +1,16 @@
-export type WeaponId = "none" | "knife" | "pistol" | "worn-ak" | "short-mosin" | "rifle" | "smg" | "shotgun" | "pkm" | "amr" | "rpg";
+export type WeaponId =
+  | "none"
+  | "knife"
+  | "pistol"
+  | "worn-ak"
+  | "short-mosin"
+  | "rifle"
+  | "smg"
+  | "shotgun"
+  | "pkm"
+  | "amr"
+  | "rpg"
+  | "c4";
 
 export interface WeaponDefinition {
   id: WeaponId;
@@ -349,5 +361,34 @@ export const WEAPONS: Record<WeaponId, WeaponDefinition> = {
     noiseRadius: 980,
     noiseScore: 3.4,
     color: 0xfacc15
+  },
+  c4: {
+    id: "c4",
+    name: "C4 Charge",
+    description: "Plantable demolition charge for destroying camp structures. Plant it, move away, and let the delayed blast finish the breach.",
+    raidCost: 315,
+    damage: 180,
+    pellets: 1,
+    spread: 0,
+    fireInterval: 0.7,
+    bulletSpeed: 0,
+    range: 0,
+    magazineSize: 1,
+    reserveAmmo: 0,
+    ammoPackAmmo: 0,
+    reloadTime: 0,
+    reloadStyle: "magazine",
+    reloadInsertTime: 0,
+    moveSpeed: 224,
+    moveSpreadPenalty: 0,
+    recoilPerShot: 0,
+    recoilRecoveryPerSecond: 0.1,
+    maxSpreadPenalty: 0,
+    focusMoveMultiplier: 0.78,
+    focusSpreadMultiplier: 1,
+    focusRecoveryMultiplier: 1,
+    noiseRadius: 180,
+    noiseScore: 0.35,
+    color: 0xf43f5e
   }
 };

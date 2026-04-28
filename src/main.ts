@@ -1782,6 +1782,8 @@ function renderWeaponPreview(weaponId: WeaponId): string {
         ? "Anti-materiel overwatch platform"
       : weaponId === "rpg"
         ? "Earned siege rocket platform"
+      : weaponId === "c4"
+        ? "Plantable demolition charge"
       : weaponId === "rifle"
       ? "Long rifle platform"
       : weaponId === "smg"
@@ -2425,6 +2427,12 @@ function buildStashRackTiles(
   const arsenalWeapons = Object.values(WEAPONS)
     .filter((entry) => entry.id !== "none")
     .sort((left, right) => {
+      if (left.id === "c4") {
+        return -1;
+      }
+      if (right.id === "c4") {
+        return 1;
+      }
       if (left.id === "rpg") {
         return -1;
       }
@@ -2508,6 +2516,8 @@ function formatWeaponDrawerMeta(weaponId: WeaponId): string {
         ? "anti-plate overwatch"
       : weaponId === "rpg"
         ? "earned siege rocket"
+      : weaponId === "c4"
+        ? "plantable demolition"
       : weaponId === "rifle"
         ? "long-lane control"
         : weaponId === "smg"
@@ -4836,6 +4846,8 @@ function buildMissionBriefing(
         ? "AMRs are for long peeks, plate breaks, and deleting the lane anchor that is stopping the whole plan. Brace, fire with intent, and never let the room collapse onto you."
       : weaponId === "rpg"
         ? "The RPG is late-war siege kit. Spend it on camp anchors, bunker mouths, and packed trench lines, then move before the blast pulls every rifle onto you."
+      : weaponId === "c4"
+        ? "C4 is plantable demolition kit. Get close to the camp anchor, plant the charge, and move before the delayed blast owns the room around you."
       : weaponId === "rifle"
         ? "Rifles are for longer lanes and deliberate peeks. Hold distance, brace angles, and make the other side walk into your fire."
         : weaponId === "pkm"
@@ -4882,6 +4894,8 @@ function buildMissionBriefing(
             ? "Use the AMR to break the lane"
           : weaponId === "rpg"
             ? "Use the RPG to crack the camp"
+          : weaponId === "c4"
+            ? "Plant C4 and clear the blast"
           : weaponId === "pkm"
             ? "Use the PKM to own the lane"
           : weaponId === "smg"
@@ -5034,6 +5048,10 @@ function getHardcoreWeaponRank(weaponId: WeaponId): number {
   }
 
   if (weaponId === "rpg") {
+    return 6;
+  }
+
+  if (weaponId === "c4") {
     return 6;
   }
 
@@ -14853,6 +14871,39 @@ const SURVIVOR_TEST_SHOT_PROFILES: Record<WeaponId, SurvivorTestShotProfile> = {
     noiseGain: 0.038,
     reloadPitchHz: 220,
     dryFirePitchHz: 130
+  },
+  c4: {
+    id: "marksman",
+    weaponId: "c4",
+    projectileSpeedPxPerMs: 0,
+    tracerLengthScale: 0.45,
+    tracerLengthMinPx: 24,
+    tracerWidthPx: 2.8,
+    nearStreakLengthPx: 32,
+    nearStreakWidthPx: 3.6,
+    projectileHeadSizePx: 10,
+    tracerCore: "rgba(254, 226, 226, 1)",
+    tracerFade: "rgba(244, 63, 94, 0.08)",
+    tracerGlow: "rgba(244, 63, 94, 0.44)",
+    projectileHeadGlow: "rgba(254, 243, 199, 1)",
+    muzzleFlashScale: 0.68,
+    recoilKickPx: 2.2,
+    weaponKickPx: 2.8,
+    cameraPunchPx: 1.4,
+    cadencePenaltyPx: 0.7,
+    recoilDurationMs: 120,
+    muzzleSmokeScale: 0.72,
+    muzzleSmokeDurationMs: 180,
+    reloadDurationMs: 980,
+    shotBodyHz: 82,
+    shotBodyType: "sawtooth",
+    shotTailHz: 42,
+    shotTailMs: 220,
+    crackHz: 860,
+    crackGain: 0.03,
+    noiseGain: 0.024,
+    reloadPitchHz: 180,
+    dryFirePitchHz: 110
   }
 };
 
@@ -38967,6 +39018,17 @@ function getAgentSnapshot() {
               position: {
                 x: Number(bullet.position.x.toFixed(1)),
                 y: Number(bullet.position.y.toFixed(1))
+              }
+            })),
+            plantedCharges: state.plantedCharges.map((charge) => ({
+              id: charge.id,
+              ownerLabel: charge.ownerLabel,
+              elapsed: Number(charge.elapsed.toFixed(2)),
+              fuseTime: Number(charge.fuseTime.toFixed(2)),
+              radius: Number(charge.radius.toFixed(1)),
+              position: {
+                x: Number(charge.position.x.toFixed(1)),
+                y: Number(charge.position.y.toFixed(1))
               }
             })),
             enemyCount: state.enemies.length,
