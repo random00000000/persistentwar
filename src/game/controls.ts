@@ -30,7 +30,8 @@ export const RAID_ACTION_KEY_CODES = {
   reload: Phaser.Input.Keyboard.KeyCodes.R,
   grenade: Phaser.Input.Keyboard.KeyCodes.G,
   interact: Phaser.Input.Keyboard.KeyCodes.E,
-  heal: Phaser.Input.Keyboard.KeyCodes.F
+  heal: Phaser.Input.Keyboard.KeyCodes.F,
+  swapWeapon: Phaser.Input.Keyboard.KeyCodes.Q
 } as const;
 
 export const RAID_SUPPORT_ORDER_KEY_CODES = {
@@ -102,6 +103,11 @@ export const RAID_CONTROL_GROUPS: RaidControlGroup[] = [
         keyLabel: "R",
         action: "Reload",
         detail: "Top off before the next shove or extract hold."
+      },
+      {
+        keyLabel: "Q",
+        action: "Swap Long Gun",
+        detail: "Swap between the sling weapon and the long gun staged on your back."
       },
       {
         keyLabel: "G",

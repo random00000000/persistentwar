@@ -1606,6 +1606,8 @@ export interface PlayerState {
   weaponId: WeaponId;
   ammoInMag: number;
   reserveAmmo: number;
+  weaponSlots: PlayerWeaponSlotState[];
+  activeWeaponSlotId: PlayerWeaponSlotState["slotId"];
   fireCooldown: number;
   grenades: number;
   grenadeCooldown: number;
@@ -1628,6 +1630,14 @@ export interface PlayerState {
   bleedoutTimer: number;
   stabilized: boolean;
   commandRestrictionMode: "full" | "downed";
+}
+
+export interface PlayerWeaponSlotState {
+  slotId: "primary" | "secondary";
+  label: string;
+  weaponId: WeaponId;
+  ammoInMag: number;
+  reserveAmmo: number;
 }
 
 export interface SupplyStock {
@@ -8885,7 +8895,31 @@ function getPlayerStartingReserveAmmo(weapon: WeaponDefinition, prepLoadout: Sup
   return weapon.reserveAmmo + prepLoadout.ammoPacks * weapon.ammoPackAmmo;
 }
 
-const createPlayer = (weapon: WeaponDefinition, prepLoadout: SupplyStock, insertion: RaidInsertionDefinition): PlayerState => ({
+const createPlayerWeaponSlot = (
+  slotId: PlayerWeaponSlotState["slotId"],
+  weapon: WeaponDefinition,
+  prepLoadout: SupplyStock
+): PlayerWeaponSlotState => ({
+  slotId,
+  label: slotId === "primary" ? "On sling" : "On back",
+  weaponId: weapon.id,
+  ammoInMag: weapon.magazineSize,
+  reserveAmmo: getPlayerStartingReserveAmmo(weapon, prepLoadout)
+});
+
+const createPlayer = (
+  weapon: WeaponDefinition,
+  prepLoadout: SupplyStock,
+  insertion: RaidInsertionDefinition,
+  secondaryWeapon: WeaponDefinition | null = null
+): PlayerState => {
+  const primarySlot = createPlayerWeaponSlot("primary", weapon, prepLoadout);
+  const secondarySlot =
+    secondaryWeapon && secondaryWeapon.id !== weapon.id && secondaryWeapon.id !== "none" && secondaryWeapon.id !== "pistol"
+      ? createPlayerWeaponSlot("secondary", secondaryWeapon, prepLoadout)
+      : null;
+
+  return {
   position: { ...insertion.position },
   velocity: { x: 0, y: 0 },
   facing: insertion.facing ? normalize(insertion.facing) : { x: 1, y: 0 },
@@ -8893,8 +8927,10 @@ const createPlayer = (weapon: WeaponDefinition, prepLoadout: SupplyStock, insert
   maxHealth: 100,
   radius: 18,
   weaponId: weapon.id,
-  ammoInMag: weapon.magazineSize,
-  reserveAmmo: getPlayerStartingReserveAmmo(weapon, prepLoadout),
+  ammoInMag: primarySlot.ammoInMag,
+  reserveAmmo: primarySlot.reserveAmmo,
+  weaponSlots: secondarySlot ? [primarySlot, secondarySlot] : [primarySlot],
+  activeWeaponSlotId: "primary",
   fireCooldown: 0,
   grenades: PLAYER_GRENADE_STOCK,
   grenadeCooldown: 0,
@@ -8917,7 +8953,8 @@ const createPlayer = (weapon: WeaponDefinition, prepLoadout: SupplyStock, insert
   bleedoutTimer: 0,
   stabilized: false,
   commandRestrictionMode: "full"
-});
+  };
+};
 
 function getFrontlineMomentumProfile(support: FrontlineSupportState): {
   label: string;
@@ -17505,8 +17542,12 @@ export class RaidController {
     }
   }
 
-  public startRaid(weaponId: WeaponId): void {
+  public startRaid(weaponId: WeaponId, secondaryWeaponId: WeaponId | null = null): void {
     const weapon = WEAPONS[weaponId];
+    const secondaryWeapon =
+      secondaryWeaponId && secondaryWeaponId !== weaponId && secondaryWeaponId !== "none" && secondaryWeaponId !== "pistol"
+        ? WEAPONS[secondaryWeaponId]
+        : null;
     const deploymentCost = this.getDeploymentCost(weaponId);
     const prepLoadout = this.getPreparedLoadout();
     const route = this.getActiveRoute();
@@ -17549,7 +17590,7 @@ export class RaidController {
     this.state.stashCredits -= deploymentCost;
     this.state.stashSupplies.medkits -= prepLoadout.medkits;
     this.state.stashSupplies.ammoPacks -= prepLoadout.ammoPacks;
-    this.state.player = createPlayer(weapon, prepLoadout, insertion);
+    this.state.player = createPlayer(weapon, prepLoadout, insertion, secondaryWeapon);
     this.state.obstacles = raidObstacles;
     if (activeFrontlineDefinition) {
       this.state.player.medkits += activeFrontlineDefinition.bonusMedkits;
@@ -17708,8 +17749,8 @@ export class RaidController {
     this.squadLastContext = "insert";
     const activeDemand = this.getActiveDemand();
     this.state.message = soloOfficerStart
-      ? `${route.name} live. You are deploying alone for the officer trial. Survive ${Math.ceil(this.getOfficerSoloSurvivalRemainingSeconds() / 60)} minutes, loot what you can, scout the pressure, and keep the lane cold until command authority opens. ${this.state.currentPocketEventLabel} is in play. ${weapon.name} deployed with ${tacticalService.name} for ${deploymentCost} credits.`
-      : `${route.name} live. ${insertion.label} insertion is active with ${this.state.currentThreatLabel}. Quiet ingress is live, so keep the lane cold and take the first body on your terms. ${this.state.currentPocketEventLabel} is in play. ${weapon.name} deployed with ${tacticalService.name} for ${deploymentCost} credits. ${activeFrontlineDefinition ? `${activeFrontlineDefinition.title} is live: ${activeFrontlineDefinition.effectSummary} ` : ""}${activeDemand.title} pays ${activeDemand.bonusPerItem} credits per ${activeDemand.id} haul on extract.`;
+        ? `${route.name} live. You are deploying alone for the officer trial. Survive ${Math.ceil(this.getOfficerSoloSurvivalRemainingSeconds() / 60)} minutes, loot what you can, scout the pressure, and keep the lane cold until command authority opens. ${this.state.currentPocketEventLabel} is in play. ${weapon.name}${secondaryWeapon ? ` plus ${secondaryWeapon.name} on back` : ""} deployed with ${tacticalService.name} for ${deploymentCost} credits.`
+      : `${route.name} live. ${insertion.label} insertion is active with ${this.state.currentThreatLabel}. Quiet ingress is live, so keep the lane cold and take the first body on your terms. ${this.state.currentPocketEventLabel} is in play. ${weapon.name}${secondaryWeapon ? ` plus ${secondaryWeapon.name} on back` : ""} deployed with ${tacticalService.name} for ${deploymentCost} credits. ${activeFrontlineDefinition ? `${activeFrontlineDefinition.title} is live: ${activeFrontlineDefinition.effectSummary} ` : ""}${activeDemand.title} pays ${activeDemand.bonusPerItem} credits per ${activeDemand.id} haul on extract.`;
     this.state.selectedWeapon = weaponId;
 
     this.moveInput = { x: 0, y: 0 };
@@ -17962,6 +18003,45 @@ export class RaidController {
 
   public setSelectedWeapon(weaponId: WeaponId): void {
     this.state.selectedWeapon = weaponId;
+  }
+
+  public switchPlayerWeaponSlot(slotId?: PlayerWeaponSlotState["slotId"]): void {
+    if (this.state.phase !== "raid") {
+      return;
+    }
+
+    const player = this.state.player;
+    if (player.commandRestrictionMode === "downed" || this.isPlayerRescueLocked()) {
+      this.state.message = "Weapon swap is locked while you are being handled by the casualty drill.";
+      return;
+    }
+
+    const currentSlot = player.weaponSlots.find((slot) => slot.slotId === player.activeWeaponSlotId) ?? null;
+    const nextSlot =
+      slotId !== undefined
+        ? player.weaponSlots.find((slot) => slot.slotId === slotId) ?? null
+        : player.weaponSlots.find((slot) => slot.slotId !== player.activeWeaponSlotId) ?? null;
+
+    if (!nextSlot || nextSlot.slotId === player.activeWeaponSlotId) {
+      this.state.message = "No second long gun staged. Put one on your back from the stash first.";
+      return;
+    }
+
+    if (currentSlot) {
+      currentSlot.weaponId = player.weaponId;
+      currentSlot.ammoInMag = player.ammoInMag;
+      currentSlot.reserveAmmo = player.reserveAmmo;
+    }
+
+    player.activeWeaponSlotId = nextSlot.slotId;
+    player.weaponId = nextSlot.weaponId;
+    player.ammoInMag = nextSlot.ammoInMag;
+    player.reserveAmmo = nextSlot.reserveAmmo;
+    player.reloadTimer = 0;
+    player.fireCooldown = Math.max(player.fireCooldown, 0.16);
+    player.shotSpreadPenalty = 0;
+    player.currentSpread = WEAPONS[player.weaponId].spread;
+    this.state.message = `Swapped to ${WEAPONS[player.weaponId].name} from ${nextSlot.label}.`;
   }
 
   public setSelectedTacticalService(tacticalServiceId: TacticalServiceId): void {

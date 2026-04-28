@@ -7942,6 +7942,7 @@ export class RaidScene extends Phaser.Scene {
     private ctrlKey!: Phaser.Input.Keyboard.Key;
     private braceKey!: Phaser.Input.Keyboard.Key;
   private reloadKey!: Phaser.Input.Keyboard.Key;
+  private swapWeaponKey!: Phaser.Input.Keyboard.Key;
   private grenadeKey!: Phaser.Input.Keyboard.Key;
   private interactKey!: Phaser.Input.Keyboard.Key;
   private healKey!: Phaser.Input.Keyboard.Key;
@@ -8362,6 +8363,7 @@ export class RaidScene extends Phaser.Scene {
       this.ctrlKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.CTRL);
       this.braceKey = this.input.keyboard!.addKey(RAID_ACTION_KEY_CODES.brace);
     this.reloadKey = this.input.keyboard!.addKey(RAID_ACTION_KEY_CODES.reload);
+    this.swapWeaponKey = this.input.keyboard!.addKey(RAID_ACTION_KEY_CODES.swapWeapon);
     this.grenadeKey = this.input.keyboard!.addKey(RAID_ACTION_KEY_CODES.grenade);
     this.interactKey = this.input.keyboard!.addKey(RAID_ACTION_KEY_CODES.interact);
     this.healKey = this.input.keyboard!.addKey(RAID_ACTION_KEY_CODES.heal);
@@ -8407,6 +8409,9 @@ export class RaidScene extends Phaser.Scene {
 
     if (Phaser.Input.Keyboard.JustDown(this.reloadKey)) {
       raidController.queueReload();
+    }
+    if (Phaser.Input.Keyboard.JustDown(this.swapWeaponKey)) {
+      raidController.switchPlayerWeaponSlot();
     }
     if (Phaser.Input.Keyboard.JustDown(this.grenadeKey) && !this.altKey.isDown) {
         raidController.queueGrenade();

@@ -216,6 +216,7 @@ type StashStartButtonArea = Extract<StashGearLayoutArea, "left-operator-workspac
 type StashActionId =
   | "inspect"
   | "stage-weapon"
+  | "stage-back-weapon"
   | "equip-default"
   | "assign-quick-slot"
   | "add-resource"
@@ -274,6 +275,7 @@ const STASH_START_BUTTON_LAYOUT_AREA: StashStartButtonArea = "left-operator-work
 const STASH_ACTION_IDS = new Set<StashActionId>([
   "inspect",
   "stage-weapon",
+  "stage-back-weapon",
   "equip-default",
   "assign-quick-slot",
   "add-resource",
@@ -1541,7 +1543,7 @@ function createEquippedWeaponTile(slotId: "on-sling" | "on-back", weaponId: Weap
     detail:
       slotId === "on-sling"
         ? "Primary weapon staged through the worn kit. Whatever sits on the sling is what goes into the raid."
-        : "Backup long gun staged on the operator. Drag it onto the sling if you want it to become the live raid primary.",
+        : "Backup long gun staged on the operator. It deploys with the sling weapon and swaps in raid with Q.",
     compact: true,
     draggable: true,
     dragKind: "weapon",
@@ -1574,6 +1576,11 @@ function getHolsterWeaponId(): WeaponId | null {
   }
 
   return holsterTile.variant === "pistol" || holsterTile.weaponId === "pistol" ? "pistol" : null;
+}
+
+function getSecondaryWeaponId(): WeaponId | null {
+  const weaponId = stashUiState.equippedItems["on-back"]?.weaponId ?? null;
+  return weaponId && weaponId !== raidController.state.selectedWeapon ? weaponId : null;
 }
 
 function syncSelectedWeaponFromEquipment(): void {
@@ -18215,6 +18222,9 @@ function getStashTileActions(tile: StashTileDefinition): StashActionDefinition[]
 
   if (tile.dragKind === "weapon" && tile.dragSource === "rack" && tile.weaponId) {
     addStashAction(actions, "stage-weapon", "Stage On Bench");
+    if (tile.weaponId !== "none" && tile.weaponId !== "pistol" && tile.weaponId !== raidController.state.selectedWeapon) {
+      addStashAction(actions, "stage-back-weapon", "Stage On Back");
+    }
   }
 
   if (tile.dragSource === "rack" && preferredEquipSlot) {
@@ -18732,6 +18742,11 @@ function runStashTileAction(tile: StashTileDefinition, actionId: StashActionId):
     return;
   }
 
+  if (actionId === "stage-back-weapon" && tile.weaponId) {
+    handleEquipmentDrop("on-back", getStashTilePayload(tile));
+    return;
+  }
+
   if (actionId === "add-resource" && tile.resource) {
     raidController.adjustPrepLoadout(tile.resource, 1);
     updateUi();
@@ -18825,7 +18840,7 @@ function closeBriefing(): void {
 }
 
 function deployFromBriefing(): void {
-  raidController.startRaid(raidController.state.selectedWeapon);
+  raidController.startRaid(raidController.state.selectedWeapon, getSecondaryWeaponId());
   briefingState.open = false;
   briefingState.beatIndex = 0;
   briefingPanel.scrollTop = 0;
@@ -36171,6 +36186,7 @@ type AgentShowcaseId =
 interface AgentConfigureInput {
   routeId?: RaidRouteId;
   weaponId?: WeaponId;
+  secondaryWeaponId?: WeaponId | null;
   tacticalServiceId?: TacticalServiceId;
   contractId?: ContractId;
   medkits?: number;
@@ -36628,6 +36644,7 @@ interface TopDownExtractionAgentApi {
   setCommandTab: (tabId: CommandTabId) => ReturnType<typeof getAgentSnapshot>;
   startRaid: () => ReturnType<typeof getAgentSnapshot>;
   advanceRaid: (payload?: { seconds?: number; tickSeconds?: number; move?: { x: number; y: number } }) => ReturnType<typeof getAgentSnapshot>;
+  switchWeaponSlot: (slotId?: "primary" | "secondary") => ReturnType<typeof getAgentSnapshot>;
   completeOfficerSoloSurvival: () => ReturnType<typeof getAgentSnapshot>;
   rollRecruitCandidates: () => ReturnType<typeof getAgentSnapshot>;
   setMoveInput: (move: { x: number; y: number }) => ReturnType<typeof getAgentSnapshot>;
@@ -38429,6 +38446,7 @@ function getAgentSnapshot() {
       deploymentCost: raidController.getDeploymentCost(),
       projectedReserveAmmo: raidController.getProjectedReserveAmmo(),
       selectedWeapon: state.selectedWeapon,
+      secondaryWeapon: getSecondaryWeaponId(),
       selectedTacticalService: state.selectedTacticalService,
       officerOnboarding: {
         stage: state.officerOnboarding.stage,
@@ -38775,7 +38793,28 @@ function getAgentSnapshot() {
         ? {
           player: {
             weaponId: state.player.weaponId,
-            weaponName: WEAPONS[state.player.weaponId].name
+            weaponName: WEAPONS[state.player.weaponId].name,
+            activeWeaponSlotId: state.player.activeWeaponSlotId,
+            weaponSlots: state.player.weaponSlots.map((slot) => ({
+              slotId: slot.slotId,
+              label: slot.label,
+              weaponId:
+                slot.slotId === state.player.activeWeaponSlotId
+                  ? state.player.weaponId
+                  : slot.weaponId,
+              weaponName:
+                slot.slotId === state.player.activeWeaponSlotId
+                  ? WEAPONS[state.player.weaponId].name
+                  : WEAPONS[slot.weaponId].name,
+              ammoInMag:
+                slot.slotId === state.player.activeWeaponSlotId
+                  ? state.player.ammoInMag
+                  : slot.ammoInMag,
+              reserveAmmo:
+                slot.slotId === state.player.activeWeaponSlotId
+                  ? state.player.reserveAmmo
+                  : slot.reserveAmmo
+            }))
           },
           timerRemaining: Number(state.timerRemaining.toFixed(1)),
           health: state.player.health,
@@ -39376,6 +39415,19 @@ function configureNextRaid(config: AgentConfigureInput): ReturnType<typeof getAg
 
   if (config.weaponId) {
     selectWeapon(config.weaponId);
+  }
+
+  if (config.secondaryWeaponId !== undefined) {
+    if (config.secondaryWeaponId && config.secondaryWeaponId !== "none" && config.secondaryWeaponId !== "pistol") {
+      stashUiState.equippedItems["on-back"] = createEquippedWeaponTile("on-back", config.secondaryWeaponId, `rack-weapon-${config.secondaryWeaponId}`);
+      stashUiState.hiddenRackTileIds.add(`rack-weapon-${config.secondaryWeaponId}`);
+    } else {
+      const previousBackWeapon = stashUiState.equippedItems["on-back"];
+      if (previousBackWeapon) {
+        stashUiState.hiddenRackTileIds.delete(previousBackWeapon.id);
+      }
+      delete stashUiState.equippedItems["on-back"];
+    }
   }
 
   if (config.tacticalServiceId) {
@@ -41185,7 +41237,7 @@ topDownWindow.__topdownExtractionAgentApi = {
   },
   startRaid: () => {
     if (raidController.state.phase === "stash" && raidController.canStartRaid()) {
-      raidController.startRaid(raidController.state.selectedWeapon);
+      raidController.startRaid(raidController.state.selectedWeapon, getSecondaryWeaponId());
       updateUi();
     }
     return getAgentSnapshot();
@@ -41216,6 +41268,11 @@ topDownWindow.__topdownExtractionAgentApi = {
       }
       updateUi();
     }
+    return getAgentSnapshot();
+  },
+  switchWeaponSlot: (slotId) => {
+    raidController.switchPlayerWeaponSlot(slotId);
+    updateUi();
     return getAgentSnapshot();
   },
   completeOfficerSoloSurvival: () => {
