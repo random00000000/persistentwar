@@ -19,20 +19,65 @@ page.on("console", (message) => {
 });
 page.on("pageerror", (error) => consoleErrors.push(error.message));
 
+async function getRackWeaponActions(weaponId) {
+  await page.locator(`[data-stash-tile-id="rack-weapon-${weaponId}"]`).dispatchEvent("contextmenu", {
+    bubbles: true,
+    cancelable: true,
+    clientX: 960,
+    clientY: 520
+  });
+  await page.waitForFunction(
+    () => {
+      const menu = document.querySelector("[data-stash-context-menu]");
+      return menu && !menu.classList.contains("hidden") && menu.querySelector("[data-stash-action]");
+    },
+    null,
+    { timeout: 5000 }
+  );
+  return page.locator("[data-stash-context-menu] [data-stash-action]").evaluateAll((buttons) =>
+    buttons.map((button) => ({
+      id: button.getAttribute("data-stash-action"),
+      label: button.textContent?.trim() ?? ""
+    }))
+  );
+}
+
+async function clickRackWeaponAction(weaponId, actionId) {
+  const actions = await getRackWeaponActions(weaponId);
+  const action = actions.find((entry) => entry.id === actionId);
+  assert(action, `Missing ${actionId} action for ${weaponId}. Actions: ${actions.map((entry) => entry.label).join(", ")}`);
+  await page.locator(`[data-stash-context-menu] [data-stash-action="${actionId}"]`).dispatchEvent("click", {
+    bubbles: true,
+    cancelable: true
+  });
+}
+
+function getActiveAmmo(raidPlayer) {
+  return raidPlayer.weaponSlots.find((slot) => slot.slotId === raidPlayer.activeWeaponSlotId)?.ammoInMag ?? raidPlayer.ammoInMag;
+}
+
 try {
   await page.goto(`${GAME_URL}?dual-primary-smoke=${Date.now()}`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => Boolean(window.__topdownExtractionAgentApi), null, { timeout: 15000 });
 
-  let snapshot = await page.evaluate(() =>
-    window.__topdownExtractionAgentApi.configureNextRaid({
-      weaponId: "worn-ak",
-      secondaryWeaponId: "rpg",
-      ammoPacks: 2
-    })
+  await page.evaluate(() => window.__topdownExtractionAgentApi.configureNextRaid({ ammoPacks: 2, secondaryWeaponId: null }));
+  const rpgActions = await getRackWeaponActions("rpg");
+  assert(
+    rpgActions.some((action) => action.id === "stage-weapon" && action.label === "Equip On Sling 1"),
+    `RPG context menu missing Equip On Sling 1. Actions: ${rpgActions.map((action) => action.label).join(", ")}`
+  );
+  assert(
+    rpgActions.some((action) => action.id === "stage-back-weapon" && action.label === "Equip On Sling 2"),
+    `RPG context menu missing Equip On Sling 2. Actions: ${rpgActions.map((action) => action.label).join(", ")}`
   );
 
-  assert(snapshot.stash.selectedWeapon === "worn-ak", `Expected Worn AK on sling, got ${snapshot.stash.selectedWeapon}`);
-  assert(snapshot.stash.secondaryWeapon === "rpg", `Expected RPG on back, got ${snapshot.stash.secondaryWeapon}`);
+  await clickRackWeaponAction("worn-ak", "stage-weapon");
+  await clickRackWeaponAction("rpg", "stage-back-weapon");
+
+  let snapshot = await page.evaluate(() => window.__topdownExtractionAgentApi.getSnapshot());
+
+  assert(snapshot.stash.selectedWeapon === "worn-ak", `Expected Worn AK on Sling 1, got ${snapshot.stash.selectedWeapon}`);
+  assert(snapshot.stash.secondaryWeapon === "rpg", `Expected RPG on Sling 2, got ${snapshot.stash.secondaryWeapon}`);
 
   snapshot = await page.evaluate(() => window.__topdownExtractionAgentApi.startRaid());
   assert(snapshot.raid, "Raid did not start.");
@@ -47,8 +92,6 @@ try {
   assert(snapshot.raid.player.weaponId === "rpg", `Expected RPG after swap, got ${snapshot.raid.player.weaponId}`);
   assert(snapshot.raid.player.activeWeaponSlotId === "secondary", `Expected secondary active, got ${snapshot.raid.player.activeWeaponSlotId}`);
 
-  const getActiveAmmo = (raidPlayer) =>
-    raidPlayer.weaponSlots.find((slot) => slot.slotId === raidPlayer.activeWeaponSlotId)?.ammoInMag ?? raidPlayer.ammoInMag;
   const ammoBeforeRpg = getActiveAmmo(snapshot.raid.player);
   const playerPosition = snapshot.raid.player.position;
   await page.evaluate(
