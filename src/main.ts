@@ -195,6 +195,7 @@ const survivorIdleRifleImages = buildSpritePaintFrameImages(survivorIdleRifleFra
 const survivorMoveRifleImages = buildSpritePaintFrameImages(survivorMoveRifleFrames);
 
 type ActiveRoute = ReturnType<typeof raidController.getActiveRoute>;
+type ActiveDemand = ReturnType<typeof raidController.getActiveDemand>;
 type TownWarSnapshot = ReturnType<typeof townWarController.getSnapshot>;
 type BriefingSpeakerId = "handler" | "operator" | "broker";
 type StoryFinaleChoiceId = "sell-route" | "burn-route";
@@ -458,6 +459,15 @@ interface OperatorPaperdollSlot {
 interface StashActionDefinition {
   id: StashActionId;
   label: string;
+}
+
+interface StashRenderModel {
+  benchTiles: StashTileDefinition[];
+  rackTiles: StashTileDefinition[];
+  visibleRackTiles: StashTileDefinition[];
+  focusedRackTile: StashTileDefinition | null;
+  hoverSwapTile: StashTileDefinition | null;
+  openContainerTile: StashTileDefinition | null;
 }
 
 interface QuickSlotPresentation {
@@ -18281,6 +18291,133 @@ function renderStashContextMenu(tile: StashTileDefinition | null): void {
   `;
 }
 
+function refreshCurrentStashTiles(
+  route: ActiveRoute,
+  selectedWeaponId: WeaponId,
+  tacticalServiceId: TacticalServiceId,
+  activeDemandId: ContrabandCategoryId,
+  activeContractId: ContractId,
+  prepLoadout: SupplyStock,
+  prepBurdenScore: number,
+  entryMobility: number,
+  deploymentCost: number,
+  stashSupplies: SupplyStock,
+  lastRaidSummary: RaidSummary | null
+): StashRenderModel {
+  currentBenchTiles = buildReadyBenchTiles(
+    route,
+    selectedWeaponId,
+    tacticalServiceId,
+    activeDemandId,
+    activeContractId,
+    prepLoadout,
+    prepBurdenScore,
+    entryMobility,
+    deploymentCost
+  );
+  currentRackTiles = arrangeRackTiles(
+    buildStashRackTiles(route, stashSupplies, selectedWeaponId, activeDemandId, lastRaidSummary).filter(
+      (tile) => !stashUiState.hiddenRackTileIds.has(tile.id) && !stashUiState.soldRackTileIds.has(tile.id)
+    ),
+    stashUiState.rackPlacements
+  );
+  ensureSelectedStashTile();
+
+  currentBenchTiles = currentBenchTiles.map((tile) => ({
+    ...tile,
+    selected: tile.selected || tile.id === stashUiState.selectedTileId
+  }));
+  currentRackTiles = currentRackTiles.map((tile) => ({
+    ...tile,
+    selected: tile.selected || tile.id === stashUiState.selectedTileId
+  }));
+
+  const focusedRackTile = currentRackTiles.find((tile) => tile.id === stashUiState.selectedTileId) ?? null;
+  const hoverSwapTile = stashUiState.rackHoverPlacement?.displacedTileId
+    ? currentRackTiles.find((tile) => tile.id === stashUiState.rackHoverPlacement?.displacedTileId) ?? null
+    : null;
+
+  return {
+    benchTiles: currentBenchTiles,
+    rackTiles: currentRackTiles,
+    visibleRackTiles: currentRackTiles.filter((tile) => matchesRackFilters(tile)),
+    focusedRackTile,
+    hoverSwapTile,
+    openContainerTile: findStashTile(stashUiState.openContainerTileId ?? "")
+  };
+}
+
+function renderStashTabControls(): void {
+  stashSearchValue.value = stashUiState.rackSearchQuery;
+
+  for (const button of topTabButtons) {
+    const tabId = button.dataset.stashTopTab as TopTabId | undefined;
+    const active = tabId === stashUiState.activeTopTab;
+    button.classList.toggle("active", active);
+    button.toggleAttribute("aria-current", active);
+  }
+
+  for (const pane of topTabPanes) {
+    const tabId = pane.dataset.stashTopPane as TopTabId | undefined;
+    const active = tabId === stashUiState.activeTopTab;
+    pane.classList.toggle("hidden", !active);
+    pane.classList.toggle("stash-top-pane-active", active);
+  }
+
+  for (const pane of gearWorkbenchPanes) {
+    const tabId = pane.dataset.gearWorkbenchPane as GearWorkbenchTabId | undefined;
+    const persistent = pane.dataset.gearWorkbenchPersistent === "true";
+    const hidden = persistent ? false : tabId !== stashUiState.activeGearWorkbenchTab;
+    pane.classList.toggle("hidden", hidden);
+  }
+
+  for (const button of stashFilterButtons) {
+    const filterId = button.dataset.stashFilter as StashFilterId | undefined;
+    button.classList.toggle("active", filterId === stashUiState.rackFilter);
+  }
+}
+
+function renderStashInventorySurfaces(
+  stashRenderModel: StashRenderModel,
+  selectedWeaponId: WeaponId,
+  prepLoadout: SupplyStock
+): void {
+  stashBenchValue.innerHTML = stashRenderModel.benchTiles.map((tile) => renderStashTile(tile)).join("");
+  stashRackValue.innerHTML = renderStashRackGrid(stashRenderModel.visibleRackTiles);
+  equipmentGridValue.innerHTML = STASH_EQUIPMENT_SLOT_ORDER.map((slotId) => renderEquipmentSlot(slotId, selectedWeaponId)).join("");
+  storageSurfacesValue.innerHTML = (Object.keys(STORAGE_SURFACES) as StorageSurfaceId[])
+    .map((surfaceId) => renderStorageSurfaceGrid(surfaceId, selectedWeaponId))
+    .join("");
+  quickbarGridValue.innerHTML = QUICK_SLOT_IDS.map((slotId) => renderQuickSlot(slotId, selectedWeaponId, prepLoadout)).join("");
+}
+
+function renderStashRackStatus(stashRenderModel: StashRenderModel, activeDemand: ActiveDemand): void {
+  stashRackCapacityValue.textContent =
+    `${getRackOccupiedSlots(stashRenderModel.rackTiles)} / ${STASH_RACK_TOTAL_SLOTS} cells | ` +
+    `${stashRenderModel.visibleRackTiles.length} shown / ${stashRenderModel.rackTiles.length} items`;
+  stashRackFocusValue.textContent = stashRenderModel.focusedRackTile
+    ? `Focus: ${stashRenderModel.focusedRackTile.label} | ${stashRenderModel.focusedRackTile.slotTag ?? "Unplaced"}${stashRenderModel.focusedRackTile.rotated ? " | Vertical" : ""}`
+    : "Focus: No item selected";
+  stashRackHotValue.textContent =
+    stashUiState.rackHoverPlacement?.action === "swap" && stashRenderModel.hoverSwapTile
+      ? `Swap ready with ${stashRenderModel.hoverSwapTile.label} | release to trade slots`
+      : `${activeDemand.title} paying ${activeDemand.bonusPerItem} cr per ${formatDemandCategoryLabel(activeDemand.id)} | drag inside rack to place`;
+  stashBrokerTaggedValue.textContent =
+    `${stashUiState.brokerTaggedTileIds.size} broker tag${stashUiState.brokerTaggedTileIds.size === 1 ? "" : "s"}` +
+    `${stashUiState.realizedBrokerCredits > 0 ? ` | +${stashUiState.realizedBrokerCredits} cr realized` : ""}`;
+}
+
+function renderStashContainerAndInspector(stashRenderModel: StashRenderModel): void {
+  const openContainerItems = getStashContainerItems(stashRenderModel.openContainerTile);
+  stashTrayTitleValue.textContent = stashRenderModel.openContainerTile ? stashRenderModel.openContainerTile.label : "No container open";
+  stashTrayMetaValue.textContent = stashRenderModel.openContainerTile
+    ? `${openContainerItems.length} packed item${openContainerItems.length === 1 ? "" : "s"} | ${getContainerLabel(stashRenderModel.openContainerTile)}`
+    : "Right click a case or crate";
+  stashTrayItemsValue.innerHTML = renderOpenContainerItems(stashRenderModel.openContainerTile);
+  renderStashInspector(findStashTile(stashUiState.selectedTileId ?? ""));
+  renderStashContextMenu(findStashTile(stashUiState.contextTileId ?? ""));
+}
+
 function buildOperatorPaperdollSlots(
   route: ActiveRoute,
   weaponId: WeaponId,
@@ -24988,7 +25125,7 @@ function updateUi(): void {
   stashCredits.textContent = `${stash} cr`;
   stashMedkits.textContent = `${stashSupplies.medkits}`;
   stashAmmoPacks.textContent = `${stashSupplies.ammoPacks}`;
-  currentBenchTiles = buildReadyBenchTiles(
+  const stashRenderModel = refreshCurrentStashTiles(
     route,
     selectedWeapon,
     tacticalService.id,
@@ -24997,84 +25134,25 @@ function updateUi(): void {
     prepLoadout,
     prepBurdenScore,
     entryMobility,
-    deploymentCost
+    deploymentCost,
+    stashSupplies,
+    lastRaidSummary
   );
-  currentRackTiles = arrangeRackTiles(
-    buildStashRackTiles(route, stashSupplies, selectedWeapon, activeDemand.id, lastRaidSummary).filter(
-      (tile) => !stashUiState.hiddenRackTileIds.has(tile.id) && !stashUiState.soldRackTileIds.has(tile.id)
-    ),
-    stashUiState.rackPlacements
+  const normalizedStashItems = buildNormalizedStashItems(
+    stashRenderModel.benchTiles,
+    stashRenderModel.rackTiles,
+    memorialRecords
   );
-  ensureSelectedStashTile();
-  currentBenchTiles = currentBenchTiles.map((tile) => ({
-    ...tile,
-    selected: tile.selected || tile.id === stashUiState.selectedTileId
-  }));
-  currentRackTiles = currentRackTiles.map((tile) => ({
-    ...tile,
-    selected: tile.selected || tile.id === stashUiState.selectedTileId
-  }));
-  const normalizedStashItems = buildNormalizedStashItems(currentBenchTiles, currentRackTiles, memorialRecords);
   const stashOperationalBoard = buildStashOperationalBoard(
     normalizedStashItems,
     squadRosterRecords,
     recruitRecords,
     memorialRecords
   );
-  const visibleRackTiles = currentRackTiles.filter((tile) => matchesRackFilters(tile));
-  stashSearchValue.value = stashUiState.rackSearchQuery;
-  for (const button of topTabButtons) {
-    const tabId = button.dataset.stashTopTab as TopTabId | undefined;
-    const active = tabId === stashUiState.activeTopTab;
-    button.classList.toggle("active", active);
-    button.toggleAttribute("aria-current", active);
-  }
-  for (const pane of topTabPanes) {
-    const tabId = pane.dataset.stashTopPane as TopTabId | undefined;
-    const active = tabId === stashUiState.activeTopTab;
-    pane.classList.toggle("hidden", !active);
-    pane.classList.toggle("stash-top-pane-active", active);
-  }
-  for (const pane of gearWorkbenchPanes) {
-    const tabId = pane.dataset.gearWorkbenchPane as GearWorkbenchTabId | undefined;
-    const persistent = pane.dataset.gearWorkbenchPersistent === "true";
-    const hidden = persistent ? false : tabId !== stashUiState.activeGearWorkbenchTab;
-    pane.classList.toggle("hidden", hidden);
-  }
-  for (const button of stashFilterButtons) {
-    const filterId = button.dataset.stashFilter as StashFilterId | undefined;
-    button.classList.toggle("active", filterId === stashUiState.rackFilter);
-  }
-  stashBenchValue.innerHTML = currentBenchTiles.map((tile) => renderStashTile(tile)).join("");
-  stashRackValue.innerHTML = renderStashRackGrid(visibleRackTiles);
-  equipmentGridValue.innerHTML = STASH_EQUIPMENT_SLOT_ORDER.map((slotId) => renderEquipmentSlot(slotId, selectedWeapon)).join("");
-  storageSurfacesValue.innerHTML = (Object.keys(STORAGE_SURFACES) as StorageSurfaceId[])
-    .map((surfaceId) => renderStorageSurfaceGrid(surfaceId, selectedWeapon))
-    .join("");
-  const focusedRackTile = currentRackTiles.find((tile) => tile.id === stashUiState.selectedTileId) ?? null;
-  stashRackCapacityValue.textContent = `${getRackOccupiedSlots(currentRackTiles)} / ${STASH_RACK_TOTAL_SLOTS} cells | ${visibleRackTiles.length} shown / ${currentRackTiles.length} items`;
-  stashRackFocusValue.textContent = focusedRackTile
-    ? `Focus: ${focusedRackTile.label} | ${focusedRackTile.slotTag ?? "Unplaced"}${focusedRackTile.rotated ? " | Vertical" : ""}`
-    : "Focus: No item selected";
-  const hoverSwapTile = stashUiState.rackHoverPlacement?.displacedTileId
-    ? currentRackTiles.find((tile) => tile.id === stashUiState.rackHoverPlacement?.displacedTileId) ?? null
-    : null;
-  stashRackHotValue.textContent =
-    stashUiState.rackHoverPlacement?.action === "swap" && hoverSwapTile
-      ? `Swap ready with ${hoverSwapTile.label} | release to trade slots`
-      : `${activeDemand.title} paying ${activeDemand.bonusPerItem} cr per ${formatDemandCategoryLabel(activeDemand.id)} | drag inside rack to place`;
-  stashBrokerTaggedValue.textContent =
-    `${stashUiState.brokerTaggedTileIds.size} broker tag${stashUiState.brokerTaggedTileIds.size === 1 ? "" : "s"}` +
-    `${stashUiState.realizedBrokerCredits > 0 ? ` | +${stashUiState.realizedBrokerCredits} cr realized` : ""}`;
-  const openContainerTile = findStashTile(stashUiState.openContainerTileId ?? "");
-  const openContainerItems = getStashContainerItems(openContainerTile);
-  stashTrayTitleValue.textContent = openContainerTile ? openContainerTile.label : "No container open";
-  stashTrayMetaValue.textContent = openContainerTile
-    ? `${openContainerItems.length} packed item${openContainerItems.length === 1 ? "" : "s"} | ${getContainerLabel(openContainerTile)}`
-    : "Right click a case or crate";
-  stashTrayItemsValue.innerHTML = renderOpenContainerItems(openContainerTile);
-  renderStashInspector(findStashTile(stashUiState.selectedTileId ?? ""));
-  renderStashContextMenu(findStashTile(stashUiState.contextTileId ?? ""));
+  renderStashTabControls();
+  renderStashInventorySurfaces(stashRenderModel, selectedWeapon, prepLoadout);
+  renderStashRackStatus(stashRenderModel, activeDemand);
+  renderStashContainerAndInspector(stashRenderModel);
   prepMedkitsValue.textContent = `${prepLoadout.medkits}`;
   prepAmmoPacksValue.textContent = `${prepLoadout.ammoPacks}`;
   prepMedkitsMeta.textContent = `${formatSupplyLabel("medkits", prepLoadout.medkits)} committed`;
@@ -25085,7 +25163,6 @@ function updateUi(): void {
   entryPaceValue.textContent = formatPaceValue(entryMobility);
   summaryMedkitsValue.textContent = `${prepLoadout.medkits}`;
   summaryAmmoPacksValue.textContent = `${prepLoadout.ammoPacks}`;
-  quickbarGridValue.innerHTML = QUICK_SLOT_IDS.map((slotId) => renderQuickSlot(slotId, selectedWeapon, prepLoadout)).join("");
   deploymentBriefingValue.textContent = formatPrepLoadoutNote(route, prepBurdenScore);
   operatorPortraitValue.dataset.weapon = selectedWeapon;
   operatorLoadoutTitleValue.textContent =
