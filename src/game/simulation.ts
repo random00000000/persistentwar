@@ -18084,6 +18084,18 @@ export class RaidController {
     player.currentSpread = weapon.spread;
   }
 
+  private replaceActivePlayerWeaponSlot(weapon: WeaponDefinition, ammoInMag: number, reserveAmmo: number): void {
+    const player = this.state.player;
+    player.weaponId = weapon.id;
+    player.ammoInMag = ammoInMag;
+    player.reserveAmmo = reserveAmmo;
+    player.reloadTimer = 0;
+    player.fireCooldown = 0;
+    player.shotSpreadPenalty = 0;
+    player.currentSpread = weapon.spread;
+    this.syncActivePlayerWeaponSlot();
+  }
+
   public setSelectedTacticalService(tacticalServiceId: TacticalServiceId): void {
     if (this.state.phase !== "stash" || tacticalServiceId === this.state.selectedTacticalService) {
       return;
@@ -27814,14 +27826,7 @@ export class RaidController {
           "Loot"
         );
       } else {
-        player.weaponId = battlefieldWeapon.id;
-        player.ammoInMag = pickedAmmoInMag;
-        player.reserveAmmo = pickedReserveAmmo;
-        player.reloadTimer = 0;
-        player.fireCooldown = 0;
-        player.shotSpreadPenalty = 0;
-        player.currentSpread = battlefieldWeapon.spread;
-        this.syncActivePlayerWeaponSlot();
+        this.replaceActivePlayerWeaponSlot(battlefieldWeapon, pickedAmmoInMag, pickedReserveAmmo);
         this.state.currentRaidStats.weaponId = battlefieldWeapon.id;
         this.state.currentRaidStats.weaponName = battlefieldWeapon.name;
         this.state.recoveredFieldWeapon = {
@@ -27832,11 +27837,11 @@ export class RaidController {
           reserveAmmo: loot.raidReserveAmmo,
           salvageValue: Math.max(90, Math.round(battlefieldWeapon.raidCost * 0.68))
         };
-        weaponPickupSummary = ` ${previousWeapon.name} was dropped and you are now running ${battlefieldWeapon.name} off the body.`;
+        weaponPickupSummary = ` ${previousWeapon.name} was dropped from your active sling and ${battlefieldWeapon.name} took its place.`;
         this.pushSquadLog(
           "Makar",
           "warning",
-          `Fresh ${battlefieldWeapon.name} off the dead. It feels like a crime to leave that thing on the floor.`,
+          `Fresh ${battlefieldWeapon.name} off the dead. Active sling swapped, the other sling stays put.`,
           "Loot"
         );
       }
