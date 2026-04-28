@@ -480,6 +480,24 @@ export interface EnemyState {
   compressionTimer: number;
 }
 
+interface HostileAiBalanceProfile {
+  archetype: EnemyArchetypeDefinition;
+  weaponCombatProfile: SharedWeaponCombatProfile;
+  tapeCombatTuning: EnemyTapeCombatTuning;
+  woundMoveMultiplier: number;
+  woundEngageMultiplier: number;
+  woundFireIntervalMultiplier: number;
+  anchoredHoldPosture: boolean;
+  roleBoundToBuilding: boolean;
+  machineGunner: boolean;
+  engageRange: number;
+  basePreferredMinRange: number;
+  basePreferredMaxRange: number;
+  baseChaseSpeed: number;
+  baseFlankSpeed: number;
+  retreatSpeed: number;
+}
+
 export interface FriendlyCombatantState {
   id: number;
   ownerKind: "squadmate" | "support" | "incident" | "town-war-soldier";
@@ -25243,6 +25261,104 @@ export class RaidController {
     this.state.message = `${weapon.name} reloaded. Use cover and repick the angle.`;
   }
 
+  private getHostileAiBalanceProfile(enemy: EnemyState): HostileAiBalanceProfile {
+    const archetype = SCAV_ARCHETYPES[enemy.archetypeId];
+    const weaponCombatProfile = getSharedWeaponCombatProfile(enemy.weaponId, enemy.archetypeId);
+    const tapeCombatTuning = getEnemyTapeCombatTuning(enemy.tapeId);
+    const woundMoveMultiplier = getWoundMoveMultiplier(enemy.woundSeverity);
+    const woundEngageMultiplier = getWoundEngageRangeMultiplier(enemy.woundSeverity);
+    const woundFireIntervalMultiplier = getWoundFireIntervalMultiplier(enemy.woundSeverity);
+    const anchoredHoldPosture = enemy.openingPosture === "hold" || enemy.openingPosture === "reserve";
+    const roleBoundToBuilding = isEnemyBuildingHoldRole(enemy.squadRole);
+    const machineGunner = enemy.squadRole === "support-gunner" && enemy.weaponId === "pkm";
+    const engageRange = weaponCombatProfile.engageRange * tapeCombatTuning.engageRangeMultiplier * woundEngageMultiplier;
+    const basePreferredMinRange =
+      weaponCombatProfile.preferredMinRange *
+      tapeCombatTuning.preferredMinRangeMultiplier *
+      (enemy.squadRole === "support-gunner"
+        ? 1.24
+        : enemy.squadRole === "deep-rifle"
+          ? 1.12
+          : anchoredHoldPosture
+            ? 1.16
+            : enemy.openingPosture === "patrol"
+              ? 0.96
+              : 1);
+    const basePreferredMaxRange =
+      weaponCombatProfile.preferredMaxRange *
+      tapeCombatTuning.preferredMaxRangeMultiplier *
+      (enemy.squadRole === "support-gunner"
+        ? 1.34
+        : enemy.squadRole === "deep-rifle"
+          ? 1.08
+          : anchoredHoldPosture
+            ? 1.18
+            : enemy.openingPosture === "patrol"
+              ? 0.98
+              : 1);
+    const baseChaseSpeed =
+      archetype.chaseSpeed *
+      tapeCombatTuning.chaseSpeedMultiplier *
+      (enemy.squadRole === "support-gunner"
+        ? 0.54
+        : enemy.squadRole === "deep-rifle"
+          ? 0.62
+          : anchoredHoldPosture
+            ? 0.82
+            : enemy.openingPosture === "sweeper"
+              ? 1.06
+              : 1);
+    const baseFlankSpeed =
+      archetype.flankSpeed *
+      tapeCombatTuning.flankSpeedMultiplier *
+      (enemy.squadRole === "support-gunner"
+        ? 0.48
+        : enemy.squadRole === "deep-rifle"
+          ? 0.56
+          : enemy.squadRole === "probe-rifle"
+            ? 1.06
+            : anchoredHoldPosture
+              ? 0.8
+              : enemy.openingPosture === "sweeper"
+                ? 1.08
+                : 1);
+
+    return {
+      archetype,
+      weaponCombatProfile,
+      tapeCombatTuning,
+      woundMoveMultiplier,
+      woundEngageMultiplier,
+      woundFireIntervalMultiplier,
+      anchoredHoldPosture,
+      roleBoundToBuilding,
+      machineGunner,
+      engageRange,
+      basePreferredMinRange,
+      basePreferredMaxRange,
+      baseChaseSpeed,
+      baseFlankSpeed,
+      retreatSpeed: archetype.retreatSpeed * tapeCombatTuning.retreatSpeedMultiplier
+    };
+  }
+
+  private advanceHostileAiTimers(enemy: EnemyState, deltaSeconds: number): void {
+    enemy.cooldown = Math.max(0, enemy.cooldown - deltaSeconds);
+    enemy.grenadeCooldown = Math.max(0, enemy.grenadeCooldown - deltaSeconds);
+    enemy.investigateTimer = Math.max(0, enemy.investigateTimer - deltaSeconds);
+    enemy.pressureTimer = Math.max(0, enemy.pressureTimer - deltaSeconds);
+    enemy.blindFireTimer = Math.max(0, enemy.blindFireTimer - deltaSeconds);
+    enemy.panicTimer = Math.max(0, enemy.panicTimer - deltaSeconds);
+    enemy.compressionTimer = Math.max(0, enemy.compressionTimer - deltaSeconds);
+    enemy.armorBrokenTimer = Math.max(0, enemy.armorBrokenTimer - deltaSeconds);
+    enemy.armorFlash = Math.max(0, enemy.armorFlash - deltaSeconds);
+    enemy.fleshFlash = Math.max(0, enemy.fleshFlash - deltaSeconds);
+
+    if (enemy.pressureTimer === 0) {
+      enemy.pressureType = null;
+    }
+  }
+
   private updateEnemies(deltaSeconds: number): void {
     const player = this.state.player;
 
@@ -26196,67 +26312,22 @@ export class RaidController {
         continue;
       }
 
-      const archetype = SCAV_ARCHETYPES[enemy.archetypeId];
-      const weaponCombatProfile = getSharedWeaponCombatProfile(enemy.weaponId, enemy.archetypeId);
-      const woundMoveMultiplier = getWoundMoveMultiplier(enemy.woundSeverity);
-      const woundEngageMultiplier = getWoundEngageRangeMultiplier(enemy.woundSeverity);
-      const woundFireIntervalMultiplier = getWoundFireIntervalMultiplier(enemy.woundSeverity);
-      const tapeCombatTuning = getEnemyTapeCombatTuning(enemy.tapeId);
-      const anchoredHoldPosture = enemy.openingPosture === "hold" || enemy.openingPosture === "reserve";
-      const roleBoundToBuilding = isEnemyBuildingHoldRole(enemy.squadRole);
-      const machineGunner = enemy.squadRole === "support-gunner" && enemy.weaponId === "pkm";
-      const engageRange = weaponCombatProfile.engageRange * tapeCombatTuning.engageRangeMultiplier * woundEngageMultiplier;
-      const basePreferredMinRange =
-        weaponCombatProfile.preferredMinRange *
-        tapeCombatTuning.preferredMinRangeMultiplier *
-        (enemy.squadRole === "support-gunner"
-          ? 1.24
-          : enemy.squadRole === "deep-rifle"
-            ? 1.12
-            : anchoredHoldPosture
-              ? 1.16
-              : enemy.openingPosture === "patrol"
-                ? 0.96
-                : 1);
-      const basePreferredMaxRange =
-        weaponCombatProfile.preferredMaxRange *
-        tapeCombatTuning.preferredMaxRangeMultiplier *
-        (enemy.squadRole === "support-gunner"
-          ? 1.34
-          : enemy.squadRole === "deep-rifle"
-            ? 1.08
-            : anchoredHoldPosture
-              ? 1.18
-              : enemy.openingPosture === "patrol"
-                ? 0.98
-                : 1);
-      const baseChaseSpeed =
-        archetype.chaseSpeed *
-        tapeCombatTuning.chaseSpeedMultiplier *
-        (enemy.squadRole === "support-gunner"
-          ? 0.54
-          : enemy.squadRole === "deep-rifle"
-            ? 0.62
-            : anchoredHoldPosture
-              ? 0.82
-              : enemy.openingPosture === "sweeper"
-                ? 1.06
-                : 1);
-      const baseFlankSpeed =
-        archetype.flankSpeed *
-        tapeCombatTuning.flankSpeedMultiplier *
-        (enemy.squadRole === "support-gunner"
-          ? 0.48
-          : enemy.squadRole === "deep-rifle"
-            ? 0.56
-            : enemy.squadRole === "probe-rifle"
-              ? 1.06
-              : anchoredHoldPosture
-                ? 0.8
-                : enemy.openingPosture === "sweeper"
-                  ? 1.08
-                  : 1);
-      const retreatSpeed = archetype.retreatSpeed * tapeCombatTuning.retreatSpeedMultiplier;
+      const hostileProfile = this.getHostileAiBalanceProfile(enemy);
+      const {
+        archetype,
+        weaponCombatProfile,
+        woundMoveMultiplier,
+        woundFireIntervalMultiplier,
+        tapeCombatTuning,
+        roleBoundToBuilding,
+        machineGunner,
+        engageRange,
+        basePreferredMinRange,
+        basePreferredMaxRange,
+        baseChaseSpeed,
+        baseFlankSpeed,
+        retreatSpeed
+      } = hostileProfile;
       const autoHostileRescueTarget = this.getAutoHostileRescueTarget(enemy);
       const activeHostileRescueTask =
         this.state.activeHostileRescueTask?.rescuerId === enemy.id ? this.state.activeHostileRescueTask : null;
@@ -26266,19 +26337,7 @@ export class RaidController {
         this.state.activeHostileRescueTask !== null &&
         this.state.activeHostileRescueTask.targetId === enemy.id &&
         this.state.activeHostileRescueTask.task !== "stabilize";
-      enemy.cooldown = Math.max(0, enemy.cooldown - deltaSeconds);
-      enemy.grenadeCooldown = Math.max(0, enemy.grenadeCooldown - deltaSeconds);
-      enemy.investigateTimer = Math.max(0, enemy.investigateTimer - deltaSeconds);
-      enemy.pressureTimer = Math.max(0, enemy.pressureTimer - deltaSeconds);
-      enemy.blindFireTimer = Math.max(0, enemy.blindFireTimer - deltaSeconds);
-      enemy.panicTimer = Math.max(0, enemy.panicTimer - deltaSeconds);
-      enemy.compressionTimer = Math.max(0, enemy.compressionTimer - deltaSeconds);
-      enemy.armorBrokenTimer = Math.max(0, enemy.armorBrokenTimer - deltaSeconds);
-      enemy.armorFlash = Math.max(0, enemy.armorFlash - deltaSeconds);
-      enemy.fleshFlash = Math.max(0, enemy.fleshFlash - deltaSeconds);
-      if (enemy.pressureTimer === 0) {
-        enemy.pressureType = null;
-      }
+      this.advanceHostileAiTimers(enemy, deltaSeconds);
 
       const toPlayer = subtract(player.position, enemy.position);
       const distanceToPlayer = length(toPlayer);
