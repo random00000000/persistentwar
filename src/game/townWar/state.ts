@@ -1018,6 +1018,26 @@ export interface TownWarAiTacticsState {
   completedConstructionImpact: TownWarCompletedConstructionImpactState[];
 }
 
+export type TownWarEnemyCommanderOrderKind = "defend-camp" | "occupy-trench" | "patrol" | "assault" | "resupply" | "fall-back";
+
+export interface TownWarEnemyCommanderOrderState {
+  id: string;
+  kind: TownWarEnemyCommanderOrderKind;
+  soldierId: string;
+  task: TownWarTask;
+  reason: string;
+  issuedAtSeconds: number;
+}
+
+export interface TownWarEnemyCommanderState {
+  faction: TownWarFactionId;
+  enabled: boolean;
+  nextThinkAtSeconds: number;
+  lastIssuedAtSeconds: number | null;
+  ordersIssued: number;
+  recentOrders: TownWarEnemyCommanderOrderState[];
+}
+
 export interface TownWarState {
   version: 1;
   nextSoldierId: number;
@@ -1063,6 +1083,7 @@ export interface TownWarState {
   town: TownWarTownState;
   camps: TownWarCampState[];
   match: TownWarMatchState;
+  enemyCommander: TownWarEnemyCommanderState;
   aiThreats: TownWarAiThreatState;
   aiTactics: TownWarAiTacticsState;
   combatants: TownWarCombatantState[];
@@ -1328,6 +1349,14 @@ export function createTownWarState(): TownWarState {
       createTownWarCampState(TOWN_WAR_ENEMY_FACTION, "Ukrainian Enemy Camp", enemyCampSpawn)
     ],
     match: { status: "active", winner: null, reason: null },
+    enemyCommander: {
+      faction: TOWN_WAR_ENEMY_FACTION,
+      enabled: true,
+      nextThinkAtSeconds: 0,
+      lastIssuedAtSeconds: null,
+      ordersIssued: 0,
+      recentOrders: []
+    },
     aiThreats: {
       playerThreatShare: 0,
       playerThreatReason: "officer quiet behind friendly line",

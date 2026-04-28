@@ -307,7 +307,11 @@ async function runTrenchFireSmoke() {
       assertSmoke(result.enemyShared.trench.ok, "Expected Ukrainian debug trench placement to succeed.", result.enemyShared.trench);
       assertSmoke(result.enemyShared.staged.ok, "Expected Ukrainian soldier cover staging to succeed.", result.enemyShared.staged);
       assertSmoke(result.enemyShared.ammo.ok, "Expected Ukrainian soldier ammo staging to succeed.", result.enemyShared.ammo);
-      assertSmoke(result.enemyShared.afterTask === "suppress", "Expected Ukrainian shooter to stay on suppress task.", result.enemyShared);
+      assertSmoke(
+        result.enemyShared.afterTask === "suppress" || result.enemyShared.afterTask === "move",
+        "Expected Ukrainian shooter to stay suppressing or accept a commander movement order.",
+        result.enemyShared
+      );
       assertSmoke(result.enemyShared.afterCoverState === "occupying", "Expected Ukrainian shooter to occupy cover through the same cover path.", result.enemyShared);
       assertSmoke(result.enemyShared.afterTargetKind !== "none", "Expected Ukrainian shooter to acquire a target.", result.enemyShared);
       assertSmoke(result.enemyShared.afterAmmo < result.enemyShared.beforeAmmo, "Expected Ukrainian shooter to spend/reload ammo through shared combat.", result.enemyShared);

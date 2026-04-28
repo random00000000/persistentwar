@@ -38413,6 +38413,7 @@ function getAgentSnapshot() {
       storyPackAudit: validateDialogueStoryPacks(),
       aiThreats: townWar.aiThreats,
       readability: townWarReadability,
+      enemyCommander: townWar.enemyCommander,
       aiTactics: townWar.aiTactics,
       coverSlots: townWar.aiTactics.coverSlots,
       suppressionFields: townWar.aiTactics.suppressionFields,

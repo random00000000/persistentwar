@@ -95,6 +95,7 @@ import {
   type TownWarTrenchRetreatHint,
   type TownWarWorkPriorityState,
   type TownWarThreatContactState,
+  type TownWarEnemyCommanderOrderKind,
   type TownWarState,
   type TownWarTownState,
   type TownWarUnifiedSoldierCommandState,
@@ -138,6 +139,8 @@ const COVER_SEEK_PRESSURE_RATIO = 0.025;
 const COVER_FALLBACK_PRESSURE_RATIO = 0.55;
 const TRENCH_PROACTIVE_SEEK_DISTANCE = 620;
 const TRENCH_TASK_ANCHOR_DISTANCE = 320;
+const ENEMY_COMMANDER_THINK_SECONDS = 4;
+const ENEMY_COMMANDER_RECENT_ORDER_LIMIT = 24;
 const TRENCH_SEGMENT_HALF_LENGTH = 42;
 const TRENCH_NETWORK_ENDPOINT_SNAP_DISTANCE = 78;
 const TRENCH_NETWORK_BRANCH_SNAP_DISTANCE = 70;
@@ -7438,6 +7441,266 @@ export class TownWarController {
     }
   }
 
+  private isEnemyCommanderLockedTask(soldier: TownWarSoldierState): boolean {
+    return (
+      soldier.health.current <= 0 ||
+      soldier.task.kind === "build" ||
+      soldier.task.kind === "heal" ||
+      soldier.currentNeed === "wounded" ||
+      soldier.squadBridge.status === "assigned"
+    );
+  }
+
+  private issueEnemyCommanderOrder(
+    soldier: TownWarSoldierState,
+    kind: TownWarEnemyCommanderOrderKind,
+    task: TownWarTask,
+    reason: string
+  ): void {
+    soldier.task = {
+      ...task,
+      targetPosition: task.targetPosition ? cloneVec2(task.targetPosition) : null,
+      resumeTask: task.resumeTask
+        ? {
+            ...task.resumeTask,
+            targetPosition: task.resumeTask.targetPosition ? cloneVec2(task.resumeTask.targetPosition) : null,
+            resumeTask: null
+          }
+        : task.resumeTask ?? null
+    };
+    this.refreshTaskDecisionForSoldier(soldier, soldier.task.targetPosition ?? soldier.position);
+    this.state.enemyCommander.ordersIssued += 1;
+    this.state.enemyCommander.lastIssuedAtSeconds = this.state.clock.seconds;
+    this.state.enemyCommander.recentOrders = [
+      {
+        id: `enemy-commander-order-${this.state.enemyCommander.ordersIssued}`,
+        kind,
+        soldierId: soldier.id,
+        task: {
+          ...soldier.task,
+          targetPosition: soldier.task.targetPosition ? cloneVec2(soldier.task.targetPosition) : null,
+          resumeTask: soldier.task.resumeTask
+            ? {
+                ...soldier.task.resumeTask,
+                targetPosition: soldier.task.resumeTask.targetPosition ? cloneVec2(soldier.task.resumeTask.targetPosition) : null,
+                resumeTask: null
+              }
+            : soldier.task.resumeTask ?? null
+        },
+        reason,
+        issuedAtSeconds: this.state.clock.seconds
+      },
+      ...this.state.enemyCommander.recentOrders
+    ].slice(0, ENEMY_COMMANDER_RECENT_ORDER_LIMIT);
+  }
+
+  private getEnemyCommanderFrontlinePosition(offset = -120): Vec2 {
+    const lane = this.state.officer.focusedLane;
+    const laneY = lane === "north" ? WORLD_HEIGHT * 0.5 - 140 : lane === "south" ? WORLD_HEIGHT * 0.5 + 140 : WORLD_HEIGHT * 0.5;
+    const campALineX = this.getCampLineX("camp-a");
+    const campBLineX = this.getCampLineX("camp-b");
+    return {
+      x: (campALineX + campBLineX) / 2 + offset,
+      y: laneY
+    };
+  }
+
+  private pickEnemyCommanderSoldier(
+    candidates: TownWarSoldierState[],
+    excludedIds: Set<string>,
+    preferred: (soldier: TownWarSoldierState) => number
+  ): TownWarSoldierState | null {
+    return (
+      candidates
+        .filter((soldier) => !excludedIds.has(soldier.id) && !this.isEnemyCommanderLockedTask(soldier))
+        .sort((left, right) => preferred(right) - preferred(left))[0] ?? null
+    );
+  }
+
+  private tickEnemyCommander(): void {
+    const commander = this.state.enemyCommander;
+    if (!commander.enabled || this.state.match.status !== "active" || this.state.clock.seconds < commander.nextThinkAtSeconds) {
+      return;
+    }
+
+    commander.nextThinkAtSeconds = this.state.clock.seconds + ENEMY_COMMANDER_THINK_SECONDS;
+    const faction = commander.faction;
+    const camp = this.getCamp(faction);
+    if (!camp || camp.destroyed) {
+      return;
+    }
+
+    const soldiers = this.state.soldiers.filter((soldier) => soldier.faction === faction && soldier.health.current > 0);
+    if (soldiers.length === 0) {
+      return;
+    }
+
+    const issuedThisThink = new Set<string>();
+    const campSpawn = this.getCampSpawn(faction).position;
+    const frontline = this.getEnemyCommanderFrontlinePosition(-120);
+    const assaultTarget = this.getEnemyCommanderFrontlinePosition(120);
+
+    const fallback = soldiers
+      .filter((soldier) => !issuedThisThink.has(soldier.id))
+      .filter((soldier) => soldier.task.kind !== "build" && soldier.task.kind !== "heal")
+      .filter(
+        (soldier) =>
+          soldier.health.current / Math.max(1, soldier.health.max) <= 0.38 ||
+          soldier.morale.pressure / Math.max(1, soldier.morale.maxPressure) >= 0.72
+      )
+      .sort(
+        (left, right) =>
+          right.morale.pressure / Math.max(1, right.morale.maxPressure) -
+          left.morale.pressure / Math.max(1, left.morale.maxPressure)
+      )[0] ?? null;
+    if (fallback) {
+      const dugout = this.getNearestActiveDugout(faction, fallback.position, DUGOUT_SHELTER_RADIUS * 2.6);
+      const fallbackPosition = dugout?.position ?? campSpawn;
+      this.issueEnemyCommanderOrder(
+        fallback,
+        "fall-back",
+        {
+          kind: "move",
+          label: dugout ? "Enemy commander: fall back to dugout" : "Enemy commander: fall back to camp",
+          targetPosition: fallbackPosition,
+          targetEntityId: dugout?.id ?? faction,
+          resumeTask: {
+            kind: "defend",
+            label: dugout ? `Enemy commander: defend from ${dugout.id}` : "Enemy commander: defend camp",
+            targetPosition: null,
+            targetEntityId: dugout?.id ?? faction
+          }
+        },
+        "soldier under high pressure or health loss"
+      );
+      issuedThisThink.add(fallback.id);
+    }
+
+    const resupply = this.pickEnemyCommanderSoldier(
+      soldiers.filter((soldier) => soldier.ammo.inMag + soldier.ammo.reserve <= soldier.ammo.maxMag * 0.75),
+      issuedThisThink,
+      (soldier) => soldier.workPriorities.Resupply * 10 + soldier.skills.logistics * 2 - getDistance(soldier.position, campSpawn) * 0.01
+    );
+    if (resupply) {
+      const crate =
+        this.state.ammoCrates
+          .filter((entry) => entry.faction === faction && entry.destroyedAtSeconds === null && entry.ammo > 0)
+          .sort((left, right) => getDistance(left.position, resupply.position) - getDistance(right.position, resupply.position))[0] ?? null;
+      this.issueEnemyCommanderOrder(
+        resupply,
+        "resupply",
+        {
+          kind: "resupply",
+          label: crate ? "Enemy commander: resupply from crate" : "Enemy commander: resupply from camp",
+          targetPosition: cloneVec2(crate?.position ?? campSpawn),
+          targetEntityId: crate?.id ?? faction,
+          resumeTask: {
+            kind: "defend",
+            label: "Enemy commander: resume defense after ammo",
+            targetPosition: cloneVec2(frontline),
+            targetEntityId: null
+          }
+        },
+        "low ammo"
+      );
+      issuedThisThink.add(resupply.id);
+    }
+
+    const openTrench =
+      this.state.aiTactics.coverSlots
+        .filter((slot) => slot.faction === faction && slot.sourceKind === "trench" && slot.occupiedBySoldierId === null)
+        .sort((left, right) => getDistance(left.position, frontline) - getDistance(right.position, frontline))[0] ?? null;
+    const trenchOccupant = openTrench
+      ? this.pickEnemyCommanderSoldier(
+          soldiers,
+          issuedThisThink,
+          (soldier) =>
+            (soldier.role === "suppressor" ? 40 : soldier.role === "rifleman" || soldier.role === "defender" ? 30 : 10) -
+            getDistance(soldier.position, openTrench.position) * 0.02
+        )
+      : null;
+    if (openTrench && trenchOccupant) {
+      this.issueEnemyCommanderOrder(
+        trenchOccupant,
+        "occupy-trench",
+        {
+          kind: "move",
+          label: `Enemy commander: occupy ${openTrench.label}`,
+          targetPosition: cloneVec2(openTrench.position),
+          targetEntityId: openTrench.id,
+          resumeTask: this.getTrenchResumeCombatTask(trenchOccupant, openTrench)
+        },
+        "open trench firing position"
+      );
+      trenchOccupant.coverIntent = {
+        coverSlotId: openTrench.id,
+        state: "moving",
+        reason: `enemy commander ordered trench occupation: ${openTrench.label}`
+      };
+      issuedThisThink.add(trenchOccupant.id);
+    }
+
+    const campDefender = this.pickEnemyCommanderSoldier(
+      soldiers.filter((soldier) => getDistance(soldier.position, campSpawn) <= 520 || camp.health.current / Math.max(1, camp.health.max) <= 0.72),
+      issuedThisThink,
+      (soldier) => soldier.workPriorities.Defend * 8 + soldier.skills.nerve + soldier.skills.shooting
+    );
+    if (campDefender) {
+      this.issueEnemyCommanderOrder(
+        campDefender,
+        "defend-camp",
+        {
+          kind: "defend",
+          label: "Enemy commander: defend camp",
+          targetPosition: { x: campSpawn.x + 180, y: campSpawn.y + (getTrailingIdNumber(campDefender.id) % 2 === 0 ? -90 : 90) },
+          targetEntityId: faction
+        },
+        camp.health.current / Math.max(1, camp.health.max) <= 0.72 ? "camp damaged" : "camp perimeter needs a defender"
+      );
+      issuedThisThink.add(campDefender.id);
+    }
+
+    const assault = this.pickEnemyCommanderSoldier(
+      soldiers.filter((soldier) => soldier.task.kind !== "suppress" && soldier.needs.fatigue < 0.75),
+      issuedThisThink,
+      (soldier) => soldier.workPriorities.Assault * 9 + soldier.skills.shooting + soldier.skills.nerve - soldier.needs.fatigue * 12
+    );
+    if (assault) {
+      this.issueEnemyCommanderOrder(
+        assault,
+        "assault",
+        {
+          kind: "attack",
+          label: "Enemy commander: assault contested lane",
+          targetPosition: cloneVec2(assaultTarget),
+          targetEntityId: null
+        },
+        "frontline pressure window"
+      );
+      issuedThisThink.add(assault.id);
+    }
+
+    const patrol = this.pickEnemyCommanderSoldier(
+      soldiers.filter((soldier) => soldier.task.kind === "idle" || soldier.task.kind === "hold" || soldier.task.kind === "defend"),
+      issuedThisThink,
+      (soldier) => soldier.skills.perception + soldier.skills.endurance + soldier.workPriorities.Scout * 4
+    );
+    if (patrol) {
+      const patrolOffset = getTrailingIdNumber(patrol.id) % 2 === 0 ? -130 : 130;
+      this.issueEnemyCommanderOrder(
+        patrol,
+        "patrol",
+        {
+          kind: "defend",
+          label: "Enemy commander: patrol approach",
+          targetPosition: { x: frontline.x - 90, y: frontline.y + patrolOffset },
+          targetEntityId: null
+        },
+        "keep approach watched"
+      );
+    }
+  }
+
   tick(deltaSeconds: number): void {
     if (!Number.isFinite(deltaSeconds) || deltaSeconds <= 0) {
       return;
@@ -7600,6 +7863,7 @@ export class TownWarController {
 
     this.tickExpeditions();
     this.tickCampBreaches();
+    this.tickEnemyCommander();
     this.refreshAiThreats();
     this.refreshTacticalIntents();
     this.tickCampSustainment(deltaSeconds);
@@ -11836,6 +12100,23 @@ export class TownWarController {
       town: cloneTown(this.state.town),
       camps: this.state.camps.map((camp) => cloneCamp(camp)),
       match: { ...this.state.match },
+      enemyCommander: {
+        ...this.state.enemyCommander,
+        recentOrders: this.state.enemyCommander.recentOrders.map((order) => ({
+          ...order,
+          task: {
+            ...order.task,
+            targetPosition: order.task.targetPosition ? cloneVec2(order.task.targetPosition) : null,
+            resumeTask: order.task.resumeTask
+              ? {
+                  ...order.task.resumeTask,
+                  targetPosition: order.task.resumeTask.targetPosition ? cloneVec2(order.task.resumeTask.targetPosition) : null,
+                  resumeTask: null
+                }
+              : order.task.resumeTask ?? null
+          }
+        }))
+      },
       aiThreats: {
         playerThreatShare: this.state.aiThreats.playerThreatShare,
         playerThreatReason: this.state.aiThreats.playerThreatReason,
